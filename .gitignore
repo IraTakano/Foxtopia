@@ -1,0 +1,20 @@
+# Local toolchains and generated packages
+/.tools/
+/dist/
+
+# Godot cache (retain .uid and .import source metadata)
+/game/.godot/
+
+# .NET build outputs
+**/bin/
+**/obj/
+
+# Local/editor files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Local visual smoke-test captures
+/character-preview.png
+/ui-smoke.png
