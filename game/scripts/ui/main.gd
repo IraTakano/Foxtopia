@@ -1960,6 +1960,7 @@ func _build_settings_page(page: VBoxContainer, category: String, draft: Dictiona
 			page.add_child(_label(_tr("settings.resolution"), 14, CREAM))
 			var resolutions := OptionButton.new()
 			_compact_option(resolutions)
+			resolutions.get_popup().max_size = Vector2i(4096, 320)
 			var sizes: Array[Vector2i] = SettingsScript.resolution_options()
 			if not sizes.has(draft["resolution"]):
 				sizes.append(draft["resolution"])
