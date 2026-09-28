@@ -8,6 +8,9 @@ func _initialize() -> void:
 	var settings = SettingsScript.new()
 	assert(settings.language == "en")
 	assert(settings.window_mode == "fullscreen")
+	assert(SettingsScript.resolution_options().has(Vector2i(1024, 768)))
+	assert(SettingsScript.resolution_options().has(Vector2i(3840, 2160)))
+	assert(SettingsScript.resolution_options().has(Vector2i(7680, 4320)))
 	settings.language = "pl"
 	settings.window_mode = "borderless"
 	settings.master_volume = 0.42

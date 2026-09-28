@@ -1967,11 +1967,11 @@ func _build_settings_page(page: VBoxContainer, category: String, draft: Dictiona
 				resolutions.add_item("%d × %d" % [size.x, size.y])
 				if size == draft["resolution"]:
 					resolutions.select(resolutions.item_count - 1)
-			resolutions.disabled = str(draft["window_mode"]) != "windowed"
+			resolutions.disabled = str(draft["window_mode"]) == "fullscreen"
 			resolutions.item_selected.connect(func(index: int): draft["resolution"] = sizes[index])
 			modes.item_selected.connect(func(index: int):
 				draft["window_mode"] = mode_ids[index]
-				resolutions.disabled = mode_ids[index] != "windowed")
+				resolutions.disabled = mode_ids[index] == "fullscreen")
 			page.add_child(resolutions)
 			var hint := _label(_tr("settings.resolution_hint"), 13, MUTED)
 			hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -16,16 +16,33 @@ var language := "en"
 
 
 static func resolution_options() -> Array[Vector2i]:
-	var standard: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1366, 768), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+	# Include common laptop, desktop, ultrawide, 4K and 8K sizes. Add the
+	# monitor's actual size below so unusual displays are never omitted.
+	var standard: Array[Vector2i] = [
+		Vector2i(960, 540), Vector2i(1024, 600), Vector2i(1024, 768),
+		Vector2i(1152, 864), Vector2i(1280, 720), Vector2i(1280, 800),
+		Vector2i(1280, 960), Vector2i(1280, 1024), Vector2i(1360, 768),
+		Vector2i(1366, 768), Vector2i(1440, 900), Vector2i(1536, 864),
+		Vector2i(1600, 900), Vector2i(1600, 1200), Vector2i(1680, 1050),
+		Vector2i(1920, 1080), Vector2i(1920, 1200), Vector2i(2048, 1152),
+		Vector2i(2560, 1080), Vector2i(2560, 1440), Vector2i(2560, 1600),
+		Vector2i(3440, 1440), Vector2i(3840, 1600), Vector2i(3840, 2160),
+		Vector2i(4096, 2160), Vector2i(5120, 1440), Vector2i(5120, 2160),
+		Vector2i(5120, 2880), Vector2i(6016, 3384), Vector2i(6144, 3456),
+		Vector2i(7680, 4320),
+	]
 	if DisplayServer.get_name() == "headless":
 		return standard
-	var usable := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen()).size
-	var available: Array[Vector2i] = []
-	for size in standard:
-		if size.x <= usable.x and size.y <= usable.y:
-			available.append(size)
-	if usable.x >= 1024 and usable.y >= 600 and not available.has(usable):
+	var screen := DisplayServer.window_get_current_screen()
+	var native := DisplayServer.screen_get_size(screen)
+	var usable := DisplayServer.screen_get_usable_rect(screen).size
+	var available: Array[Vector2i] = standard.duplicate()
+	if native.x >= 960 and native.y >= 540 and not available.has(native):
+		available.append(native)
+	if usable.x >= 960 and usable.y >= 540 and not available.has(usable):
 		available.append(usable)
+	available.sort_custom(func(a: Vector2i, b: Vector2i):
+		return a.x * a.y < b.x * b.y if a.x * a.y != b.x * b.y else a.x < b.x)
 	return available
 
 
@@ -74,18 +91,27 @@ func apply_settings() -> void:
 	_apply_audio()
 	if DisplayServer.get_name() == "headless":
 		return
-	var screen_rect := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
-	resolution = Vector2i(mini(resolution.x, screen_rect.size.x), mini(resolution.y, screen_rect.size.y))
+	var screen := DisplayServer.window_get_current_screen()
+	var screen_rect := Rect2i(DisplayServer.screen_get_position(screen), DisplayServer.screen_get_size(screen))
+	var usable_rect := DisplayServer.screen_get_usable_rect(screen)
 	match window_mode:
 		"fullscreen":
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		"borderless":
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+			resolution = Vector2i(mini(resolution.x, screen_rect.size.x), mini(resolution.y, screen_rect.size.y))
+			DisplayServer.window_set_size(resolution)
+			var bounds := usable_rect if resolution.x <= usable_rect.size.x and resolution.y <= usable_rect.size.y else screen_rect
+			DisplayServer.window_set_position(bounds.position + (bounds.size - resolution) / 2)
 		"windowed":
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+			resolution = Vector2i(mini(resolution.x, screen_rect.size.x), mini(resolution.y, screen_rect.size.y))
 			DisplayServer.window_set_size(resolution)
-			DisplayServer.window_set_position(screen_rect.position + (screen_rect.size - resolution) / 2)
+			var decorated := DisplayServer.window_get_size_with_decorations()
+			DisplayServer.window_set_position(usable_rect.position + Vector2i(maxi(0, (usable_rect.size.x - decorated.x) / 2), maxi(0, (usable_rect.size.y - decorated.y) / 2)))
 
 
 func _read_dictionary(data: Dictionary) -> void:
@@ -125,4 +151,4 @@ func _validated_language(value: String) -> String:
 
 
 func _validated_resolution(value: Vector2i) -> Vector2i:
-	return Vector2i(clampi(value.x, 1024, 7680), clampi(value.y, 600, 4320))
+	return Vector2i(clampi(value.x, 960, 16384), clampi(value.y, 540, 8640))

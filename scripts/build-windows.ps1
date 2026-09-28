@@ -61,6 +61,7 @@ $project = Join-Path $repoRoot "launcher/Foxtopia.Launcher/Foxtopia.Launcher.csp
 if ($LASTEXITCODE -ne 0) { throw "Launcher publish failed." }
 
 Copy-Item -LiteralPath (Join-Path $publishDir "FoxtopiaLauncher.exe") -Destination $packageDir
+Copy-Item -LiteralPath (Join-Path $repoRoot "game/assets/foxtopia.ico") -Destination (Join-Path $packageDir "Foxtopia.ico")
 $baseDirectory = "base-" + $Version.Replace('.', '_')
 $versionDir = Join-Path $packageDir ("versions/" + $baseDirectory)
 New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
@@ -72,7 +73,7 @@ Get-ChildItem -LiteralPath $gameDir -Force | Copy-Item -Destination $versionDir 
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $packageDir "current.json") -Encoding UTF8
 
 $innoScript = Join-Path $repoRoot "installer/Foxtopia.iss"
-& $iscc "/DPackageDir=$packageDir" "/DAppVersion=$Version" "/DOutputDir=$output" $innoScript
+& $iscc "/DPackageDir=$packageDir" "/DAppVersion=$Version" "/DOutputDir=$output" "/DIconFile=$(Join-Path $repoRoot 'game/assets/foxtopia.ico')" $innoScript
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
 
 $setup = Join-Path $output ("Foxtopia-Setup-$Version.exe")

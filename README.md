@@ -4,7 +4,7 @@ Foxtopia, Godot 4 ile geliştirilen küçük ölçekli, 2D bir koloni simülasyo
 
 ## Oyna
 
-Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.2.exe` olarak üretilir. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde GitHub Releases üzerinde güncelleme arar; yayımlanmış yeni sürümü aynı kurulum içinde indirip doğrular.
+Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.3.exe` olarak üretilir. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde GitHub Releases üzerinde güncelleme arar; yayımlanmış yeni sürümü aynı kurulum içinde indirip doğrular. Kurulum, başlatıcı, masaüstü kısayolu ve oyun penceresi aynı özgün tilki simgesini kullanır.
 
 Geliştirme sırasında Godot 4.7 ile `game/project.godot` açılabilir. Ana sahne `game/scenes/main.tscn` dosyasıdır.
 
@@ -22,6 +22,8 @@ Sunucu oyun durumunu yönetir. Rekabetçi modda oyuncular yalnızca kendi koloni
 ## Arayüz
 
 Oyun tam ekran harita üzerine kuruludur. Kolonist seçimi üst çubukta ve harita üzerinde, emirler ve çalışma panelleri alt çubuktadır. Resmî RimWorld görsellerinden ve EdB hazırlık ekranından çıkarılan yerleşim ilkeleri [docs/ui-reference.md](docs/ui-reference.md) içinde kayıtlıdır. Foxtopia'nın çizimleri ve arayüz ayrıntıları özgün üretilmiştir.
+
+Görüntü ayarlarında dizüstü, ultrawide, 4K ve 8K boyutları ile etkin monitörün doğal çözünürlüğü bulunur. Çerçevesiz ve pencereli mod seçilen pencere boyutunu kullanır; tam ekran monitörün doğal boyutunu kullanır.
 
 ## Geliştirme ve denetim
 

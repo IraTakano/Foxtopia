@@ -24,7 +24,8 @@ OutputBaseFilename=Foxtopia-Setup-{#AppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\FoxtopiaLauncher.exe
+SetupIconFile={#IconFile}
+UninstallDisplayIcon={app}\Foxtopia.ico
 CloseApplications=yes
 RestartApplications=no
 
@@ -37,8 +38,8 @@ Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "current.json"; Flags: ig
 Source: "{#PackageDir}\current.json"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Foxtopia"; Filename: "{app}\FoxtopiaLauncher.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Foxtopia"; Filename: "{app}\FoxtopiaLauncher.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autoprograms}\Foxtopia"; Filename: "{app}\FoxtopiaLauncher.exe"; IconFilename: "{app}\Foxtopia.ico"; WorkingDir: "{app}"
+Name: "{autodesktop}\Foxtopia"; Filename: "{app}\FoxtopiaLauncher.exe"; IconFilename: "{app}\Foxtopia.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Masaüstü kısayolu oluştur"; GroupDescription: "Ek seçenekler:"

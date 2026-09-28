@@ -57,6 +57,9 @@ func _run() -> void:
 	assert(selectors.size() == 2)
 	var mode_selector := selectors[0] as OptionButton
 	var resolution_selector := selectors[1] as OptionButton
+	mode_selector.select(1)
+	mode_selector.item_selected.emit(1)
+	assert(not resolution_selector.disabled)
 	mode_selector.select(2)
 	mode_selector.item_selected.emit(2)
 	var resolution_index := -1
