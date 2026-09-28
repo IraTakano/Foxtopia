@@ -5,12 +5,14 @@ var game_mode := "competitive"
 var submitted := false
 var started := false
 var got_result := false
+var late_join := false
 
 
 func _ready() -> void:
 	role = OS.get_environment("FOXTOPIA_TEST_ROLE")
 	game_mode = OS.get_environment("FOXTOPIA_TEST_MODE")
 	if game_mode.is_empty(): game_mode = "competitive"
+	late_join = OS.get_environment("FOXTOPIA_TEST_LATE") == "1"
 	Net.lobby_changed.connect(_on_lobby)
 	Net.snapshot_received.connect(_on_snapshot)
 	Net.command_result.connect(_on_result)
@@ -19,7 +21,7 @@ func _ready() -> void:
 		if role == "host" and started:
 			print("HOST_CLIENT_FINISHED:", game_mode)
 			get_tree().quit())
-	var timeout := get_tree().create_timer(12.0)
+	var timeout := get_tree().create_timer(30.0)
 	timeout.timeout.connect(func():
 		push_error("NETWORK_PROBE_TIMEOUT:%s" % role)
 		get_tree().quit(2))
@@ -28,6 +30,12 @@ func _ready() -> void:
 		print("HOST_START:", result)
 		assert(result.get("ok", false))
 		Net.configure_lobby({"mode": game_mode, "seed": "network-test", "colonists_per_faction": 1})
+		if late_join:
+			started = true
+			var config := {"mode": game_mode, "seed": "network-test", "colonists_per_faction": 1,
+				"faction_specs": [{"name": "Host", "settlement_name": "Host Town", "site_id": "site_1", "colonists": [{"name": "Host Pawn"}]}]}
+			assert(Net.start_game(config).get("ok", false))
+			print("HOST_GAME_STARTED_LATE:", game_mode)
 	elif role == "client":
 		var result: Dictionary = Net.join("127.0.0.1", 24579)
 		print("CLIENT_JOIN:", result)
@@ -38,7 +46,7 @@ func _ready() -> void:
 
 
 func _on_lobby(lobby: Dictionary) -> void:
-	if role == "client" and not submitted and not bool(lobby.get("started", false)) and (lobby.get("players", []) as Array).size() > 1:
+	if role == "client" and not submitted and (lobby.get("players", []) as Array).size() > 1 and (not bool(lobby.get("started", false)) or late_join and game_mode == "competitive"):
 		submitted = true
 		var spec := {"name": "Client", "settlement_name": "Client Town", "site_id": "site_2", "colonists": [{"name": "Client Pawn"}]}
 		assert(Net.submit_player_setup(spec).get("ok", false))

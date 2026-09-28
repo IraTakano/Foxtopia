@@ -138,7 +138,8 @@ func start_game(config: Dictionary) -> Dictionary:
 				return {"ok": false, "error": "Her koloni ayrı bir boş yerleşke seçmeli."}
 			selected_sites[site_id] = true
 	setup["faction_specs"] = specs
-	Game.start_new_game(setup)
+	var started: Dictionary = Game.start_new_game(setup)
+	if started.has("ok") and not bool(started.get("ok", false)): return started
 	_lobby["started"] = true
 	_broadcast_lobby()
 	return {"ok": true, "snapshot": get_snapshot()}
@@ -175,11 +176,55 @@ func is_authority() -> bool:
 
 
 func _clean_setup(spec: Dictionary) -> Dictionary:
+	var clean_colonists: Array = []
+	var raw_colonists: Variant = spec.get("colonists", [])
+	if raw_colonists is Array:
+		for raw_person in (raw_colonists as Array).slice(0, 3):
+			if not raw_person is Dictionary: continue
+			var person: Dictionary = raw_person
+			var appearance: Dictionary = {}
+			var raw_appearance: Variant = person.get("appearance", {})
+			if raw_appearance is Dictionary:
+				for key in ["hair", "hair_color", "skin", "outfit"]:
+					if raw_appearance.has(key): appearance[key] = str(raw_appearance[key]).substr(0, 24)
+			var traits: Array = []
+			var raw_traits: Variant = person.get("traits", [])
+			if raw_traits is Array:
+				for value in (raw_traits as Array).slice(0, 3): traits.append(str(value).substr(0, 32))
+			var conditions: Array = []
+			var raw_conditions: Variant = person.get("health_conditions", [])
+			if raw_conditions is Array:
+				for value in (raw_conditions as Array).slice(0, 3): conditions.append(str(value).substr(0, 32))
+			var skills: Dictionary = {}
+			var raw_skills: Variant = person.get("skills", {})
+			if raw_skills is Dictionary:
+				for key in raw_skills.keys():
+					if Game.WORK_TYPES.has(str(key)) or str(key) == "combat": skills[str(key)] = clampi(int(raw_skills[key]), 0, 10)
+			var starting_gear: Dictionary = {}
+			var raw_gear: Variant = person.get("starting_gear", {})
+			if raw_gear is Dictionary:
+				for key in ["weapon", "apparel"]:
+					if raw_gear.has(key): starting_gear[key] = str(raw_gear[key]).substr(0, 16)
+			var starting_relationships: Dictionary = {}
+			var raw_relationships: Variant = person.get("starting_relationships", {})
+			if raw_relationships is Dictionary:
+				for key in raw_relationships.keys():
+					if str(key) in ["0", "1", "2"]:
+						starting_relationships[str(key)] = str(raw_relationships[key]).substr(0, 16)
+			clean_colonists.append({"name": str(person.get("name", "Colonist")).substr(0, 48),
+				"age": int(person.get("age", 24)),
+				"childhood": str(person.get("childhood", "rural_child")).substr(0, 32),
+				"adulthood": str(person.get("adulthood", "farmer")).substr(0, 32),
+				"sex": str(person.get("sex", "female")).substr(0, 16),
+				"gender": str(person.get("gender", "woman")).substr(0, 16),
+				"appearance": appearance, "traits": traits, "health_conditions": conditions,
+				"skills": skills, "starting_gear": starting_gear,
+				"starting_relationships": starting_relationships})
 	return {
-		"name": str(spec.get("name", "Koloni")).substr(0, 48),
-		"settlement_name": str(spec.get("settlement_name", "Yerleşke")).substr(0, 48),
-		"site_id": str(spec.get("site_id", "")),
-		"colonists": (spec.get("colonists", []) as Array).slice(0, 3),
+		"name": str(spec.get("name", "Unnamed colony")).substr(0, 48),
+		"settlement_name": str(spec.get("settlement_name", "Unnamed settlement")).substr(0, 48),
+		"site_id": str(spec.get("site_id", "")).substr(0, 64),
+		"colonists": clean_colonists,
 	}
 
 
@@ -200,16 +245,19 @@ func _broadcast_lobby() -> void:
 func _on_peer_connected(peer_id: int) -> void:
 	if mode != "host": return
 	if not _connected_peers.has(peer_id): _connected_peers.append(peer_id)
+	if bool(_lobby.get("started", false)) and str(_lobby.get("mode", "")) == "coop":
+		Game.add_late_player(peer_id)
 	_lobby["players"] = [1] + _connected_peers
-	_lobby["ready"][str(peer_id)] = false
+	_lobby["ready"][str(peer_id)] = bool(_lobby.get("started", false)) and str(_lobby.get("mode", "")) == "coop"
 	_broadcast_lobby()
-	if not Game.state.is_empty():
+	if not Game.state.is_empty() and Game.state.get("players", {}).has(str(peer_id)):
 		_receive_snapshot.rpc_id(peer_id, Game.get_snapshot(peer_id))
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	if mode != "host": return
 	_connected_peers.erase(peer_id)
+	if bool(_lobby.get("started", false)): Game.remove_player(peer_id)
 	_player_setups.erase(str(peer_id))
 	_lobby["players"] = [1] + _connected_peers
 	_lobby["ready"].erase(str(peer_id))
@@ -246,15 +294,27 @@ func _server_request_lobby() -> void:
 	if mode != "host": return
 	var peer_id := multiplayer.get_remote_sender_id()
 	_receive_lobby.rpc_id(peer_id, get_lobby())
-	if not Game.state.is_empty():
+	if not Game.state.is_empty() and Game.state.get("players", {}).has(str(peer_id)):
 		_receive_snapshot.rpc_id(peer_id, Game.get_snapshot(peer_id))
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func _server_submit_setup(spec: Dictionary) -> void:
-	if mode != "host" or bool(_lobby.get("started", false)): return
+	if mode != "host": return
 	var peer_id := multiplayer.get_remote_sender_id()
 	if not _connected_peers.has(peer_id): return
+	if bool(_lobby.get("started", false)):
+		if str(_lobby.get("mode", "")) == "coop":
+			_receive_command_result.rpc_id(peer_id, {"ok": true})
+			_receive_snapshot.rpc_id(peer_id, Game.get_snapshot(peer_id))
+			return
+		var late_result: Dictionary = Game.add_late_player(peer_id, _clean_setup(spec))
+		_receive_command_result.rpc_id(peer_id, late_result)
+		if bool(late_result.get("ok", false)):
+			_lobby["ready"][str(peer_id)] = true
+			_broadcast_lobby()
+			_receive_snapshot.rpc_id(peer_id, Game.get_snapshot(peer_id))
+		return
 	_player_setups[str(peer_id)] = _clean_setup(spec)
 	_lobby["ready"][str(peer_id)] = true
 	_broadcast_lobby()

@@ -62,7 +62,22 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
 
         if (release is null)
             return UpdateOutcome.NoRelease;
-        if (release.Version == installed.Version && File.Exists(GetGamePath(installed)))
+        var gamePresent = File.Exists(GetGamePath(installed));
+        if (release.Version == installed.Version && gamePresent)
+            return UpdateOutcome.AlreadyCurrent;
+
+        var versionOrder = ReleaseVersion.Compare(release.Version, installed.Version);
+        if (versionOrder is null && release.Version != installed.Version)
+        {
+            Log($"Update skipped: cannot order installed tag {installed.Version} and release tag {release.Version}.");
+            return UpdateOutcome.UnknownVersionOrder;
+        }
+        if (versionOrder < 0)
+        {
+            Log($"Update skipped: installed {installed.Version} is newer than release {release.Version}.");
+            return UpdateOutcome.InstalledNewer;
+        }
+        if (versionOrder == 0 && gamePresent)
             return UpdateOutcome.AlreadyCurrent;
 
         ValidateManifest(release);

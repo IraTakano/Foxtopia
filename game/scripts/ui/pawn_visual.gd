@@ -1,87 +1,136 @@
 extends RefCounted
 
-## A compact, original top-down pawn assembled from editable layers.
-## Used by both the preparation preview and the map, so appearance never diverges.
+## Original layered top-down pawn shared by the map, portraits and editor.
 
 static func draw_pawn(canvas: CanvasItem, center: Vector2, diameter: float, appearance: Dictionary, selected: bool = false, enemy: bool = false, drafted: bool = false) -> void:
 	var r := diameter * 0.5
 	var skin := _color(str(appearance.get("skin", "#d9ad81")), Color("#d9ad81"))
 	var outfit := _color(str(appearance.get("outfit", "#527a81")), Color("#527a81"))
 	var hair := _color(str(appearance.get("hair_color", "#4d3c32")), Color("#4d3c32"))
-	var hair_style := str(appearance.get("hair", "short"))
+	var hairstyle := str(appearance.get("hair", "short")).to_lower()
 	if enemy:
 		outfit = Color("#a65b51")
-	# All pieces use the same proportions in the lobby preview and on the map.
-	canvas.draw_circle(center + Vector2(0, r * 0.70), r * 0.62, Color("#12211f", 0.35))
+
+	_ellipse(canvas, center + Vector2(0, r * 0.78), r * 0.55, r * 0.16, Color("#101919", 0.28))
 	if selected:
-		canvas.draw_arc(center + Vector2(0, r * 0.43), r * 0.88, 0, TAU, 32, Color("#f2d180"), maxf(2.0, diameter * 0.06))
+		_ellipse_outline(canvas, center + Vector2(0, r * 0.58), r * 0.76, r * 0.42, Color("#ead282"), maxf(1.5, diameter * 0.035))
 	if drafted:
-		canvas.draw_arc(center + Vector2(0, r * 0.43), r * 0.98, 0, TAU, 32, Color("#e19479"), maxf(1.5, diameter * 0.04))
-	var body_points := PackedVector2Array([
-		center + Vector2(-r * 0.40, r * 0.06),
-		center + Vector2(-r * 0.56, r * 0.42),
-		center + Vector2(-r * 0.46, r * 0.82),
-		center + Vector2(-r * 0.25, r * 0.95),
-		center + Vector2(r * 0.25, r * 0.95),
-		center + Vector2(r * 0.46, r * 0.82),
-		center + Vector2(r * 0.56, r * 0.42),
-		center + Vector2(r * 0.40, r * 0.06),
-	])
-	canvas.draw_colored_polygon(body_points, Color("#293532"))
-	canvas.draw_colored_polygon(PackedVector2Array([
-		center + Vector2(-r * 0.35, r * 0.11),
-		center + Vector2(-r * 0.48, r * 0.43),
-		center + Vector2(-r * 0.39, r * 0.78),
-		center + Vector2(-r * 0.20, r * 0.88),
-		center + Vector2(r * 0.20, r * 0.88),
-		center + Vector2(r * 0.39, r * 0.78),
-		center + Vector2(r * 0.48, r * 0.43),
-		center + Vector2(r * 0.35, r * 0.11),
-	]), outfit)
-	canvas.draw_colored_polygon(PackedVector2Array([
-		center + Vector2(-r * 0.35, r * 0.18),
-		center + Vector2(-r * 0.24, r * 0.75),
-		center + Vector2(r * 0.19, r * 0.76),
-		center + Vector2(r * 0.34, r * 0.18),
-	]), outfit.lightened(0.08))
-	var head_center := center + Vector2(0, -r * 0.23)
-	if hair_style == "long":
-		canvas.draw_rect(Rect2(head_center + Vector2(-r * 0.52, -r * 0.03), Vector2(r * 0.24, r * 0.82)), hair.darkened(0.10))
-		canvas.draw_rect(Rect2(head_center + Vector2(r * 0.28, -r * 0.03), Vector2(r * 0.24, r * 0.82)), hair.darkened(0.10))
-	canvas.draw_circle(head_center, r * 0.49, Color("#293532"))
-	canvas.draw_circle(head_center, r * 0.45, skin)
-	canvas.draw_arc(head_center + Vector2(-r * 0.04, -r * 0.04), r * 0.36, PI * 1.02, PI * 1.82, 12, skin.lightened(0.12), maxf(1.0, r * 0.07))
-	match hair_style:
+		_ellipse_outline(canvas, center + Vector2(0, r * 0.58), r * 0.85, r * 0.49, Color("#dc8e78"), maxf(1.3, diameter * 0.025))
+
+	var head := center + Vector2(0, -r * 0.17)
+	if hairstyle == "long":
+		_poly(canvas, head, r, [
+			Vector2(-0.34, -0.37), Vector2(-0.46, -0.29), Vector2(-0.52, -0.08),
+			Vector2(-0.50, 0.29), Vector2(-0.45, 0.59), Vector2(-0.34, 0.72),
+			Vector2(-0.22, 0.67), Vector2(-0.15, 0.32), Vector2(0.15, 0.32),
+			Vector2(0.22, 0.67), Vector2(0.34, 0.72), Vector2(0.45, 0.59),
+			Vector2(0.50, 0.29), Vector2(0.52, -0.08), Vector2(0.46, -0.29),
+			Vector2(0.34, -0.37)
+		], hair.darkened(0.20))
+
+	var silhouette := [
+		Vector2(-0.28, 0.05), Vector2(-0.40, 0.08), Vector2(-0.49, 0.17),
+		Vector2(-0.55, 0.33), Vector2(-0.55, 0.60), Vector2(-0.52, 0.73),
+		Vector2(-0.44, 0.84), Vector2(-0.27, 0.91), Vector2(0.27, 0.91),
+		Vector2(0.44, 0.84), Vector2(0.52, 0.73), Vector2(0.55, 0.60),
+		Vector2(0.55, 0.33), Vector2(0.49, 0.17), Vector2(0.40, 0.08),
+		Vector2(0.28, 0.05)
+	]
+	_poly(canvas, center, r, silhouette, Color("#263432"))
+	_poly(canvas, center, r * 0.94, silhouette, outfit.darkened(0.12))
+	_poly(canvas, center, r, [
+		Vector2(-0.29, 0.11), Vector2(-0.40, 0.15), Vector2(-0.47, 0.31),
+		Vector2(-0.47, 0.68), Vector2(-0.40, 0.79), Vector2(-0.23, 0.84),
+		Vector2(0.13, 0.84), Vector2(0.18, 0.23), Vector2(0.04, 0.11)
+	], outfit.lightened(0.075))
+	_poly(canvas, center, r, [
+		Vector2(0.19, 0.15), Vector2(0.38, 0.18), Vector2(0.48, 0.33),
+		Vector2(0.47, 0.68), Vector2(0.39, 0.79), Vector2(0.27, 0.84),
+		Vector2(0.14, 0.84)
+	], outfit.darkened(0.20))
+	_poly(canvas, center, r, [
+		Vector2(-0.21, 0.08), Vector2(0, 0.28), Vector2(0.21, 0.08),
+		Vector2(0.15, 0.04), Vector2(0, 0.17), Vector2(-0.15, 0.04)
+	], outfit.darkened(0.27))
+
+	# Skin has a fine outline and a restrained shadow. No frontal face
+	# features are shown because the viewpoint is from above.
+	_ellipse(canvas, head + Vector2(0, r * 0.015), r * 0.435, r * 0.455, Color("#27312e"))
+	_ellipse(canvas, head, r * 0.395, r * 0.417, skin.darkened(0.075))
+	_ellipse(canvas, head + Vector2(-r * 0.035, -r * 0.025), r * 0.365, r * 0.390, skin)
+	_draw_hair(canvas, head, r, hair, hairstyle)
+
+
+static func _draw_hair(canvas: CanvasItem, head: Vector2, r: float, hair: Color, style: String) -> void:
+	match style:
 		"shaved":
-			canvas.draw_arc(head_center, r * 0.43, PI * 1.08, PI * 1.92, 14, hair, maxf(1.0, r * 0.11))
+			_poly(canvas, head, r, [
+				Vector2(-0.37, -0.11), Vector2(-0.35, -0.28), Vector2(-0.24, -0.40),
+				Vector2(-0.06, -0.44), Vector2(0.18, -0.41), Vector2(0.33, -0.29),
+				Vector2(0.38, -0.09), Vector2(0.28, -0.21), Vector2(0.02, -0.26),
+				Vector2(-0.25, -0.20)
+			], hair.lightened(0.22))
 		"curly":
-			for offset in [Vector2(-0.35, -0.22), Vector2(-0.25, -0.40), Vector2(-0.05, -0.48), Vector2(0.16, -0.46), Vector2(0.35, -0.32)]:
-				canvas.draw_circle(head_center + offset * r, r * 0.17, hair)
+			_hair_cap(canvas, head, r, hair.darkened(0.10), false)
+			for offset in [Vector2(-0.32, -0.30), Vector2(-0.15, -0.42), Vector2(0.04, -0.43), Vector2(0.24, -0.37), Vector2(0.34, -0.20), Vector2(-0.32, -0.11)]:
+				_ellipse(canvas, head + offset * r, r * 0.135, r * 0.12, hair)
 		"wavy":
-			canvas.draw_colored_polygon(PackedVector2Array([
-				head_center + Vector2(-0.45, -0.08) * r,
-				head_center + Vector2(-0.40, -0.37) * r,
-				head_center + Vector2(-0.18, -0.51) * r,
-				head_center + Vector2(0.04, -0.42) * r,
-				head_center + Vector2(0.22, -0.53) * r,
-				head_center + Vector2(0.41, -0.30) * r,
-				head_center + Vector2(0.43, -0.02) * r,
-				head_center + Vector2(0.11, -0.23) * r,
-				head_center + Vector2(-0.17, -0.17) * r
-			]), hair)
+			_hair_cap(canvas, head, r, hair, true)
+			_poly(canvas, head, r, [
+				Vector2(-0.37, -0.11), Vector2(-0.24, -0.14), Vector2(-0.17, -0.23),
+				Vector2(-0.04, -0.17), Vector2(0.08, -0.26), Vector2(0.19, -0.17),
+				Vector2(0.32, -0.18), Vector2(0.28, -0.04), Vector2(0.10, -0.06),
+				Vector2(-0.09, -0.04), Vector2(-0.27, -0.02)
+			], hair.lightened(0.08))
 		"long":
-			canvas.draw_arc(head_center, r * 0.43, PI * 1.06, PI * 1.94, 17, hair, maxf(2.0, r * 0.20))
+			_hair_cap(canvas, head, r, hair, true)
+			_poly(canvas, head, r, [
+				Vector2(-0.40, -0.20), Vector2(-0.42, 0.20), Vector2(-0.37, 0.49),
+				Vector2(-0.27, 0.55), Vector2(-0.26, 0.17), Vector2(-0.29, -0.12)
+			], hair.darkened(0.035))
+			_poly(canvas, head, r, [
+				Vector2(0.40, -0.20), Vector2(0.42, 0.20), Vector2(0.37, 0.49),
+				Vector2(0.27, 0.55), Vector2(0.26, 0.17), Vector2(0.29, -0.12)
+			], hair.darkened(0.12))
 		_:
-			canvas.draw_arc(head_center, r * 0.42, PI * 1.08, PI * 1.92, 15, hair, maxf(2.0, r * 0.21))
-			canvas.draw_colored_polygon(PackedVector2Array([
-				head_center + Vector2(-0.39, -0.22) * r,
-				head_center + Vector2(0.03, -0.48) * r,
-				head_center + Vector2(0.36, -0.26) * r,
-				head_center + Vector2(0.16, -0.12) * r
-			]), hair)
-	if diameter >= 55.0:
-		canvas.draw_circle(head_center + Vector2(-r * 0.14, r * 0.11), r * 0.027, Color("#3c322c"))
-		canvas.draw_circle(head_center + Vector2(r * 0.14, r * 0.11), r * 0.027, Color("#3c322c"))
+			_hair_cap(canvas, head, r, hair, false)
+
+
+static func _hair_cap(canvas: CanvasItem, head: Vector2, r: float, hair: Color, broad: bool) -> void:
+	var side := 0.43 if broad else 0.39
+	_poly(canvas, head, r, [
+		Vector2(-side, -0.11), Vector2(-0.38, -0.31), Vector2(-0.28, -0.42),
+		Vector2(-0.12, -0.47), Vector2(0.11, -0.47), Vector2(0.29, -0.39),
+		Vector2(0.39, -0.28), Vector2(side, -0.08), Vector2(0.29, -0.17),
+		Vector2(0.13, -0.18), Vector2(-0.04, -0.15), Vector2(-0.22, -0.19)
+	], hair)
+	_poly(canvas, head, r, [
+		Vector2(-0.29, -0.36), Vector2(-0.15, -0.43), Vector2(0.10, -0.43),
+		Vector2(0.28, -0.35), Vector2(0.10, -0.38), Vector2(-0.11, -0.37)
+	], hair.lightened(0.10))
+
+
+static func _poly(canvas: CanvasItem, origin: Vector2, r: float, points: Array, color: Color) -> void:
+	var scaled := PackedVector2Array()
+	for point in points:
+		scaled.append(origin + point * r)
+	canvas.draw_colored_polygon(scaled, color)
+
+
+static func _ellipse(canvas: CanvasItem, origin: Vector2, rx: float, ry: float, color: Color) -> void:
+	var points := PackedVector2Array()
+	for step in range(28):
+		var angle := float(step) * TAU / 28.0
+		points.append(origin + Vector2(cos(angle) * rx, sin(angle) * ry))
+	canvas.draw_colored_polygon(points, color)
+
+
+static func _ellipse_outline(canvas: CanvasItem, origin: Vector2, rx: float, ry: float, color: Color, width: float) -> void:
+	var points := PackedVector2Array()
+	for step in range(33):
+		var angle := float(step) * TAU / 32.0
+		points.append(origin + Vector2(cos(angle) * rx, sin(angle) * ry))
+	canvas.draw_polyline(points, color, width, true)
 
 
 static func _color(value: String, fallback: Color) -> Color:

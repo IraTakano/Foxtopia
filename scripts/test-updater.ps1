@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $releaseFiles -Force | Out-Null
 Set-Content -LiteralPath (Join-Path $installed "versions/base-v1/Foxtopia.exe") -Value "version one" -Encoding UTF8
 @{ repository = ""; manifestAsset = "Foxtopia-update.json"; archiveAsset = "Foxtopia-win-x64.zip"; gameExecutable = "Foxtopia.exe" } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installed "launcher-config.json") -Encoding UTF8
-@{ version = "v1.0.0"; directory = "base-v1" } |
+@{ version = "v0.1.0"; directory = "base-v1" } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installed "current.json") -Encoding UTF8
 
 Set-Content -LiteralPath (Join-Path $releaseFiles "Foxtopia.exe") -Value "version two" -Encoding UTF8
@@ -27,7 +27,7 @@ Set-Content -LiteralPath (Join-Path $releaseFiles "Foxtopia.pck") -Value "game d
 $archive = Join-Path $fixture "Foxtopia-win-x64.zip"
 Compress-Archive -Path (Join-Path $releaseFiles '*') -DestinationPath $archive
 $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-@{ schemaVersion = 1; version = "v1.1.0"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+@{ schemaVersion = 1; version = "v0.1.1"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
 
 function Invoke-Fixture([string]$expected) {
@@ -40,15 +40,45 @@ function Invoke-Fixture([string]$expected) {
 
 Invoke-Fixture "Updated"
 $state = Get-Content -LiteralPath (Join-Path $installed "current.json") -Raw | ConvertFrom-Json
-if ($state.version -ne "v1.1.0") { throw "Version pointer was not updated." }
+if ($state.version -ne "v0.1.1") { throw "Version pointer was not updated." }
 $gameFile = Join-Path $installed ("versions/" + $state.directory + "/Foxtopia.exe")
 if ((Get-Content -LiteralPath $gameFile -Raw).Trim() -ne "version two") { throw "Installed game file is incorrect." }
 Invoke-Fixture "AlreadyCurrent"
 
-@{ schemaVersion = 1; version = "v1.2.0"; archive = "Foxtopia-win-x64.zip"; sha256 = ('0' * 64); gameExecutable = "Foxtopia.exe" } |
+@{ schemaVersion = 1; version = "v0.1.0"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "InstalledNewer"
+
+@{ schemaVersion = 1; version = "v0.1.1-rc.1"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "InstalledNewer"
+
+@{ schemaVersion = 1; version = "nightly"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "UnknownVersionOrder"
+
+@{ schemaVersion = 1; version = "v0.1.10"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "Updated"
+$state = Get-Content -LiteralPath (Join-Path $installed "current.json") -Raw | ConvertFrom-Json
+if ($state.version -ne "v0.1.10") { throw "Numeric version ordering failed." }
+
+@{ schemaVersion = 1; version = "v0.1.9"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "InstalledNewer"
+
+@{ schemaVersion = 1; version = "v0.1.11"; archive = "Foxtopia-win-x64.zip"; sha256 = ('0' * 64); gameExecutable = "Foxtopia.exe" } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
 Invoke-Fixture "Failed"
 $stateAfterFailure = Get-Content -LiteralPath (Join-Path $installed "current.json") -Raw | ConvertFrom-Json
-if ($stateAfterFailure.version -ne "v1.1.0") { throw "A failed update replaced the working version." }
-Write-Host "Updater fixture passed: update, repeat launch, and rejected hash mismatch."
+if ($stateAfterFailure.version -ne "v0.1.10") { throw "A failed update replaced the working version." }
+
+@{ version = "legacy-newer"; directory = $stateAfterFailure.directory } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $installed "current.json") -Encoding UTF8
+@{ schemaVersion = 1; version = "v0.1.11"; archive = "Foxtopia-win-x64.zip"; sha256 = $hash; gameExecutable = "Foxtopia.exe" } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $fixture "Foxtopia-update.json") -Encoding UTF8
+Invoke-Fixture "UnknownVersionOrder"
+$legacyState = Get-Content -LiteralPath (Join-Path $installed "current.json") -Raw | ConvertFrom-Json
+if ($legacyState.version -ne "legacy-newer") { throw "An unrecognized installed tag was overwritten." }
+Write-Host "Updater fixture passed: semantic updates, no downgrade, unknown tags, and rejected hash mismatch."
 

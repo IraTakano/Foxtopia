@@ -72,6 +72,8 @@ internal enum UpdateOutcome
 {
     NoRepository,
     AlreadyCurrent,
+    InstalledNewer,
+    UnknownVersionOrder,
     Updated,
     NoRelease,
     Failed

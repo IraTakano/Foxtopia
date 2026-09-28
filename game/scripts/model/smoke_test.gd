@@ -17,12 +17,23 @@ func _initialize() -> void:
 	var site_id: String = str(colonist["site_id"])
 	var map_data: Dictionary = model.state["maps"][site_id]
 	var tree: Dictionary = {}
+	var tree_distance := 9999
 	for resource in map_data["resources"]:
-		if resource["kind"] == "tree": tree = resource; break
+		if resource["kind"] != "tree": continue
+		var distance: int = abs(int(resource["x"]) - 25) + abs(int(resource["y"]) - 25)
+		if distance < tree_distance:
+			tree_distance = distance
+			tree = resource
 	assert(not tree.is_empty())
 	var bad_owner := model.issue_command(2, {"type":"set_work_priority",
 		"colonist_id":colonist["id"], "work":"chop", "priority":1})
 	assert(not bad_owner["ok"], "Other faction modified a colonist")
+	assert(not model.issue_command(1, {"type":"customize_colonist", "colonist_id":colonist["id"],
+		"appearance":{"hair_color":"#123456"}})["ok"], "Styling must require a table")
+	map_data["structures"].append({"id":"styling_test", "kind":"styling_table", "x":25, "y":25})
+	assert(model.issue_command(1, {"type":"direct", "colonist_id":colonist["id"],
+		"action":"style", "target_id":"styling_test"})["ok"])
+	for i in range(8): model.tick(1.0)
 	assert(model.issue_command(1, {"type":"customize_colonist", "colonist_id":colonist["id"],
 		"appearance":{"hair_color":"#123456"}})["ok"])
 	assert(colonist["appearance"]["hair_color"] == "#123456")
@@ -57,6 +68,7 @@ func _initialize() -> void:
 	var systems := GameModel.new()
 	root.add_child(systems)
 	systems.start_new_game({"seed":"systems", "mode":"solo", "colonists_per_faction":3})
+	assert(not systems.issue_command(1, {"type":"set_research", "project":"farming"})["ok"], "Research must require a bench")
 	var built := systems.issue_command(1, {"type":"designate", "site_id":"site_1",
 		"x":27, "y":25, "kind":"build_research_bench", "priority":1})
 	assert(built["ok"])
@@ -72,6 +84,12 @@ func _initialize() -> void:
 	for caravan in systems.state["caravans"]:
 		if caravan["kind"] == "npc": npc = caravan
 	assert(not npc.is_empty(), "NPC caravan did not visit")
+	assert(not systems.issue_command(1, {"type":"npc_trade", "caravan_id":npc["id"],
+		"buy":{"food":1}})["ok"], "Trading must require contact")
+	var trader: Dictionary = systems.state["colonists"][0]
+	assert(systems.issue_command(1, {"type":"direct", "colonist_id":trader["id"],
+		"action":"trade", "target_id":npc["id"]})["ok"])
+	for i in range(12): systems.tick(1.0)
 	var npc_trade := systems.issue_command(1, {"type":"npc_trade", "caravan_id":npc["id"],
 		"buy":{"food":1}, "sell":{"stone":2}})
 	assert(npc_trade["ok"], str(npc_trade))

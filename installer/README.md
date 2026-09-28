@@ -12,12 +12,12 @@ Inno Setup 6. `dist/game/Foxtopia.exe` ile oyunun diğer dışa aktarım dosyala
 hazır olmalıdır.
 
 ```powershell
-./scripts/build-windows.ps1 -Version v0.1.0
+./scripts/build-windows.ps1 -Version v0.1.1
 ```
 
 Varsayılan depo `IraTakano/Foxtopia`'dır. `-Repository` ile
 `https://github.com/owner/repo` biçiminde başka bir depo da verilebilir.
-Çıktı: `dist/Foxtopia-Setup-v0.1.0.exe`. Yerel deneme için güncelleme
+Çıktı: `dist/Foxtopia-Setup-v0.1.1.exe`. Yerel deneme için güncelleme
 kontrolünü kapatmak gerektiğinde `-Repository ''` verilebilir.
 
 ## Güncelleme paketini hazırlama

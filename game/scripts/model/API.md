@@ -9,7 +9,7 @@ made of JSON-friendly dictionaries, arrays, strings, numbers, and booleans.
 
 ```gdscript
 var preview = Game.preview_world("my seed")
-# {seed, width:64, height:40, tiles:[2560 biome strings], sites:[...]}
+# {seed, width:96, height:60, tiles:[5760 biome strings], sites:[...]}
 # site: {id:"site_1", x, y, biome, kind:"vacant"|"friendly"|"hostile", name}
 
 Game.start_new_game({
@@ -19,9 +19,13 @@ Game.start_new_game({
     "faction_specs": [
         {"id":"faction_1", "name":"Tilki", "settlement_name":"Yuva",
          "site_id":"site_1", "players":[1],
-         "colonists":[{"name":"Ada", "appearance":{"hair":"short",
-           "hair_color":"#493629", "skin":"#d59e74", "outfit":"#517da7"},
-           "traits":["hardworking","calm"]}]},
+         "colonists":[{"name":"Ada", "age":34,
+           "childhood":"rural_child", "adulthood":"builder",
+           "appearance":{"hair":"short", "hair_color":"#493629",
+             "skin":"#d59e74", "outfit":"#517da7"},
+           "traits":["hardworking","calm"], "health_conditions":[],
+           "skills":{"build":6}, "starting_gear":{"weapon":"spear",
+             "apparel":"jacket"}, "starting_relationships":{"1":"friend"}}]},
         {"id":"faction_2", "name":"Kuzey", "settlement_name":"Kale",
          "site_id":"site_2", "players":[2], "colonists":[]}
     ]
@@ -33,6 +37,9 @@ competitive player from `player_count`. `colonists` can also be supplied at the
 top level for the default first faction. Invalid or occupied start sites are
 replaced by the next vacant site. `players` contains ENet peer IDs; the model
 maps each ID to its faction. The host should provide the actual connected IDs.
+`starting_relationships` keys are zero-based indices into the same faction's
+starting roster; values are `friend`, `rival`, or `partner`. Character preparation
+may enforce a configurable point limit.
 
 ## Snapshots
 
@@ -119,7 +126,10 @@ stock. Hostile NPC sites generate periodic raids on each active settlement.
 
 ## Persistence
 
-`Game.serialize_game()` returns the full server state. `Game.save_game()`
-writes `user://foxtopia_save.json`, and `Game.load_game()` reads it. For custom
-storage, pass the saved dictionary to `Game.load_game(data)`. `load_snapshot`
-is for rendering a server view and accepts snapshots filtered for one client.
+`Game.serialize_game()` returns the full server state. `Game.save_game()` writes
+a timestamped slot under `user://saves/`; pass a slot ID to overwrite a named
+slot. `Game.list_saved_games()` returns available slots and `Game.load_game()`
+loads the newest one. Pass a slot ID to load a specific slot, or a saved
+dictionary for custom storage. `load_game()` also reads the legacy
+`user://foxtopia_save.json` when there are no slots. `load_snapshot` is for
+rendering a server view and accepts snapshots filtered for one client.

@@ -34,7 +34,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "current.json"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#PackageDir}\current.json"; DestDir: "{app}"; Flags: onlyifdoesntexist
+Source: "{#PackageDir}\current.json"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\Foxtopia"; Filename: "{app}\FoxtopiaLauncher.exe"; WorkingDir: "{app}"
