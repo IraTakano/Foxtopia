@@ -15,6 +15,7 @@ var _connected_peers: Array[int] = []
 var _player_setups: Dictionary = {}
 var _lobby: Dictionary = {
 	"mode": "solo", "seed": "", "colonists_per_faction": 3,
+	"world_options": {}, "scenario_id": "landfall", "storyteller_id": "steady", "difficulty_id": "frontier",
 	"players": [1], "ready": {}, "started": false,
 }
 
@@ -33,6 +34,7 @@ func start_solo() -> Dictionary:
 	mode = "solo"
 	_player_setups.clear()
 	_lobby = {"mode": "solo", "seed": "", "colonists_per_faction": 3,
+		"world_options": {}, "scenario_id": "landfall", "storyteller_id": "steady", "difficulty_id": "frontier",
 		"players": [1], "ready": {"1": true}, "started": false}
 	lobby_changed.emit(get_lobby())
 	connection_changed.emit(true, "Tek oyunculu oturum hazır.")
@@ -50,6 +52,7 @@ func host(port: int = DEFAULT_PORT) -> Dictionary:
 	_connected_peers.clear()
 	_player_setups.clear()
 	_lobby = {"mode": "coop", "seed": "", "colonists_per_faction": 3,
+		"world_options": {}, "scenario_id": "landfall", "storyteller_id": "steady", "difficulty_id": "frontier",
 		"players": [1], "ready": {"1": true}, "started": false}
 	lobby_changed.emit(get_lobby())
 	connection_changed.emit(true, "Oda %d portunda açık." % port)
@@ -86,6 +89,14 @@ func configure_lobby(rules: Dictionary) -> Dictionary:
 	_lobby["mode"] = selected_mode
 	_lobby["seed"] = str(rules.get("seed", _lobby.get("seed", "")))
 	_lobby["colonists_per_faction"] = clampi(int(rules.get("colonists_per_faction", 3)), 1, 3)
+	var supplied_options: Variant = rules.get("world_options", {})
+	if supplied_options is Dictionary:
+		var options: Dictionary = {}
+		for key in ["coverage", "rainfall", "temperature", "population"]:
+			options[key] = clampf(float(supplied_options.get(key, 0.5)), 0.25 if key == "coverage" else 0.0, 0.75 if key == "coverage" else 1.0)
+		_lobby["world_options"] = options
+	for key in ["scenario_id", "storyteller_id", "difficulty_id"]:
+		_lobby[key] = str(rules.get(key, _lobby.get(key, "")))
 	_player_setups.clear()
 	_lobby["ready"] = {"1": true}
 	_broadcast_lobby()
@@ -176,6 +187,11 @@ func is_authority() -> bool:
 
 
 func _clean_setup(spec: Dictionary) -> Dictionary:
+	var clean_cargo: Dictionary = {}
+	var raw_cargo: Variant = spec.get("starting_cargo", {})
+	if raw_cargo is Dictionary:
+		for item in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
+			if raw_cargo.has(item): clean_cargo[item] = clampi(int(raw_cargo[item]), 0, 999)
 	var clean_colonists: Array = []
 	var raw_colonists: Variant = spec.get("colonists", [])
 	if raw_colonists is Array:
@@ -224,6 +240,7 @@ func _clean_setup(spec: Dictionary) -> Dictionary:
 		"name": str(spec.get("name", "Unnamed colony")).substr(0, 48),
 		"settlement_name": str(spec.get("settlement_name", "Unnamed settlement")).substr(0, 48),
 		"site_id": str(spec.get("site_id", "")).substr(0, 64),
+		"starting_cargo": clean_cargo,
 		"colonists": clean_colonists,
 	}
 

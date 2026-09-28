@@ -16,7 +16,17 @@ var language := "en"
 
 
 static func resolution_options() -> Array[Vector2i]:
-	return [Vector2i(1280, 720), Vector2i(1366, 768), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+	var standard: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1366, 768), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
+	if DisplayServer.get_name() == "headless":
+		return standard
+	var usable := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen()).size
+	var available: Array[Vector2i] = []
+	for size in standard:
+		if size.x <= usable.x and size.y <= usable.y:
+			available.append(size)
+	if usable.x >= 1024 and usable.y >= 600 and not available.has(usable):
+		available.append(usable)
+	return available
 
 
 static func load_settings() -> FoxtopiaSettings:
@@ -64,6 +74,8 @@ func apply_settings() -> void:
 	_apply_audio()
 	if DisplayServer.get_name() == "headless":
 		return
+	var screen_rect := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
+	resolution = Vector2i(mini(resolution.x, screen_rect.size.x), mini(resolution.y, screen_rect.size.y))
 	match window_mode:
 		"fullscreen":
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
@@ -72,11 +84,8 @@ func apply_settings() -> void:
 		"windowed":
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-			var screen := DisplayServer.window_get_current_screen()
-			var screen_rect := DisplayServer.screen_get_usable_rect(screen)
-			var fitted := Vector2i(mini(resolution.x, screen_rect.size.x), mini(resolution.y, screen_rect.size.y))
-			DisplayServer.window_set_size(fitted)
-			DisplayServer.window_set_position(screen_rect.position + (screen_rect.size - fitted) / 2)
+			DisplayServer.window_set_size(resolution)
+			DisplayServer.window_set_position(screen_rect.position + (screen_rect.size - resolution) / 2)
 
 
 func _read_dictionary(data: Dictionary) -> void:

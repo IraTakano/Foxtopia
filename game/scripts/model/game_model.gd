@@ -1,6 +1,8 @@
 extends Node
 class_name GameModel
 
+const SetupCatalog = preload("res://scripts/model/setup_catalog.gd")
+
 ## Authoritative, transport-independent game simulation. All values in state are
 ## JSON-compatible so the server can send snapshots and save the same data.
 signal state_changed(snapshot: Dictionary)
@@ -33,7 +35,8 @@ const HEALTH_CONDITION_COSTS := {"asthma": -4, "bad_back": -5, "scar": -2}
 const CHILDHOOD_SKILL_BONUSES := {"rural_child": "harvest", "town_child": "haul", "apprentice": "build"}
 const ADULTHOOD_SKILL_BONUSES := {"farmer": "harvest", "builder": "build", "medic": "treat", "scholar": "research"}
 const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2}
-const STARTING_RELATIONSHIP_OPINIONS := {"friend": 35, "rival": -35, "partner": 65}
+const STARTING_RELATIONSHIP_OPINIONS := {"friend": 35, "rival": -35, "partner": 65,
+	"parent": 45, "child": 45, "sibling": 40}
 const PREPARATION_POINT_LIMIT := 12
 const FIRST_NAMES := ["Ada", "Deniz", "Efe", "Elif", "Emir", "Maya", "Mert", "Nil", "Selin", "Tuna", "Zeynep", "Arda"]
 const SITE_NAMES := ["Çınar", "Kavak", "Akkaya", "Yeşilova", "Güneydere", "Kuzeyyaka", "Taşlık", "Yelbayır", "Söğüt", "Gökova", "Kızıltepe", "Ilıca", "Umut", "Serin", "Akpınar", "Günyeli"]
@@ -51,10 +54,16 @@ var colonies: Array:
 		return state.get("factions", [])
 
 
-func preview_world(seed_text: String) -> Dictionary:
+func preview_world(seed_text: String, options: Dictionary = {}) -> Dictionary:
 	var seed_value := seed_text.strip_edges()
 	if seed_value.is_empty():
 		seed_value = "Foxtopia-%d" % Time.get_unix_time_from_system()
+	var world_options := {
+		"coverage": clampf(float(options.get("coverage", 0.50)), 0.25, 0.75),
+		"rainfall": clampf(float(options.get("rainfall", 0.50)), 0.0, 1.0),
+		"temperature": clampf(float(options.get("temperature", 0.50)), 0.0, 1.0),
+		"population": clampf(float(options.get("population", 0.50)), 0.0, 1.0),
+	}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seed_number(seed_value)
 	var continent := FastNoiseLite.new()
@@ -78,41 +87,128 @@ func preview_world(seed_text: String) -> Dictionary:
 		{"center": Vector2(0.17 + rng.randf_range(-0.07, 0.07), 0.72 + rng.randf_range(-0.08, 0.08)), "radius": Vector2(rng.randf_range(0.085, 0.12), rng.randf_range(0.09, 0.14))},
 	]
 	var tiles: Array = []
+	var elevations: Array = []
+	var rainfalls: Array = []
+	var temperatures: Array = []
+	var coverage_scale := sqrt(float(world_options["coverage"]) / 0.50)
 	for y in range(WORLD_HEIGHT):
 		for x in range(WORLD_WIDTH):
 			var position := Vector2((float(x) + 0.5) / float(WORLD_WIDTH), (float(y) + 0.5) / float(WORLD_HEIGHT))
 			var height := -1.0
 			for mass in land_masses:
-				var offset: Vector2 = (position - mass["center"]) / mass["radius"]
+				var offset: Vector2 = (position - mass["center"]) / (mass["radius"] * coverage_scale)
 				height = maxf(height, 1.0 - offset.length())
 			height += continent.get_noise_2d(float(x), float(y)) * 0.35
 			height += details.get_noise_2d(float(x), float(y)) * 0.075
 			var moisture := climate.get_noise_2d(float(x), float(y))
 			var ruggedness := details.get_noise_2d(float(x) + 91.0, float(y) - 57.0)
+			var latitude := absf(position.y - 0.5) * 2.0
+			var temperature := 29.0 - latitude * 32.0 + (float(world_options["temperature"]) - 0.5) * 24.0 + climate.get_noise_2d(float(x) + 231.0, float(y)) * 8.0 - maxf(height - 0.35, 0.0) * 17.0
+			var rainfall := clampf(620.0 + moisture * 880.0 + (float(world_options["rainfall"]) - 0.5) * 1050.0 - latitude * 170.0, 80.0, 2000.0)
+			var elevation := maxf(0.0, (height - 0.10) * 2400.0 + ruggedness * 250.0)
 			var biome := "plains"
 			if height < 0.145:
 				biome = "water"
-			elif height > 0.46 and ruggedness > 0.06:
+			elif height > 0.48 and ruggedness > 0.07:
 				biome = "rocky"
-			elif moisture > 0.02:
+			elif temperature < 0.0:
+				biome = "tundra"
+			elif rainfall < 410.0:
+				biome = "arid"
+			elif rainfall > 720.0:
 				biome = "forest"
 			tiles.append(biome)
+			elevations.append(snappedf(elevation, 1.0))
+			rainfalls.append(snappedf(rainfall, 1.0))
+			temperatures.append(snappedf(temperature, 0.1))
 	var sites: Array = []
-	for i in range(16):
+	var population_count := clampi(roundi(22.0 + float(world_options["population"]) * 54.0), 22, 76)
+	for i in range(population_count):
 		var pos := _find_site_position(rng, sites, tiles)
 		var kind := "vacant"
-		if i >= 8 and i < 12:
+		if i >= population_count / 2 and i < population_count * 3 / 4:
 			kind = "friendly"
-		elif i >= 12:
+		elif i >= population_count * 3 / 4:
 			kind = "hostile"
-		var site_name: String = SITE_NAMES[i]
+		var site_name: String = SITE_NAMES[i % SITE_NAMES.size()]
 		sites.append({
 			"id": "site_%d" % (i + 1), "x": pos.x, "y": pos.y,
 			"biome": tiles[pos.y * WORLD_WIDTH + pos.x],
-			"kind": kind, "name": site_name,
+			"kind": kind, "name": site_name if i < SITE_NAMES.size() else "%s %d" % [site_name, i / SITE_NAMES.size() + 1],
 		})
 	return {"seed": seed_value, "width": WORLD_WIDTH, "height": WORLD_HEIGHT,
-		"tiles": tiles, "sites": sites}
+		"tiles": tiles, "elevation": elevations, "rainfall_map": rainfalls,
+		"temperature_map": temperatures, "options": world_options, "sites": sites}
+
+
+func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
+	var site: Dictionary = _site_by_id(world_data, site_id)
+	var x := int(site.get("x", -1))
+	var y := int(site.get("y", -1))
+	if site_id.begins_with("tile_"):
+		var parts := site_id.trim_prefix("tile_").split("_")
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			x = int(parts[0])
+			y = int(parts[1])
+	var width := int(world_data.get("width", 0))
+	var height := int(world_data.get("height", 0))
+	var tiles: Array = world_data.get("tiles", [])
+	if x < 0 or y < 0 or x >= width or y >= height or y * width + x >= tiles.size():
+		return {}
+	var index := y * width + x
+	var biome := str(tiles[index])
+	if biome == "water":
+		return {}
+	var elevation_data: Array = world_data.get("elevation", [])
+	var rainfall_data: Array = world_data.get("rainfall_map", [])
+	var temperature_data: Array = world_data.get("temperature_map", [])
+	var elevation := int(elevation_data[index]) if index < elevation_data.size() else 200
+	var rainfall := int(rainfall_data[index]) if index < rainfall_data.size() else 700
+	var temperature := float(temperature_data[index]) if index < temperature_data.size() else 18.0
+	var terrain := "Mountainous" if biome == "rocky" and elevation > 700 else "Hilly" if elevation > 450 or biome == "rocky" else "Flat"
+	var coast_direction := ""
+	var nearest_water := 99
+	for direction in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		var step: Vector2i = direction
+		for distance in range(1, 5):
+			var neighbor_x: int = posmod(x + step.x * distance, width)
+			var neighbor_y: int = y + step.y * distance
+			if neighbor_y < 0 or neighbor_y >= height:
+				break
+			if str(tiles[neighbor_y * width + neighbor_x]) == "water":
+				if distance < nearest_water:
+					nearest_water = distance
+					coast_direction = "west" if step.x < 0 else "east" if step.x > 0 else "north" if step.y < 0 else "south"
+				break
+	var hash_value := _seed_number("%s/%d/%d/stone" % [str(world_data.get("seed", "")), x, y])
+	return {
+		"id": site_id, "name": str(site.get("name", "Unsettled land")), "x": x, "y": y,
+		"kind": str(site.get("kind", "vacant")), "biome": biome,
+		"terrain": terrain, "elevation": elevation, "rainfall": rainfall,
+		"temperature": temperature, "growing_days": clampi(roundi((temperature + 3.0) * 8.0), 0, 60),
+		"coastal": nearest_water <= 3, "coast_direction": coast_direction if nearest_water <= 3 else "",
+		"stone_types": ["granite", "slate"] if hash_value % 2 == 0 else ["limestone", "sandstone"],
+		"latitude": snappedf((0.5 - (float(y) + 0.5) / float(height)) * 180.0, 0.1),
+		"longitude": snappedf(((float(x) + 0.5) / float(width) - 0.5) * 360.0, 0.1),
+	}
+
+
+func preview_local_map(world_data: Dictionary, site_id: String) -> Dictionary:
+	var site_info := describe_site(world_data, site_id)
+	if site_info.is_empty():
+		return {}
+	return _generate_local_map(str(world_data.get("seed", "")), site_id, str(site_info["biome"]), site_info)
+
+
+func _starting_inventory(spec: Dictionary, scenario_id: String) -> Dictionary:
+	var scenario: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id)
+	var defaults: Dictionary = scenario.get("inventory", {})
+	var inventory: Dictionary = defaults.duplicate(true)
+	var chosen: Variant = spec.get("starting_cargo", {})
+	if chosen is Dictionary and not chosen.is_empty():
+		for item in defaults.keys():
+			inventory[item] = clampi(int(chosen.get(item, 0)), 0, 999)
+	return inventory
 
 
 func start_new_game(config: Dictionary) -> Dictionary:
@@ -122,7 +218,10 @@ func start_new_game(config: Dictionary) -> Dictionary:
 	if not mode in ["solo", "coop", "competitive"]:
 		mode = "solo"
 	var count: int = clampi(int(config.get("colonists_per_faction", config.get("colonist_count", 3))), 1, 3)
-	var generated_world := preview_world(seed_text)
+	var selected_scenario := str(config.get("scenario_id", "landfall"))
+	var selected_storyteller := str(config.get("storyteller_id", "steady"))
+	var selected_difficulty := str(config.get("difficulty_id", "frontier"))
+	var generated_world := preview_world(seed_text, config.get("world_options", {}))
 	var specs: Array = config.get("faction_specs", [])
 	if specs.is_empty():
 		specs = _default_specs(config, mode, generated_world, count)
@@ -151,8 +250,7 @@ func start_new_game(config: Dictionary) -> Dictionary:
 			"id": faction_id, "name": faction_name,
 			"settlement_name": settlement_name, "site_id": site_id,
 			"players": peer_ids.duplicate(),
-			"inventory": {"wood": 12, "stone": 8, "food": 12, "medicine": 2,
-				"silver": 25, "spear": 2, "jacket": 3},
+			"inventory": _starting_inventory(spec, selected_scenario),
 			"research": {"project": "", "progress": 0.0, "unlocked": []},
 			"relations": {}, "name_prompted": false,
 		}
@@ -163,7 +261,7 @@ func start_new_game(config: Dictionary) -> Dictionary:
 		site["kind"] = "player"
 		site["faction_id"] = faction_id
 		site["name"] = settlement_name
-		maps[site_id] = _generate_local_map(generated_world["seed"], site_id, str(site.get("biome", "plains")))
+		maps[site_id] = preview_local_map(generated_world, site_id)
 		var prepared: Array = spec.get("colonists", [])
 		for j in range(count):
 			var prepared_one: Dictionary = prepared[j] if j < prepared.size() else {}
@@ -173,6 +271,8 @@ func start_new_game(config: Dictionary) -> Dictionary:
 	state = {
 		"schema": 1, "mode": mode, "seed": generated_world["seed"],
 		"time": 0, "day_length": 600, "raid_clock": 0, "caravan_clock": 0, "next_id": 1,
+		"scenario_id": selected_scenario, "storyteller_id": selected_storyteller,
+		"difficulty_id": selected_difficulty, "raid_cycle": 0, "caravan_cycle": 0,
 		"colonists_per_faction": count,
 		"world": generated_world, "factions": factions, "players": players,
 		"maps": maps, "colonists": colonists, "orders": [], "raiders": [],
@@ -195,8 +295,9 @@ func add_late_player(peer_id: int, spec: Dictionary = {}) -> Dictionary:
 		_emit_change()
 		return _ok({"faction_id": shared["id"]})
 	if str(state.get("mode", "")) != "competitive": return _error("Late joining is unavailable in this mode.")
-	var validation := validate_setup({"seed": state["seed"], "faction_specs": [spec],
+	var validation := validate_setup({"seed": state["seed"], "world_options": state["world"].get("options", {}), "faction_specs": [spec],
 		"colonists_per_faction": state.get("colonists_per_faction", 3),
+		"scenario_id": state.get("scenario_id", "landfall"),
 		"point_limit_enabled": state.get("point_limit_enabled", true)})
 	if not bool(validation.get("ok", false)): return validation
 	var site_id := str(spec.get("site_id", ""))
@@ -215,8 +316,8 @@ func add_late_player(peer_id: int, spec: Dictionary = {}) -> Dictionary:
 	if faction_name.is_empty(): faction_name = "Unnamed colony"
 	if settlement_name.is_empty(): settlement_name = "Unnamed settlement"
 	var faction := {"id": faction_id, "name": faction_name, "settlement_name": settlement_name,
-		"site_id": site_id, "players": [peer_id], "inventory": {"wood": 12, "stone": 8,
-			"food": 12, "medicine": 2, "silver": 25, "spear": 2, "jacket": 3},
+		"site_id": site_id, "players": [peer_id],
+		"inventory": _starting_inventory(spec, str(state.get("scenario_id", "landfall"))),
 		"research": {"project": "", "progress": 0.0, "unlocked": []},
 		"relations": {}, "name_prompted": false}
 	state["factions"].append(faction)
@@ -225,7 +326,7 @@ func add_late_player(peer_id: int, spec: Dictionary = {}) -> Dictionary:
 	site["kind"] = "player"
 	site["faction_id"] = faction_id
 	site["name"] = settlement_name
-	state["maps"][site_id] = _generate_local_map(str(state["seed"]), site_id, str(site["biome"]))
+	state["maps"][site_id] = preview_local_map(state["world"], site_id)
 	var prepared: Array = spec.get("colonists", [])
 	var first_colonist_index: int = state["colonists"].size()
 	for j in range(int(state.get("colonists_per_faction", 3))):
@@ -248,12 +349,27 @@ func remove_player(peer_id: int) -> void:
 
 
 func validate_setup(config: Dictionary) -> Dictionary:
-	var preview := preview_world(str(config.get("seed", "")))
+	for selection in [
+		[SetupCatalog.SCENARIOS, str(config.get("scenario_id", "landfall"))],
+		[SetupCatalog.STORYTELLERS, str(config.get("storyteller_id", "steady"))],
+		[SetupCatalog.DIFFICULTIES, str(config.get("difficulty_id", "frontier"))],
+	]:
+		if str(SetupCatalog.find_by_id(selection[0], selection[1]).get("id", "")) != selection[1]:
+			return _error("Invalid game setup choice.")
+	var preview := preview_world(str(config.get("seed", "")), config.get("world_options", {}))
 	var selected: Dictionary = {}
 	var count: int = clampi(int(config.get("colonists_per_faction", config.get("colonist_count", 3))), 1, 3)
 	for raw_spec in config.get("faction_specs", []):
 		if not raw_spec is Dictionary: return _error("Invalid faction setup.")
 		var spec: Dictionary = raw_spec
+		if spec.has("starting_cargo"):
+			var cargo: Variant = spec["starting_cargo"]
+			if not cargo is Dictionary: return _error("Invalid starting cargo.")
+			for item in cargo.keys():
+				if str(item) not in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
+					return _error("Invalid starting cargo item.")
+				if int(cargo[item]) < 0 or int(cargo[item]) > 999:
+					return _error("Starting cargo quantity must be between 0 and 999.")
 		var site_id := str(spec.get("site_id", ""))
 		if selected.has(site_id): return _error("Each colony needs a separate start tile.")
 		selected[site_id] = true
@@ -307,9 +423,13 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				if not STARTING_RELATIONSHIP_OPINIONS.has(relation_type):
 					return _error("Invalid starting relationship.")
 				var pair_key := "%d_%d" % [mini(person_index, other_index), maxi(person_index, other_index)]
-				if declared_relationships.has(pair_key) and declared_relationships[pair_key] != relation_type:
+				var normalized_relation := relation_type
+				if person_index > other_index:
+					if relation_type == "parent": normalized_relation = "child"
+					elif relation_type == "child": normalized_relation = "parent"
+				if declared_relationships.has(pair_key) and declared_relationships[pair_key] != normalized_relation:
 					return _error("Conflicting starting relationships.")
-				declared_relationships[pair_key] = relation_type
+				declared_relationships[pair_key] = normalized_relation
 			var traits: Array = person.get("traits", [])
 			if traits.size() > 3: return _error("A colonist can have at most three traits.")
 			var trait_unique: Dictionary = {}
@@ -361,6 +481,7 @@ func issue_command(peer_id: int, command: Dictionary) -> Dictionary:
 	match command_type:
 		"designate": result = _command_designate(faction_id, command)
 		"set_work_priority": result = _command_work_priority(faction_id, command)
+		"set_schedule": result = _command_schedule(faction_id, command)
 		"set_order_priority": result = _command_order_priority(faction_id, command)
 		"direct": result = _command_direct(faction_id, command)
 		"set_draft": result = _command_draft(faction_id, command)
@@ -494,6 +615,11 @@ func _migrate_loaded_state() -> void:
 	if not state.has("day_length"): state["day_length"] = 600
 	if not state.has("colonists_per_faction"): state["colonists_per_faction"] = 3
 	if not state.has("point_limit_enabled"): state["point_limit_enabled"] = true
+	if not state.has("scenario_id"): state["scenario_id"] = "landfall"
+	if not state.has("storyteller_id"): state["storyteller_id"] = "steady"
+	if not state.has("difficulty_id"): state["difficulty_id"] = "frontier"
+	if not state.has("raid_cycle"): state["raid_cycle"] = 0
+	if not state.has("caravan_cycle"): state["caravan_cycle"] = 0
 	for faction in state.get("factions", []):
 		if not faction.has("name_prompted"):
 			faction["name_prompted"] = not str(faction.get("name", "")).begins_with("Unnamed")
@@ -514,6 +640,8 @@ func _migrate_loaded_state() -> void:
 		if not colonist.has("idle_until"): colonist["idle_until"] = int(state.get("time", 0))
 		if not colonist.has("styling_ready_until"): colonist["styling_ready_until"] = -1
 		if not colonist.has("relationships"): colonist["relationships"] = {}
+		if not colonist.has("schedule") or not colonist["schedule"] is Array or colonist["schedule"].size() != 24:
+			colonist["schedule"] = _default_schedule()
 		if not colonist["needs"].has("thoughts"): colonist["needs"]["thoughts"] = []
 		if not colonist["health"].has("conditions"): colonist["health"]["conditions"] = []
 		if not colonist["health"].has("wound_summary"): _update_health_summary(colonist["health"])
@@ -589,6 +717,7 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 			"skin": str(appearance.get("skin", "medium")),
 			"outfit": str(appearance.get("outfit", "blue"))},
 		"traits": traits.duplicate(), "skills": skills, "work_priorities": priorities,
+		"schedule": _default_schedule(),
 		"relationships": {}, "relationship_types": {},
 		"needs": {"hunger": 100.0, "rest": 100.0, "mood": 75.0, "thoughts": []},
 		"health": {"hp": starting_hp, "max_hp": 100.0, "bleeding": 0.0,
@@ -619,48 +748,67 @@ func _apply_starting_relationships(colonists: Array, prepared: Array, offset: in
 			source["relationships"][str(other["id"])] = STARTING_RELATIONSHIP_OPINIONS[relation_type]
 			other["relationships"][str(source["id"])] = STARTING_RELATIONSHIP_OPINIONS[relation_type]
 			source["relationship_types"][str(other["id"])] = relation_type
-			other["relationship_types"][str(source["id"])] = relation_type
+			var reverse_type := "child" if relation_type == "parent" else "parent" if relation_type == "child" else relation_type
+			other["relationship_types"][str(source["id"])] = reverse_type
 
 
-func _generate_local_map(seed_text: String, site_id: String, biome: String) -> Dictionary:
+func _generate_local_map(seed_text: String, site_id: String, biome: String, site_info: Dictionary = {}) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seed_number("%s/%s/map" % [seed_text, site_id])
 	var terrain_noise := FastNoiseLite.new()
 	terrain_noise.seed = int(rng.randi())
-	terrain_noise.frequency = 0.065
-	terrain_noise.fractal_octaves = 3
+	terrain_noise.frequency = 0.052
+	terrain_noise.fractal_octaves = 4
 	var detail_noise := FastNoiseLite.new()
 	detail_noise.seed = int(rng.randi())
-	detail_noise.frequency = 0.13
+	detail_noise.frequency = 0.105
 	var foliage_noise := FastNoiseLite.new()
 	foliage_noise.seed = int(rng.randi())
-	foliage_noise.frequency = 0.10
+	foliage_noise.frequency = 0.075
+	var coast_direction := str(site_info.get("coast_direction", ""))
+	var hilly := str(site_info.get("terrain", "Flat")) != "Flat"
+	var mountainous := str(site_info.get("terrain", "Flat")) == "Mountainous"
+	var rainfall := int(site_info.get("rainfall", 700))
+	var has_lake := coast_direction.is_empty() and rainfall > 900 and rng.randf() < 0.65
+	var lake_center := Vector2(10 if rng.randi() % 2 == 0 else 40, 11 if rng.randi() % 2 == 0 else 39)
+	var lake_radius := rng.randf_range(6.0, 9.0)
+	var ridge_side := rng.randi_range(0, 3)
 	var terrain: Array = []
 	var resources: Array = []
 	for y in range(LOCAL_SIZE):
 		for x in range(LOCAL_SIZE):
 			var broad := terrain_noise.get_noise_2d(float(x), float(y))
 			var detail := detail_noise.get_noise_2d(float(x), float(y))
-			var clearing := maxf(0.0, 1.0 - Vector2(float(x - 25), float(y - 25)).length() / 13.0)
+			var center_distance := Vector2(float(x - 25), float(y - 25)).length()
+			var clearing := maxf(0.0, 1.0 - center_distance / 12.0)
+			var protected_center := center_distance < 9.0
 			var tile := "grass"
-			if clearing < 0.55 and broad + detail * 0.24 < (-0.37 if biome == "plains" else -0.43):
+			var shore_position := 8.0 + broad * 11.0 + detail * 2.0
+			var shoreline := (coast_direction == "west" and float(x) < shore_position) or (coast_direction == "east" and float(LOCAL_SIZE - 1 - x) < shore_position) or (coast_direction == "north" and float(y) < shore_position) or (coast_direction == "south" and float(LOCAL_SIZE - 1 - y) < shore_position)
+			var lake_distance := Vector2(float(x), float(y)).distance_to(lake_center)
+			var lake := has_lake and lake_distance < lake_radius + broad * 4.0 + detail * 1.5
+			var ridge_distance := float(x) if ridge_side == 0 else float(LOCAL_SIZE - 1 - x) if ridge_side == 1 else float(y) if ridge_side == 2 else float(LOCAL_SIZE - 1 - y)
+			var ridge := hilly and ridge_distance < (10.0 if mountainous else 4.0) + broad * 12.0
+			if not protected_center and (shoreline or lake):
 				tile = "water"
-			elif broad + detail * 0.19 > (0.24 if biome == "rocky" else 0.42):
+			elif not protected_center and (ridge or (biome == "rocky" and broad > 0.18)):
 				tile = "rock_ground"
-			elif detail > 0.12 or clearing > 0.50:
+			elif (biome == "arid" and detail > -0.25) or detail > 0.21 or clearing > 0.55:
 				tile = "dirt"
 			terrain.append(tile)
 			if x >= 21 and x <= 29 and y >= 21 and y <= 29: continue
 			if tile == "water": continue
 			var r := rng.randf()
 			var foliage := foliage_noise.get_noise_2d(float(x), float(y))
-			if tile != "rock_ground" and foliage > (-0.08 if biome == "forest" else 0.17) and r < 0.23:
+			var tree_chance := 0.24 if biome == "forest" else 0.10 if biome == "plains" else 0.04 if biome == "tundra" else 0.025
+			if tile != "rock_ground" and foliage > (-0.12 if biome == "forest" else 0.08) and r < tree_chance:
 				resources.append({"id": "res_%d_%d" % [x, y], "x": x, "y": y, "kind": "tree", "amount": 1})
-			elif tile == "rock_ground" and r < 0.22 or r < 0.025:
+			elif (tile == "rock_ground" and r < 0.22) or r < 0.018:
 				resources.append({"id": "res_%d_%d" % [x, y], "x": x, "y": y, "kind": "stone", "amount": 1})
-			elif tile == "grass" and foliage > 0.10 and r < 0.11:
+			elif tile == "grass" and biome in ["forest", "plains"] and foliage > 0.10 and r < 0.12:
 				resources.append({"id": "res_%d_%d" % [x, y], "x": x, "y": y, "kind": "berry", "amount": 1})
 	return {"width": LOCAL_SIZE, "height": LOCAL_SIZE, "terrain": terrain,
+		"site_id": site_id, "biome": biome, "site_info": site_info,
 		"resources": resources, "drops": [],
 		"structures": [{"id": "stockpile", "kind": "stockpile", "x": 25, "y": 26}],
 		"zones": [{"id": "zone_1", "kind": "stockpile", "x": 24, "y": 26, "width": 3, "height": 2,
@@ -691,18 +839,25 @@ func _resolve_start_site(generated_world: Dictionary, requested_id: String, used
 
 
 func _find_site_position(rng: RandomNumberGenerator, sites: Array, tiles: Array) -> Vector2i:
-	for _attempt in range(500):
-		var p := Vector2i(rng.randi_range(3, WORLD_WIDTH - 4), rng.randi_range(3, WORLD_HEIGHT - 4))
-		if tiles[p.y * WORLD_WIDTH + p.x] == "water": continue
-		var okay := true
-		for s in sites:
-			if abs(int(s["x"]) - p.x) + abs(int(s["y"]) - p.y) < 10:
-				okay = false
-				break
-		if okay: return p
+	for min_distance in [10, 7, 4, 1]:
+		for _attempt in range(500):
+			var p := Vector2i(rng.randi_range(3, WORLD_WIDTH - 4), rng.randi_range(3, WORLD_HEIGHT - 4))
+			if tiles[p.y * WORLD_WIDTH + p.x] == "water": continue
+			var okay := true
+			for s in sites:
+				if abs(int(s["x"]) - p.x) + abs(int(s["y"]) - p.y) < min_distance:
+					okay = false
+					break
+			if okay: return p
 	for y in range(3, WORLD_HEIGHT - 3):
 		for x in range(3, WORLD_WIDTH - 3):
-			if tiles[y * WORLD_WIDTH + x] != "water": return Vector2i(x, y)
+			if tiles[y * WORLD_WIDTH + x] == "water": continue
+			var occupied := false
+			for s in sites:
+				if int(s["x"]) == x and int(s["y"]) == y:
+					occupied = true
+					break
+			if not occupied: return Vector2i(x, y)
 	return Vector2i(WORLD_WIDTH / 2, WORLD_HEIGHT / 2)
 
 
@@ -828,6 +983,24 @@ func _command_work_priority(faction_id: String, command: Dictionary) -> Dictiona
 	var priority: int = int(command.get("priority", -1))
 	if priority < 0 or priority > 9: return _error("İş önceliği Kapalı (0) veya 1-9 olmalı.")
 	colonist["work_priorities"][work] = priority
+	return _ok()
+
+
+func _default_schedule() -> Array:
+	var hours: Array = []
+	for hour in 24:
+		hours.append("sleep" if hour < 6 or hour >= 22 else "recreation" if hour >= 19 else "work" if hour >= 8 else "anything")
+	return hours
+
+
+func _command_schedule(faction_id: String, command: Dictionary) -> Dictionary:
+	var colonist := _owned_colonist(faction_id, str(command.get("colonist_id", "")))
+	if colonist.is_empty(): return _error("Kolonist bulunamadı veya size ait değil.")
+	var hour := int(command.get("hour", -1))
+	var activity := str(command.get("activity", ""))
+	if hour < 0 or hour >= 24 or activity not in ["anything", "work", "recreation", "sleep"]:
+		return _error("Geçersiz günlük plan hücresi.")
+	colonist["schedule"][hour] = activity
 	return _ok()
 
 
@@ -1224,15 +1397,34 @@ func _tick_one_second() -> void:
 	_tick_farms()
 	state["raid_clock"] = int(state["raid_clock"]) + 1
 	state["caravan_clock"] = int(state["caravan_clock"]) + 1
-	if int(state["raid_clock"]) == 130:
-		for faction in state["factions"]:
-			_event("raid_warning", "%s yakınlarında düşman izleri görüldü." % faction["settlement_name"], str(faction["site_id"]))
-	if int(state["raid_clock"]) >= 150:
-		state["raid_clock"] = -40
-		_spawn_raids()
-	if int(state["caravan_clock"]) >= 100:
+	var difficulty: Dictionary = SetupCatalog.find_by_id(SetupCatalog.DIFFICULTIES, str(state.get("difficulty_id", "frontier")))
+	if float(difficulty.get("raid_scale", 1.0)) > 0.0:
+		var raid_period := _event_period("raid")
+		if int(state["raid_clock"]) == raid_period - 20:
+			for faction in state["factions"]:
+				_event("raid_warning", "%s yakınlarında düşman izleri görüldü." % faction["settlement_name"], str(faction["site_id"]))
+		if int(state["raid_clock"]) >= raid_period:
+			state["raid_clock"] = -40
+			state["raid_cycle"] = int(state.get("raid_cycle", 0)) + 1
+			_spawn_raids()
+	if int(state["caravan_clock"]) >= _event_period("caravan"):
 		state["caravan_clock"] = -35
+		state["caravan_cycle"] = int(state.get("caravan_cycle", 0)) + 1
 		_spawn_npc_caravans()
+
+
+func _event_period(kind: String) -> int:
+	var storyteller: Dictionary = SetupCatalog.find_by_id(SetupCatalog.STORYTELLERS, str(state.get("storyteller_id", "steady")))
+	var factor := float(storyteller.get("raid_factor", 1.0)) if kind == "raid" else float(storyteller.get("caravan_factor", 1.0))
+	if kind == "raid":
+		var difficulty: Dictionary = SetupCatalog.find_by_id(SetupCatalog.DIFFICULTIES, str(state.get("difficulty_id", "frontier")))
+		factor /= maxf(0.1, float(difficulty.get("raid_scale", 1.0)))
+	var variance := float(storyteller.get("variance", 0.0))
+	if variance > 0.0:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = _seed_number("%s/%s/%d" % [str(state.get("seed", "")), kind, int(state.get(kind + "_cycle", 0))])
+		factor *= 1.0 + rng.randf_range(-variance, variance)
+	return maxi(35, roundi((150.0 if kind == "raid" else 100.0) * factor))
 
 
 func _tick_colonist(colonist: Dictionary) -> void:
@@ -1255,17 +1447,24 @@ func _tick_colonist(colonist: Dictionary) -> void:
 	if float(health["bleeding"]) <= 0.0 and float(health["hp"]) < 100.0:
 		health["hp"] = minf(100.0, float(health["hp"]) + 0.025)
 	_update_health_summary(health)
+	var day_length := maxi(1, int(state.get("day_length", 600)))
+	var hour := (8 + floori(float(posmod(int(state["time"]), day_length)) * 24.0 / float(day_length))) % 24
+	var plan: Array = colonist.get("schedule", _default_schedule())
+	var activity := str(plan[hour]) if hour < plan.size() else "anything"
 	if float(needs["hunger"]) < 42.0 and int(faction["inventory"].get("food", 0)) > 0:
 		faction["inventory"]["food"] = int(faction["inventory"]["food"]) - 1
 		needs["hunger"] = minf(100.0, float(needs["hunger"]) + 42.0)
 	_update_mood(colonist)
-	if float(needs["rest"]) < 20.0 and not bool(colonist["drafted"]): colonist["resting"] = true
+	var has_manual_order := not (colonist.get("manual", {}) as Dictionary).is_empty()
+	if has_manual_order: colonist["resting"] = false
+	if (float(needs["rest"]) < 20.0 or activity == "sleep") and not bool(colonist["drafted"]) and not has_manual_order:
+		colonist["resting"] = true
 	if bool(colonist.get("resting", false)) and not bool(colonist["drafted"]):
 		var rest_gain := 0.9
 		for structure in state["maps"][colonist["site_id"]]["structures"]:
 			if structure["kind"] == "bed": rest_gain = 1.7; break
 		needs["rest"] = minf(100.0, float(needs["rest"]) + rest_gain)
-		if float(needs["rest"]) >= 80.0: colonist["resting"] = false
+		if float(needs["rest"]) >= 80.0 and activity != "sleep": colonist["resting"] = false
 		return
 	if int(colonist.get("attack_cooldown", 0)) > 0:
 		colonist["attack_cooldown"] = int(colonist["attack_cooldown"]) - 1
@@ -1278,6 +1477,10 @@ func _tick_colonist(colonist: Dictionary) -> void:
 		_tick_drafted(colonist)
 		return
 	if _tick_treat(colonist): return
+	if activity == "recreation":
+		needs["mood"] = minf(100.0, float(needs.get("mood", 75.0)) + 0.05)
+		_tick_idle(colonist)
+		return
 	var current := _order_by_id(str(colonist["current_order"]))
 	if not current.is_empty() and current["status"] == "claimed" and current["claimed_by"] == colonist["id"]:
 		_tick_order(colonist, current)
@@ -1840,7 +2043,8 @@ func _spawn_raids() -> void:
 		if living == 0: continue
 		var site_id: String = str(faction["site_id"])
 		var map_data: Dictionary = state["maps"][site_id]
-		var count := 1 if living <= 2 else 2
+		var difficulty: Dictionary = SetupCatalog.find_by_id(SetupCatalog.DIFFICULTIES, str(state.get("difficulty_id", "frontier")))
+		var count := maxi(1, roundi((1.0 if living <= 2 else 2.0) * float(difficulty.get("raid_scale", 1.0))))
 		for i in range(count):
 			var edge := _find_edge_spawn(map_data, i + int(state["time"]))
 			state["raiders"].append({"id": _new_id("raider"), "site_id": site_id,

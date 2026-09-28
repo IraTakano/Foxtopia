@@ -31,10 +31,10 @@ var _target_positions: Dictionary = {}
 var _night_alpha := 0.0
 var _sim_time := 0
 
-var _grass_colors := [
-	Color("#6a916a"), Color("#72986e"), Color("#789b73"),
-	Color("#648864"), Color("#75956b"), Color("#6d926c")
-]
+const GROUND_GRASS := Color("#718866")
+const GROUND_SOIL := Color("#8c765b")
+const GROUND_STONE := Color("#777e78")
+const GROUND_WATER := Color("#426b76")
 
 
 func _ready() -> void:
@@ -176,12 +176,12 @@ func _enemy_at(tile: Vector2i) -> String:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#213730"))
+	draw_rect(Rect2(Vector2.ZERO, size), GROUND_GRASS)
 	var w := int(map_data.get("width", 50))
 	var h := int(map_data.get("height", 50))
 	var scale := TILE_SIZE * zoom
-	if _grass_texture != null:
-		draw_texture_rect(_grass_texture, Rect2(camera_offset, Vector2(w, h) * scale), false)
+	var biome := str(map_data.get("biome", "plains"))
+	_draw_grass_ground(w, h, scale, biome)
 	var min_x := maxi(0, int(floor(-camera_offset.x / scale)))
 	var min_y := maxi(0, int(floor(-camera_offset.y / scale)))
 	var max_x := mini(w - 1, int(ceil((size.x - camera_offset.x) / scale)))
@@ -190,22 +190,8 @@ func _draw() -> void:
 	for y in range(min_y, max_y + 1):
 		for x in range(min_x, max_x + 1):
 			var p := _pos_for(x, y)
-			var tile_type := "grass"
-			var index := y * w + x
-			if index < terrain.size():
-				tile_type = str(terrain[index])
-			var color: Color = _grass_colors[absi(x * 31 + y * 17 + x * y * 3) % _grass_colors.size()]
-			if tile_type == "water":
-				color = Color("#537d85")
-			elif tile_type == "dirt":
-				color = Color("#ac9c71", 0.58)
-			elif tile_type == "stone" or tile_type == "rock" or tile_type == "rock_ground":
-				color = Color("#82908a")
-			elif _grass_texture != null:
-				color.a = 0.14
-			draw_rect(Rect2(p, Vector2.ONE * (scale + 0.5)), color)
-			if scale > 16.0 and (x * 13 + y * 7) % 9 == 0 and tile_type == "grass":
-				draw_circle(p + Vector2(0.72, 0.65) * scale, scale * 0.035, Color("#d6d7a0", 0.55))
+			var tile_type := _terrain_at(terrain, w, h, x, y)
+			_draw_ground_tile(p, scale, tile_type, biome, terrain, w, h, x, y)
 	for zone in map_data.get("zones", []):
 		if str(zone.get("kind", "")) == "stockpile":
 			var zx := int(zone.get("x", 0))
@@ -230,13 +216,6 @@ func _draw() -> void:
 			var y := int(zone.get("y", 0)) + index / int(zone.get("width", 1))
 			_draw_drop({"kind": kind, "amount": amount}, _pos_for(x, y), scale)
 			index += 1
-	if scale > 17.0:
-		for y in range(min_y, max_y + 2):
-			var yy := camera_offset.y + float(y) * scale
-			draw_line(Vector2(0, yy), Vector2(size.x, yy), Color("#263e32", 0.12), 1.0)
-		for x in range(min_x, max_x + 2):
-			var xx := camera_offset.x + float(x) * scale
-			draw_line(Vector2(xx, 0), Vector2(xx, size.y), Color("#263e32", 0.12), 1.0)
 	for resource in map_data.get("resources", []):
 		var x := int(resource.get("x", -1))
 		var y := int(resource.get("y", -1))
@@ -280,6 +259,132 @@ func _draw() -> void:
 	if _tile_hover.x >= 0 and _tile_hover.y >= 0 and _tile_hover.x < w and _tile_hover.y < h:
 		draw_rect(Rect2(_pos_for(_tile_hover.x, _tile_hover.y), Vector2.ONE * scale), Color("#e8e6b9", 0.65), false, 1.6)
 
+func _draw_grass_ground(width: int, height: int, scale: float, biome: String) -> void:
+	if _grass_texture == null:
+		draw_rect(Rect2(camera_offset, Vector2(width, height) * scale), GROUND_GRASS)
+		return
+	var tint := Color("#e3e7d8")
+	match biome:
+		"forest": tint = Color("#d7dfd1")
+		"arid": tint = Color("#ecd6ad")
+		"tundra": tint = Color("#d7dfdd")
+		"rocky": tint = Color("#dde0d5")
+	var patch_tiles := 8
+	var texture_size := _grass_texture.get_size()
+	var source_size := Vector2(minf(texture_size.x, 800.0), minf(texture_size.y, 800.0))
+	var source_travel := texture_size - source_size
+	for patch_y in range(0, height, patch_tiles):
+		for patch_x in range(0, width, patch_tiles):
+			var columns := mini(patch_tiles, width - patch_x)
+			var rows := mini(patch_tiles, height - patch_y)
+			var variant := int(_hash01(patch_x / patch_tiles, patch_y / patch_tiles, 43) * 4.0)
+			var source_start := Vector2(source_travel.x if variant % 2 == 1 else 0.0, source_travel.y if variant >= 2 else 0.0)
+			var source_rect := Rect2(source_start, source_size * Vector2(float(columns) / patch_tiles, float(rows) / patch_tiles))
+			var destination := Rect2(camera_offset + Vector2(patch_x, patch_y) * scale, Vector2(columns, rows) * scale)
+			draw_texture_rect_region(_grass_texture, destination, source_rect, tint)
+
+func _terrain_at(terrain: Array, width: int, height: int, x: int, y: int) -> String:
+	if x < 0 or y < 0 or x >= width or y >= height:
+		return "grass"
+	var index := y * width + x
+	return str(terrain[index]) if index < terrain.size() else "grass"
+
+func _material_class(tile_type: String) -> String:
+	if tile_type in ["rock", "stone", "rock_ground"]:
+		return "rock"
+	return tile_type
+
+func _draw_ground_tile(p: Vector2, scale: float, tile_type: String, biome: String, terrain: Array, width: int, height: int, x: int, y: int) -> void:
+	var material := _material_class(tile_type)
+	if material == "grass":
+		_draw_grass_details(p, scale, x, y, biome)
+		return
+	var color := GROUND_SOIL
+	match material:
+		"water": color = GROUND_WATER
+		"rock": color = GROUND_STONE
+		"dirt": color = GROUND_SOIL
+	if biome == "arid" and material == "dirt": color = Color("#a38b62")
+	if biome == "tundra" and material == "rock": color = Color("#94a3a0")
+	var variation := (_hash01(x, y, 73) - 0.5) * 0.075
+	color = color.lightened(maxf(0.0, variation)).darkened(maxf(0.0, -variation))
+	if material == "dirt": color.a = 0.84
+	elif material == "rock": color.a = 0.91
+	var north := _material_class(_terrain_at(terrain, width, height, x, y - 1)) == material
+	var east := _material_class(_terrain_at(terrain, width, height, x + 1, y)) == material
+	var south := _material_class(_terrain_at(terrain, width, height, x, y + 1)) == material
+	var west := _material_class(_terrain_at(terrain, width, height, x - 1, y)) == material
+	var n := 0.0 if north else 0.08 + _hash01(x, y, 1) * 0.06
+	var e := 0.0 if east else 0.08 + _hash01(x, y, 2) * 0.06
+	var s := 0.0 if south else 0.08 + _hash01(x, y, 3) * 0.06
+	var w := 0.0 if west else 0.08 + _hash01(x, y, 4) * 0.06
+	var shape := PackedVector2Array([
+		p + Vector2(w, n) * scale,
+		p + Vector2(0.30, n * 0.65) * scale,
+		p + Vector2(0.68, n * 1.12) * scale,
+		p + Vector2(1.0 - e, n) * scale,
+		p + Vector2(1.0 - e * 0.72, 0.32) * scale,
+		p + Vector2(1.0 - e * 1.09, 0.68) * scale,
+		p + Vector2(1.0 - e, 1.0 - s) * scale,
+		p + Vector2(0.67, 1.0 - s * 0.75) * scale,
+		p + Vector2(0.32, 1.0 - s * 1.12) * scale,
+		p + Vector2(w, 1.0 - s) * scale,
+		p + Vector2(w * 0.70, 0.67) * scale,
+		p + Vector2(w * 1.10, 0.32) * scale,
+	])
+	draw_colored_polygon(shape, color)
+	if material == "water":
+		_draw_water_detail(p, scale, x, y, north, east, south, west)
+	elif material == "dirt":
+		_draw_soil_detail(p, scale, x, y)
+	else:
+		_draw_rock_detail(p, scale, x, y)
+
+func _draw_grass_details(p: Vector2, scale: float, x: int, y: int, biome: String) -> void:
+	if scale < 15.0 or _hash01(x, y, 5) > 0.17:
+		return
+	var center := p + Vector2(0.18 + _hash01(x, y, 6) * 0.64, 0.30 + _hash01(x, y, 7) * 0.55) * scale
+	var color := Color("#516b4b", 0.55) if biome != "arid" else Color("#81774e", 0.50)
+	var line_width := maxf(1.0, scale * 0.025)
+	draw_line(center, center + Vector2(-0.08, -0.13) * scale, color, line_width)
+	draw_line(center, center + Vector2(0.01, -0.19) * scale, color, line_width)
+	draw_line(center, center + Vector2(0.09, -0.12) * scale, color, line_width)
+
+func _draw_water_detail(p: Vector2, scale: float, x: int, y: int, north: bool, east: bool, south: bool, west: bool) -> void:
+	if not north:
+		draw_line(p + Vector2(0.18, 0.14) * scale, p + Vector2(0.82, 0.14) * scale, Color("#b2bda0", 0.40), maxf(1.0, scale * 0.035))
+	if not west:
+		draw_line(p + Vector2(0.14, 0.25) * scale, p + Vector2(0.14, 0.78) * scale, Color("#b2bda0", 0.34), maxf(1.0, scale * 0.028))
+	if _hash01(x, y, 8) < 0.35:
+		var ripple_y := 0.44 + _hash01(x, y, 9) * 0.24
+		draw_line(p + Vector2(0.30, ripple_y) * scale, p + Vector2(0.63, ripple_y) * scale, Color("#b7d2c3", 0.18), maxf(1.0, scale * 0.027))
+	if not south or not east:
+		draw_circle(p + Vector2(0.78, 0.72) * scale, scale * 0.035, Color("#b7d2c3", 0.22))
+
+func _draw_soil_detail(p: Vector2, scale: float, x: int, y: int) -> void:
+	for i in range(4):
+		var dot := p + Vector2(0.16 + _hash01(x, y, 11 + i * 3) * 0.68, 0.16 + _hash01(x, y, 12 + i * 3) * 0.68) * scale
+		var fleck := Color("#beaa83", 0.36) if i % 2 == 0 else Color("#4f5341", 0.27)
+		draw_circle(dot, maxf(1.0, scale * (0.018 + _hash01(x, y, 13 + i * 3) * 0.02)), fleck)
+	if _hash01(x, y, 79) < 0.20:
+		var root := p + Vector2(0.35 + _hash01(x, y, 80) * 0.3, 0.62) * scale
+		var sprig := Color("#67744c", 0.52)
+		draw_line(root, root + Vector2(-0.08, -0.13) * scale, sprig, maxf(1.0, scale * 0.025))
+		draw_line(root, root + Vector2(0.05, -0.18) * scale, sprig, maxf(1.0, scale * 0.025))
+
+func _draw_rock_detail(p: Vector2, scale: float, x: int, y: int) -> void:
+	if _hash01(x, y, 19) > 0.60:
+		return
+	var start := p + Vector2(0.22 + _hash01(x, y, 20) * 0.25, 0.24 + _hash01(x, y, 21) * 0.31) * scale
+	var width := maxf(1.0, scale * 0.022)
+	draw_line(start, start + Vector2(0.18, 0.06) * scale, Color("#b2b5aa", 0.38), width)
+	draw_line(start + Vector2(0.18, 0.06) * scale, start + Vector2(0.30, -0.02) * scale, Color("#525b57", 0.35), width)
+
+func _hash01(x: int, y: int, salt: int) -> float:
+	var n := x * 73856093 ^ y * 19349663 ^ salt * 83492791
+	n = (n ^ (n >> 13)) * 1274126177
+	return float(n & 0xffff) / 65535.0
+
 
 func _draw_resource(resource: Dictionary, p: Vector2, scale: float) -> void:
 	var center := p + Vector2.ONE * scale * 0.5
@@ -287,7 +392,20 @@ func _draw_resource(resource: Dictionary, p: Vector2, scale: float) -> void:
 	if kind == "tree" or kind == "wood":
 		if _tree_texture != null:
 			var chosen: Texture2D = _pine_texture if (int(resource.get("x", 0)) * 7 + int(resource.get("y", 0)) * 11) % 4 == 0 and _pine_texture != null else _tree_texture
-			draw_texture_rect(chosen, Rect2(p + Vector2(-0.12, -0.66) * scale, Vector2(1.24, 1.66) * scale), false)
+			var variation := _hash01(int(resource.get("x", 0)), int(resource.get("y", 0)), 105)
+			var crown_scale := 0.84 + variation * 0.27
+			var shift := (_hash01(int(resource.get("x", 0)), int(resource.get("y", 0)), 106) - 0.5) * 0.14
+			var shadow_center := p + Vector2(0.5 + shift, 0.75) * scale
+			draw_colored_polygon(PackedVector2Array([
+				shadow_center + Vector2(-0.38, 0.02) * scale,
+				shadow_center + Vector2(-0.20, -0.08) * scale,
+				shadow_center + Vector2(0.17, -0.10) * scale,
+				shadow_center + Vector2(0.39, 0.02) * scale,
+				shadow_center + Vector2(0.20, 0.10) * scale,
+				shadow_center + Vector2(-0.17, 0.11) * scale,
+			]), Color("#273d2e", 0.30))
+			var tint := Color("#dce7d4").lerp(Color("#ffffff"), variation * 0.65)
+			draw_texture_rect(chosen, Rect2(p + Vector2(-0.12 + shift, -0.56 - (crown_scale - 1.0)) * scale, Vector2(1.24, 1.66) * scale * crown_scale), false, tint)
 			return
 		draw_rect(Rect2(center + Vector2(-0.08, 0.08) * scale, Vector2(0.16, 0.37) * scale), Color("#785641"))
 		draw_circle(center + Vector2(0, -0.11) * scale, scale * 0.34, Color("#315c45"))
