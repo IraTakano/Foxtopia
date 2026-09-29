@@ -20,27 +20,31 @@ func _run() -> void:
 	var game := root.get_node("Game")
 	var faction: Dictionary = game.state["factions"][0]
 	assert(str(faction["name"]).begins_with("Unnamed"))
-	game.tick(30.0)
-	game.tick(30.0)
 	await process_frame
-	assert(main.get("_naming_prompt_open"), "A lone colonist must still receive the naming event")
+	assert(main.get("_naming_prompt_open"), "An unnamed colony must receive the naming dialog immediately")
 	assert(main.game_paused, "Solo naming event should pause the clock")
-	var naming_popup: PopupPanel
-	for child in main.get_children():
-		if child is PopupPanel and child.visible:
-			naming_popup = child
-			break
-	assert(naming_popup != null)
+	var naming_popup: Control = main.get("_naming_overlay")
+	assert(is_instance_valid(naming_popup))
+	var old_time := int(game.state["time"])
+	main.call("_process", 10.0)
+	assert(int(game.state["time"]) == old_time)
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	main.call("_input", escape)
+	assert(main.get("_naming_prompt_open"), "Escape must not dismiss the required name dialog")
 	var edits := naming_popup.find_children("*", "LineEdit", true, false)
 	assert(edits.size() == 2)
-	(edits[0] as LineEdit).text = "Foxbound"
-	(edits[1] as LineEdit).text = "Hearth"
 	var name_button: Button
 	for button in naming_popup.find_children("*", "Button", true, false):
 		if button.text == main.call("_prep_local", "Name our home", "Yurdumuzu adlandır", "Nazwij nasz dom"):
 			name_button = button
 			break
 	assert(name_button != null)
+	name_button.pressed.emit()
+	assert(main.get("_naming_prompt_open"), "Empty names must not dismiss the dialog")
+	(edits[0] as LineEdit).text = "Foxbound"
+	(edits[1] as LineEdit).text = "Hearth"
 	name_button.pressed.emit()
 	await process_frame
 	assert(str(game.state["factions"][0]["name"]) == "Foxbound")

@@ -8,6 +8,7 @@ var appearance: Dictionary = {"hair": "short", "hair_color": "#4d3c32", "skin": 
 func _ready() -> void:
 	custom_minimum_size = Vector2(130, 146)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 func set_appearance(next_appearance: Dictionary) -> void:

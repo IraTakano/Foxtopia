@@ -1,12 +1,13 @@
 # Foxtopia: oyun saati ve performans kararı
 
-29 Eylül 2026, v0.1.7 yerel çalışma.
+29 Eylül 2026, v0.1.9 yerel çalışma.
 
 ## Kaynak ve davranış
 
 - Ludeon forumundaki [Tynan Sylvester soru-cevabı](https://ludeon.com/forums/index.php?topic=109.0) duraklatma için Space tuşunu, zaman hızları için 1×, 3× ve 6× değerlerini açıklıyor. Bu, resmî geliştirici açıklaması fakat eski bir gönderi; güncel sürümün bütün ayrıntılarını tek başına doğrulamaz.
 - [RimWorld Wiki zaman sayfası](https://mail.rimworldwiki.com/wiki/Day) güncel referans olarak 1× hızda saniyede 60 tick, oyun saatinde 2500 tick ve günde 60.000 tick (gerçek zamanda 16 dakika 40 saniye) veriyor. Wiki topluluk kaynağıdır, resmî Ludeon dokümanı değildir.
-- Foxtopia'nın simülasyon adımı RimWorld tick'iyle bire bir aynı değil. Mevcut kayıtların ve olay aralıklarının anlamını korumak için bir oyun günü **600 Foxtopia adımı** kaldı. 1× hız saniyede **0,6 adım**, dolayısıyla bir gün **1000 gerçek saniye**; 3× ve 6× bu hızı katlıyor. Hız düğmeleri 0×/1×/3×/6×. Space son seçilen hıza duraklatıp döner.
+- Foxtopia'nın simülasyon adımı RimWorld tick'iyle bire bir aynı değil. Mevcut kayıtların ve olay aralıklarının anlamını korumak için bir oyun günü **600 Foxtopia adımı** kaldı. Kullanıcı denemesinde eski tempo yavaş bulunduğundan 1× hız saniyede **1,5 adım** oldu; bir gün yaklaşık **400 gerçek saniye** sürer. 3× yaklaşık 133 saniye, 6× yaklaşık 67 saniyedir. Hız düğmeleri 0×/1×/3×/6×. Space son seçilen hıza duraklatıp döner.
+- Haritadaki hücreler arası görsel geçiş simülasyon hızına göre ölçekleniyor. Böylece hız arttığında kolonist görüntüsü eski konuma gereğinden uzun süre bağlı kalmıyor.
 - Tek oyunculu Esc menüsü açılınca saat durur; kapatılınca önceki duraklama ve hız hali döner. Çok oyunculuda yerel menü diğer oyuncuların simülasyonunu durdurmaz.
 
 ## FPS ölçümü ve düzeltme

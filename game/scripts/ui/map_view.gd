@@ -34,6 +34,7 @@ var _night_alpha := 0.0
 var _sim_time := 0
 var _animation_redraw_elapsed := 0.0
 var _animation_needs_redraw := false
+var _simulation_rate := 1.5
 
 const GROUND_GRASS := Color("#718866")
 const GROUND_SOIL := Color("#8c765b")
@@ -43,6 +44,7 @@ const GROUND_WATER := Color("#426b76")
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE if render_terrain_only else Control.MOUSE_FILTER_STOP
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	clip_contents = true
 	custom_minimum_size = Vector2(500, 400)
 	_grass_texture = load("res://assets/grass.png")
@@ -113,6 +115,10 @@ func set_stockpile_inventory(items: Dictionary) -> void:
 	queue_redraw()
 
 
+func set_simulation_rate(steps_per_second: float) -> void:
+	_simulation_rate = maxf(0.1, steps_per_second)
+
+
 func _process(delta: float) -> void:
 	if render_terrain_only:
 		return
@@ -121,7 +127,7 @@ func _process(delta: float) -> void:
 		var target: Vector2 = _target_positions[actor_id]
 		var current: Vector2 = _visual_positions.get(actor_id, target)
 		if current.distance_to(target) > 0.003:
-			_visual_positions[actor_id] = current.move_toward(target, delta * 2.9)
+			_visual_positions[actor_id] = current.move_toward(target, delta * maxf(2.9, _simulation_rate * 1.35))
 			moved = true
 	if moved:
 		_animation_needs_redraw = true
@@ -287,8 +293,9 @@ func _draw() -> void:
 	for caravan in caravans:
 		if str(caravan.get("kind", "")) == "npc" and caravan.has("x"):
 			var p := _pos_for(int(caravan.get("x", 0)), int(caravan.get("y", 0)))
-			draw_circle(p + Vector2.ONE * scale * 0.5, scale * 0.34, Color("#e8c279"))
-			draw_circle(p + Vector2.ONE * scale * 0.5, scale * 0.19, Color("#546e5e"))
+			var trader_appearance := {"sex": "female", "body_type": 1, "head_type": 1, "hair": "bob", "hair_color": "#493728", "skin": "#c88c63", "shirt": "tshirt", "pants": "pants", "shirt_color": "#c6a56f", "pants_color": "#5e6f65"}
+			PawnVisual.draw_pawn(self, p + Vector2.ONE * scale * 0.5, scale * 0.86, trader_appearance)
+			_draw_actor_name(str(caravan.get("trader_name", "Trader")), p + Vector2(scale * 0.5, scale * 0.91), scale, 1.0, false)
 	for unit in raiders:
 		_draw_person(unit, scale, true)
 	for unit in units:
@@ -531,6 +538,9 @@ func _draw_person(unit: Dictionary, scale: float, enemy: bool) -> void:
 		return
 	var center := p + Vector2.ONE * scale * 0.5
 	PawnVisual.draw_pawn(self, center, scale * 0.88, unit.get("appearance", {}), selected_ids.has(id), enemy, bool(unit.get("drafted", false)))
+	var health: Dictionary = unit.get("health", {})
+	var hp_ratio := clampf(float(health.get("hp", 100.0)) / maxf(1.0, float(health.get("max_hp", 100.0))), 0.0, 1.0)
+	_draw_actor_name(str(unit.get("name", "")), p + Vector2(scale * 0.5, scale * 0.91), scale, hp_ratio, not enemy)
 	var carrying: Dictionary = unit.get("carrying", {})
 	if not carrying.is_empty():
 		_draw_drop(carrying, center + Vector2(scale * 0.12, scale * 0.20), scale * 0.4)
@@ -539,3 +549,16 @@ func _draw_person(unit: Dictionary, scale: float, enemy: bool) -> void:
 		var remaining := maxi(0, int(unit.get("attack_at", _sim_time)) - _sim_time)
 		if remaining > 0 and scale > 25.0:
 			draw_string(get_theme_default_font(), center + Vector2(-scale * 0.12, -scale * 0.55), str(remaining), HORIZONTAL_ALIGNMENT_CENTER, scale * 0.5, 11, Color("#f3d1a3"))
+
+
+func _draw_actor_name(actor_name: String, center: Vector2, scale: float, hp_ratio: float, show_health: bool) -> void:
+	if actor_name.is_empty() or scale < 17.0:
+		return
+	var font := get_theme_default_font()
+	var font_size := clampi(int(scale * 0.25), 10, 14)
+	var label_width := clampf(font.get_string_size(actor_name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + 12.0, 28.0, 150.0)
+	var rect := Rect2(center.x - label_width * 0.5, center.y - 3.0, label_width, float(font_size + 5))
+	draw_rect(rect, Color("#17211fdc"))
+	if show_health and hp_ratio < 0.995:
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x * hp_ratio, rect.size.y)), Color("#9a6e61c9") if hp_ratio < 0.5 else Color("#819879c9"))
+	draw_string(font, Vector2(rect.position.x + 6.0, rect.position.y + font_size), actor_name, HORIZONTAL_ALIGNMENT_CENTER, label_width - 12.0, font_size, Color("#f4ebd9"))

@@ -17,7 +17,7 @@ const MAX_GROWING_TEMPERATURE := 42.0
 static func world_calendar() -> Dictionary:
 	return {"days_per_period": DAYS_PER_PERIOD, "periods_per_year": PERIODS_PER_YEAR,
 		"days_per_year": DAYS_PER_YEAR, "start_year": START_YEAR,
-		"period_names": ["Seedtime", "Highsun", "Harvestfall", "Frostrest"]}
+		"period_names": ["January", "April", "July", "October"]}
 
 
 static func date_from_steps(steps: int, day_length: int = DEFAULT_DAY_LENGTH) -> Dictionary:

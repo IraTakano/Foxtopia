@@ -32,14 +32,14 @@ func _run() -> void:
 	assert(heard_alert, "A new top-right warning should play its alert sound")
 	main.call("_set_speed", 3.0)
 	main.call("_process", 10.0)
-	assert(int(model.state["time"]) == 18, "3x must advance 18 model steps in 10 real seconds")
+	assert(int(model.state["time"]) == 45, "3x must advance 45 model steps in 10 real seconds")
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
 	escape.pressed = true
 	main.call("_input", escape)
 	assert(main.game_paused and main.get("_pause_menu_open"))
 	main.call("_process", 10.0)
-	assert(int(model.state["time"]) == 18, "Esc menu did not stop simulation")
+	assert(int(model.state["time"]) == 45, "Esc menu did not stop simulation")
 	for child in main.get_children():
 		if child is PopupPanel and child.visible:
 			child.hide()
@@ -56,7 +56,7 @@ func _run() -> void:
 	await process_frame
 	assert(main.get("_save_picker_open") and main.game_paused, "Load picker must hold the solo pause")
 	main.call("_process", 10.0)
-	assert(int(model.state["time"]) == 18)
+	assert(int(model.state["time"]) == 45)
 	for child in main.get_children():
 		if child is PopupPanel and child.visible:
 			child.hide()

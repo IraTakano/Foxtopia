@@ -31,13 +31,13 @@ const RESEARCH_PROJECTS := {
 	"stonework": {"name": "Taş İşçiliği", "cost": 35, "requires": []},
 	"barriers": {"name": "Barikat", "cost": 40, "requires": ["stonework"]},
 }
-const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11}
+const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11, "tshirt": 8, "pants": 9}
 const TRAIT_COSTS := {"hardworking": 6, "calm": 4, "quick": 4, "curious": 3,
 	"kind": 3, "night_owl": 2, "timid": -4, "abrasive": -4, "lazy": -6}
 const HEALTH_CONDITION_COSTS := {"asthma": -4, "bad_back": -5, "scar": -2}
 const CHILDHOOD_SKILL_BONUSES := {"rural_child": "harvest", "town_child": "haul", "apprentice": "build"}
 const ADULTHOOD_SKILL_BONUSES := {"farmer": "harvest", "builder": "build", "medic": "treat", "scholar": "research"}
-const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2}
+const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2, "tshirt": 0, "pants": 0, "none": 0}
 const STARTING_RELATIONSHIP_OPINIONS := {"friend": 35, "rival": -35, "partner": 65,
 	"parent": 45, "child": 45, "sibling": 40}
 const PREPARATION_POINT_LIMIT := 12
@@ -131,6 +131,7 @@ func preview_world(seed_text: String, options: Dictionary = {}) -> Dictionary:
 			rainfalls.append(snappedf(rainfall, 1.0))
 			temperatures.append(snappedf(temperature, 0.1))
 	var sites: Array = []
+	var water_bodies := _classify_water_bodies(tiles, WORLD_WIDTH, WORLD_HEIGHT)
 	var population_count := clampi(roundi(22.0 + float(world_options["population"]) * 54.0), 22, 76)
 	for i in range(population_count):
 		var pos := _find_site_position(rng, sites, tiles)
@@ -147,7 +148,8 @@ func preview_world(seed_text: String, options: Dictionary = {}) -> Dictionary:
 		})
 	return {"seed": seed_value, "width": WORLD_WIDTH, "height": WORLD_HEIGHT,
 		"tiles": tiles, "elevation": elevations, "rainfall_map": rainfalls,
-		"temperature_map": temperatures, "options": world_options, "sites": sites,
+		"temperature_map": temperatures, "water_bodies": water_bodies,
+		"options": world_options, "sites": sites,
 		"calendar": ClimateCalendar.world_calendar()}
 
 
@@ -178,20 +180,23 @@ func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
 	var site_latitude := snappedf((0.5 - (float(y) + 0.5) / float(height)) * 180.0, 0.1)
 	var climate_profile: Dictionary = ClimateCalendar.describe(temperature, site_latitude)
 	var terrain := "Mountainous" if biome == "rocky" and elevation > 700 else "Hilly" if elevation > 450 or biome == "rocky" else "Flat"
-	var coast_direction := ""
-	var nearest_water := 99
+	var water_bodies: Array = world_data.get("water_bodies", [])
+	var shore_type := "inland"
+	var shore_direction := ""
 	for direction in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var step: Vector2i = direction
-		for distance in range(1, 5):
-			var neighbor_x: int = posmod(x + step.x * distance, width)
-			var neighbor_y: int = y + step.y * distance
-			if neighbor_y < 0 or neighbor_y >= height:
-				break
-			if str(tiles[neighbor_y * width + neighbor_x]) == "water":
-				if distance < nearest_water:
-					nearest_water = distance
-					coast_direction = "west" if step.x < 0 else "east" if step.x > 0 else "north" if step.y < 0 else "south"
-				break
+		var neighbor_x: int = posmod(x + step.x, width)
+		var neighbor_y: int = y + step.y
+		if neighbor_y < 0 or neighbor_y >= height:
+			continue
+		var neighbor_index := neighbor_y * width + neighbor_x
+		if str(tiles[neighbor_index]) != "water":
+			continue
+		var body_kind := str(water_bodies[neighbor_index]) if neighbor_index < water_bodies.size() else _water_body_kind(tiles, width, height, neighbor_index)
+		# Prefer an ocean shore if the tile touches both an ocean and a lake.
+		if shore_type == "inland" or (shore_type == "lakeshore" and body_kind == "ocean"):
+			shore_type = "lakeshore" if body_kind == "lake" else "coast"
+			shore_direction = "west" if step.x < 0 else "east" if step.x > 0 else "north" if step.y < 0 else "south"
 	var hash_value := _seed_number("%s/%d/%d/stone" % [str(world_data.get("seed", "")), x, y])
 	return {
 		"id": site_id, "name": str(site.get("name", "Unsettled land")), "x": x, "y": y,
@@ -203,7 +208,9 @@ func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
 		"season_pattern": climate_profile["season_pattern"],
 		"growing_days": climate_profile["growing_days"],
 		"growing_periods": climate_profile["growing_periods"],
-		"coastal": nearest_water <= 3, "coast_direction": coast_direction if nearest_water <= 3 else "",
+		"shore_type": shore_type, "shore_direction": shore_direction,
+		"coastal": shore_type == "coast", "lakeshore": shore_type == "lakeshore",
+		"coast_direction": shore_direction if shore_type == "coast" else "",
 		"stone_types": ["granite", "slate"] if hash_value % 2 == 0 else ["limestone", "sandstone"],
 		"latitude": site_latitude,
 		"longitude": snappedf(((float(x) + 0.5) / float(width) - 0.5) * 360.0, 0.1),
@@ -217,6 +224,60 @@ func preview_local_map(world_data: Dictionary, site_id: String) -> Dictionary:
 	return _generate_local_map(str(world_data.get("seed", "")), site_id, str(site_info["biome"]), site_info)
 
 
+func _classify_water_bodies(tiles: Array, width: int, height: int) -> Array:
+	# A small enclosed water component is a lake; large connected water is sea.
+	# Horizontal neighbors wrap because the planet is a globe.
+	var kinds: Array = []
+	kinds.resize(tiles.size())
+	for index in range(tiles.size()):
+		if str(tiles[index]) != "water" or kinds[index] != null:
+			continue
+		var component: Array[int] = [index]
+		kinds[index] = "pending"
+		var cursor := 0
+		while cursor < component.size():
+			var current: int = component[cursor]
+			cursor += 1
+			var x: int = current % width
+			var y: int = current / width
+			for step in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+				var next_y: int = y + step.y
+				if next_y < 0 or next_y >= height:
+					continue
+				var next_index: int = next_y * width + posmod(x + step.x, width)
+				if str(tiles[next_index]) == "water" and kinds[next_index] == null:
+					kinds[next_index] = "pending"
+					component.append(next_index)
+		var kind := "lake" if component.size() <= 15 else "ocean"
+		for water_index in component:
+			kinds[water_index] = kind
+	return kinds
+
+
+func _water_body_kind(tiles: Array, width: int, height: int, start_index: int) -> String:
+	# Legacy worlds do not have water_bodies. Stop as soon as the lake limit is exceeded.
+	var seen: Dictionary = {start_index: true}
+	var frontier: Array[int] = [start_index]
+	var cursor := 0
+	while cursor < frontier.size():
+		var current: int = frontier[cursor]
+		cursor += 1
+		var x: int = current % width
+		var y: int = current / width
+		for step in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			var next_y: int = y + step.y
+			if next_y < 0 or next_y >= height:
+				continue
+			var next_index: int = next_y * width + posmod(x + step.x, width)
+			if str(tiles[next_index]) != "water" or seen.has(next_index):
+				continue
+			seen[next_index] = true
+			frontier.append(next_index)
+			if frontier.size() > 15:
+				return "ocean"
+	return "lake"
+
+
 func _starting_inventory(spec: Dictionary, scenario_id: String) -> Dictionary:
 	var scenario: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id)
 	var defaults: Dictionary = scenario.get("inventory", {})
@@ -225,6 +286,9 @@ func _starting_inventory(spec: Dictionary, scenario_id: String) -> Dictionary:
 	if chosen is Dictionary and not chosen.is_empty():
 		for item in defaults.keys():
 			inventory[item] = clampi(int(chosen.get(item, 0)), 0, 999)
+		for item in chosen.keys():
+			if ITEM_PRICES.has(str(item)) or str(item) == "silver":
+				inventory[item] = clampi(int(chosen[item]), 0, 999)
 	return inventory
 
 
@@ -391,7 +455,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 			var cargo: Variant = spec["starting_cargo"]
 			if not cargo is Dictionary: return _error("Invalid starting cargo.")
 			for item in cargo.keys():
-				if str(item) not in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
+				if str(item) not in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket", "tshirt", "pants"]:
 					return _error("Invalid starting cargo item.")
 				if int(cargo[item]) < 0 or int(cargo[item]) > 999:
 					return _error("Starting cargo quantity must be between 0 and 999.")
@@ -434,8 +498,13 @@ func validate_setup(config: Dictionary) -> Dictionary:
 			if not gear is Dictionary: return _error("Invalid starting gear.")
 			if str(gear.get("weapon", "fists")) not in ["fists", "spear"]:
 				return _error("Invalid starting weapon.")
-			if str(gear.get("apparel", "clothes")) not in ["clothes", "jacket"]:
+			if str(gear.get("apparel", "clothes")) not in ["clothes", "jacket", "none"]:
 				return _error("Invalid starting apparel.")
+			if str(gear.get("shirt", "tshirt")) not in ["tshirt", "none"] or str(gear.get("pants", "pants")) not in ["pants", "none"]:
+				return _error("Invalid starting clothing.")
+			for color_key in ["shirt_color", "pants_color", "apparel_color"]:
+				if gear.has(color_key) and not Color.html_is_valid(str(gear[color_key])):
+					return _error("Invalid clothing color.")
 			var relationships: Variant = person.get("starting_relationships", {})
 			if not relationships is Dictionary: return _error("Invalid starting relationships.")
 			for raw_other in relationships.keys():
@@ -472,11 +541,24 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat": return _error("Invalid skill.")
 				if int(person["skills"][skill]) < 0 or int(person["skills"][skill]) > 10:
 					return _error("Skill level must be between 0 and 10.")
+			for skill in person.get("passions", {}).keys():
+				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat": return _error("Invalid passion skill.")
+				if int(person["passions"][skill]) < 0 or int(person["passions"][skill]) > 2:
+					return _error("Passion must be between 0 and 2.")
+			if int(person.get("chronological_age", age)) < int(age):
+				return _error("Chronological age cannot be below biological age.")
+			if person.has("favorite_color") and not Color.html_is_valid(str(person["favorite_color"])):
+				return _error("Invalid favorite color.")
 			var points := preparation_points(person)
 			if bool(config.get("point_limit_enabled", true)) and points > PREPARATION_POINT_LIMIT:
 				return _error("Colonist preparation exceeds the point limit.")
 			if str(person.get("sex", "female")) not in ["female", "male"]:
 				return _error("Invalid sex selection.")
+			var appearance: Variant = person.get("appearance", {})
+			if appearance is Dictionary:
+				for shape_key in ["body_type", "head_type"]:
+					if appearance.has(shape_key) and int(appearance[shape_key]) not in [0, 1]:
+						return _error("Invalid body or head type.")
 			if str(person.get("gender", "woman")) not in ["woman", "man", "nonbinary"]:
 				return _error("Invalid gender selection.")
 	return _ok()
@@ -494,6 +576,8 @@ func preparation_points(person: Dictionary) -> int:
 	if gear is Dictionary:
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("weapon", "fists")), 0))
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("apparel", "clothes")), 0))
+		points += int(STARTING_GEAR_COSTS.get(str(gear.get("shirt", "none")), 0))
+		points += int(STARTING_GEAR_COSTS.get(str(gear.get("pants", "none")), 0))
 	return points
 
 
@@ -843,27 +927,54 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 		if HEALTH_CONDITION_COSTS.has(condition) and not conditions.has(condition): conditions.append(condition)
 	var starting_hp := 92.0 if conditions.has("bad_back") else 100.0
 	var starting_gear: Dictionary = prepared.get("starting_gear", {})
+	var sex := str(prepared.get("sex", "female" if index % 2 == 0 else "male"))
+	var new_garments := starting_gear.has("shirt") or starting_gear.has("pants")
+	var unit_appearance: Dictionary = appearance.duplicate(true)
+	unit_appearance["sex"] = sex
+	unit_appearance["hair"] = str(appearance.get("hair", "bob" if sex == "female" else "short"))
+	unit_appearance["hair_color"] = str(appearance.get("hair_color", "#4e3d32"))
+	unit_appearance["skin"] = str(appearance.get("skin", "#d9ad81"))
+	unit_appearance["body_type"] = clampi(int(appearance.get("body_type", 0)), 0, 1)
+	unit_appearance["head_type"] = clampi(int(appearance.get("head_type", 0)), 0, 1)
+	var unit_equipment := {"weapon": str(starting_gear.get("weapon", "fists")),
+		"apparel": str(starting_gear.get("apparel", "clothes"))}
+	if new_garments and unit_equipment["apparel"] == "clothes":
+		unit_equipment["apparel"] = "none"
+	unit_appearance["apparel"] = unit_equipment["apparel"]
+	unit_appearance["apparel_color"] = str(starting_gear.get("apparel_color", "#735f50"))
+	if starting_gear.has("apparel_color"):
+		unit_equipment["apparel_color"] = unit_appearance["apparel_color"]
+	if new_garments:
+		unit_equipment["shirt"] = str(starting_gear.get("shirt", "tshirt"))
+		unit_equipment["pants"] = str(starting_gear.get("pants", "pants"))
+		unit_equipment["shirt_color"] = str(starting_gear.get("shirt_color", "#527a81"))
+		unit_equipment["pants_color"] = str(starting_gear.get("pants_color", "#5f6768"))
+		unit_appearance["shirt"] = unit_equipment["shirt"]
+		unit_appearance["pants"] = unit_equipment["pants"]
+		unit_appearance["shirt_color"] = unit_equipment["shirt_color"]
+		unit_appearance["pants_color"] = unit_equipment["pants_color"]
 	return {"id": "colonist_%d_%d" % [faction_index + 1, index + 1],
 		"faction_id": faction_id, "site_id": site_id,
 		"name": str(prepared.get("name", FIRST_NAMES[(faction_index * 3 + index) % FIRST_NAMES.size()])),
+		"first_name": str(prepared.get("first_name", prepared.get("name", "Colonist"))),
+		"nickname": str(prepared.get("nickname", prepared.get("name", "Colonist"))),
+		"last_name": str(prepared.get("last_name", "")),
 		"age": clampi(int(prepared.get("age", 24 + index * 3)), 18, 80),
+		"chronological_age": maxi(int(prepared.get("chronological_age", prepared.get("age", 24 + index * 3))), int(prepared.get("age", 24 + index * 3))),
+		"favorite_color": str(prepared.get("favorite_color", "#8d985d")),
 		"childhood": childhood, "adulthood": adulthood,
-		"sex": str(prepared.get("sex", "female" if index % 2 == 0 else "male")),
-		"gender": str(prepared.get("gender", "woman" if index % 2 == 0 else "man")),
+		"sex": sex,
+		"gender": str(prepared.get("gender", "woman" if sex == "female" else "man")),
 		"x": 23 + index, "y": 25, "previous_x": 23 + index, "previous_y": 25,
 		"facing": "down",
-		"appearance": {"hair": str(appearance.get("hair", "short")),
-			"hair_color": str(appearance.get("hair_color", "#4e3d32")),
-			"skin": str(appearance.get("skin", "medium")),
-			"outfit": str(appearance.get("outfit", "blue"))},
-		"traits": traits.duplicate(), "skills": skills, "work_priorities": priorities,
+		"appearance": unit_appearance,
+		"traits": traits.duplicate(), "skills": skills, "passions": prepared.get("passions", {}).duplicate(true), "work_priorities": priorities,
 		"schedule": _default_schedule(),
 		"relationships": {}, "relationship_types": {},
 		"needs": {"hunger": 100.0, "rest": 100.0, "mood": 75.0, "thoughts": []},
 		"health": {"hp": starting_hp, "max_hp": 100.0, "bleeding": 0.0,
 			"wounds": [], "conditions": conditions},
-		"equipment": {"weapon": str(starting_gear.get("weapon", "fists")),
-			"apparel": str(starting_gear.get("apparel", "clothes"))},
+		"equipment": unit_equipment,
 		"drafted": false, "manual": {}, "current_order": "", "work_left": 0.0,
 		"resting": false, "carrying": {}, "idle_target": {}, "idle_until": 0,
 		"styling_ready_until": -1,
@@ -905,13 +1016,9 @@ func _generate_local_map(seed_text: String, site_id: String, biome: String, site
 	var foliage_noise := FastNoiseLite.new()
 	foliage_noise.seed = int(rng.randi())
 	foliage_noise.frequency = 0.075
-	var coast_direction := str(site_info.get("coast_direction", ""))
+	var shore_direction := str(site_info.get("shore_direction", site_info.get("coast_direction", "")))
 	var hilly := str(site_info.get("terrain", "Flat")) != "Flat"
 	var mountainous := str(site_info.get("terrain", "Flat")) == "Mountainous"
-	var rainfall := int(site_info.get("rainfall", 700))
-	var has_lake := coast_direction.is_empty() and rainfall > 900 and rng.randf() < 0.65
-	var lake_center := Vector2(10 if rng.randi() % 2 == 0 else 40, 11 if rng.randi() % 2 == 0 else 39)
-	var lake_radius := rng.randf_range(6.0, 9.0)
 	var ridge_side := rng.randi_range(0, 3)
 	var terrain: Array = []
 	var resources: Array = []
@@ -924,12 +1031,10 @@ func _generate_local_map(seed_text: String, site_id: String, biome: String, site
 			var protected_center := center_distance < 9.0
 			var tile := "grass"
 			var shore_position := 8.0 + broad * 11.0 + detail * 2.0
-			var shoreline := (coast_direction == "west" and float(x) < shore_position) or (coast_direction == "east" and float(LOCAL_SIZE - 1 - x) < shore_position) or (coast_direction == "north" and float(y) < shore_position) or (coast_direction == "south" and float(LOCAL_SIZE - 1 - y) < shore_position)
-			var lake_distance := Vector2(float(x), float(y)).distance_to(lake_center)
-			var lake := has_lake and lake_distance < lake_radius + broad * 4.0 + detail * 1.5
+			var shoreline := (shore_direction == "west" and float(x) < shore_position) or (shore_direction == "east" and float(LOCAL_SIZE - 1 - x) < shore_position) or (shore_direction == "north" and float(y) < shore_position) or (shore_direction == "south" and float(LOCAL_SIZE - 1 - y) < shore_position)
 			var ridge_distance := float(x) if ridge_side == 0 else float(LOCAL_SIZE - 1 - x) if ridge_side == 1 else float(y) if ridge_side == 2 else float(LOCAL_SIZE - 1 - y)
 			var ridge := hilly and ridge_distance < (10.0 if mountainous else 4.0) + broad * 12.0
-			if not protected_center and (shoreline or lake):
+			if not protected_center and shoreline:
 				tile = "water"
 			elif not protected_center and (ridge or (biome == "rocky" and broad > 0.18)):
 				tile = "rock_ground"
@@ -952,7 +1057,7 @@ func _generate_local_map(seed_text: String, site_id: String, biome: String, site
 		"resources": resources, "drops": [],
 		"structures": [{"id": "stockpile", "kind": "stockpile", "x": 25, "y": 26}],
 		"zones": [{"id": "zone_1", "kind": "stockpile", "x": 24, "y": 26, "width": 3, "height": 2,
-			"accepts": ["wood", "stone", "food", "medicine", "spear", "jacket"]}]}
+			"accepts": ["wood", "stone", "food", "medicine", "spear", "jacket", "tshirt", "pants"]}]}
 
 
 func _resolve_start_site(generated_world: Dictionary, requested_id: String, used: Array) -> String:
@@ -1346,9 +1451,9 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 		return _ok()
 	if action == "equip":
 		var item: String = str(command.get("item", ""))
-		if not item in ["spear", "jacket"]: return _error("Bu eşya kuşanılamaz.")
+		if not item in ["spear", "jacket", "tshirt", "pants"]: return _error("This item cannot be equipped.")
 		var inventory: Dictionary = _faction_by_id(faction_id)["inventory"]
-		if int(inventory.get(item, 0)) < 1: return _error("Depoda eşya yok.")
+		if int(inventory.get(item, 0)) < 1: return _error("This item is not in storage.")
 		var stockpile := _stockpile_for(colonist_map, int(colonist["x"]), int(colonist["y"]), item, true)
 		if stockpile.is_empty(): return _error("This item has no accessible stockpile.")
 		colonist["manual"] = {"action": "equip", "item": item, "x": stockpile["x"], "y": stockpile["y"]}
@@ -1836,11 +1941,15 @@ func _tick_manual(colonist: Dictionary) -> bool:
 		var item := str(manual["item"])
 		var inventory: Dictionary = _faction_by_id(str(colonist["faction_id"]))["inventory"]
 		if int(inventory.get(item, 0)) > 0:
-			var slot := "weapon" if item == "spear" else "apparel"
-			var previous: String = str(colonist["equipment"][slot])
+			var slot := "weapon" if item == "spear" else "shirt" if item == "tshirt" else "pants" if item == "pants" else "apparel"
+			var previous: String = str(colonist["equipment"].get(slot, "none"))
 			inventory[item] = int(inventory[item]) - 1
-			if previous in ["spear", "jacket"]: inventory[previous] = int(inventory.get(previous, 0)) + 1
+			if previous in ["spear", "jacket", "tshirt", "pants"]: inventory[previous] = int(inventory.get(previous, 0)) + 1
 			colonist["equipment"][slot] = item
+			if slot in ["shirt", "pants", "apparel"]:
+				colonist["appearance"][slot] = item
+				if slot in ["shirt", "pants"]:
+					colonist["appearance"][slot + "_color"] = str(colonist["equipment"].get(slot + "_color", "#527a81" if slot == "shirt" else "#5f6768"))
 		colonist["manual"] = {}
 		return true
 	if action == "trade":
@@ -2340,11 +2449,13 @@ func _spawn_npc_caravans() -> void:
 		if already_here: continue
 		var source_index: int = (floori(float(state["time"]) / 100.0) + state["factions"].find(faction)) % friendly_sites.size()
 		var source: Dictionary = friendly_sites[source_index]
+		var trader_names := ["Lyra", "Maren", "Jora", "Tomas", "Nessa", "Ilan"]
+		var trader_name: String = trader_names[(source_index + state["factions"].find(faction) + int(state["time"]) / 100) % trader_names.size()]
 		var caravan := {"id": _new_id("caravan"), "kind": "npc", "faction_id": faction["id"],
 			"site_id": faction["site_id"], "source_site_id": source["id"],
-			"source_name": source["name"], "name": "%s Ticaret Kervanı" % source["name"], "x": 27, "y": 26,
+			"source_name": source["name"], "name": "%s Ticaret Kervanı" % source["name"], "trader_name": trader_name, "x": 27, "y": 26,
 			"ttl": 70, "stock": {"wood": 15, "stone": 12, "food": 18,
-				"medicine": 5, "spear": 3, "jacket": 4, "silver": 80}}
+				"medicine": 5, "spear": 3, "jacket": 4, "tshirt": 3, "pants": 3, "silver": 80}}
 		state["caravans"].append(caravan)
 		_event("caravan", "%s geldi." % caravan["name"], str(faction["site_id"]),
 			"event.caravan_arrived", {"source_name": str(source["name"])})

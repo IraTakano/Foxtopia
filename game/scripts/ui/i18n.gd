@@ -670,6 +670,8 @@ const SITE_NAME_TRANSLATIONS := {
 
 static func localize_site_name(raw: String, locale: String) -> String:
 	var language := normalize_locale(locale)
+	if raw == "Unsettled land":
+		return "Yerleşilmemiş arazi" if language == "tr" else "Niezasiedlony teren" if language == "pl" else raw
 	if language == "tr": return raw
 	var words := raw.split(" ")
 	var base := str(words[0])
