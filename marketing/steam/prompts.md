@@ -1,0 +1,15 @@
+# Foxtopia Steam artwork prompts
+
+The three painted scenes were generated with the built-in imagegen tool. `game/assets/menu_world_v2.png` was used as Foxtopia's own palette and illustration reference. The exact fox mark and wordmark are composited from `foxtopia-logo-1280x720.png`, whose editable source is `foxtopia-logo-1280x720.svg`. Final sizing and placement are reproducible with `compose.gd`.
+
+## Vertical cover (600×900)
+
+> Vertical Steam cover art for Foxtopia, portrait 2:3. Use the Foxtopia main-menu illustration solely as a reference for dark teal night sky, warm amber frontier lighting, crisp ink outlines, hand-painted 2D game-key-art finish, and human-focused science-fiction mood. Create a new portrait composition: three ordinary human colonists in practical jackets and simple packs stand on a rocky ridge overlooking a small modular colony beside a winding river; distant ochre cliffs and a descending shuttle; starfield, a large planet and subtle teal nebula above. Leave the upper quarter clean, dark and low-detail for a separate title overlay. Dramatic but hopeful survival and settlement tone. Thumbnail-readable silhouettes. No visible text, lettering, logo, watermark, RimWorld branding or fox animal characters.
+
+## Panoramic background (3840×1240)
+
+> Foxtopia Steam library panoramic background, ultra-wide 3.1:1. Use the Foxtopia main-menu art only as a visual style and palette reference; create a new landscape scene. Paint a wide uninterrupted horizon of an alien frontier planet at dawn: a small human-built colony of modular shelters, cultivated plots, river bend and pine-like vegetation on the left and center, ochre mesas far to the right, a compact descending shuttle, high dark teal starfield, a distant cratered moon and restrained turquoise nebula. Crisp 2D illustrated key art with dark ink contours, atmospheric depth, amber colony lights and realistic human scale. Keep the central horizontal band readable at a narrow crop and the right third calmer for UI overlay. No foreground character dominating the image. No visible text, lettering, logo, watermark or RimWorld branding.
+
+## Wide cover (920×430)
+
+> Foxtopia Steam wide capsule artwork, 2.14:1. Use the Foxtopia main-menu illustration only as a reference for its dark teal and amber palette, hand-painted 2D science-fiction frontier art and bold inked silhouettes. Create a new scene focused on colony simulation: on the left, two human settlers in practical weathered clothes and simple packs consult a map and carry building timber, while a third tends a cultivated plot; behind them are modest modular shelters, a river and pine-like trees beneath an ochre alien mesa. On the right, leave mostly calm dark teal night sky with subtle turquoise nebula, stars and a distant planet for a separate logo overlay. Warm amber camp light against cool teal sky, cinematic illustrated key art, readable at thumbnail size. No lettering, words, logo, watermark, fox animal characters or RimWorld branding.

@@ -9,6 +9,14 @@ signal command_result(result: Dictionary)
 
 const DEFAULT_PORT := 24567
 const MAX_PLAYERS := 8
+const SetupCatalog = preload("res://scripts/model/setup_catalog.gd")
+
+
+func _net_text(en: String, tr: String, pl: String) -> String:
+	match TranslationServer.get_locale().to_lower().split("_")[0]:
+		"tr": return tr
+		"pl": return pl
+		_: return en
 
 var mode: String = "solo" # solo, host, client
 var _connected_peers: Array[int] = []
@@ -37,7 +45,7 @@ func start_solo() -> Dictionary:
 		"world_options": {}, "scenario_id": "landfall", "storyteller_id": "steady", "difficulty_id": "frontier",
 		"players": [1], "ready": {"1": true}, "started": false}
 	lobby_changed.emit(get_lobby())
-	connection_changed.emit(true, "Tek oyunculu oturum hazır.")
+	connection_changed.emit(true, _net_text("Single-player session is ready.", "Tek oyunculu oturum hazır.", "Sesja jednoosobowa jest gotowa."))
 	return {"ok": true}
 
 
@@ -46,7 +54,7 @@ func host(port: int = DEFAULT_PORT) -> Dictionary:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_server(port, MAX_PLAYERS)
 	if err != OK:
-		return {"ok": false, "error": "Oda açılamadı (hata %d). Portu kontrol et." % err}
+		return {"ok": false, "error": _net_text("Could not open the game room (error %d). Check the port.", "Oda açılamadı (hata %d). Portu kontrol et.", "Nie można otworzyć pokoju (błąd %d). Sprawdź port.") % err}
 	multiplayer.multiplayer_peer = peer
 	mode = "host"
 	_connected_peers.clear()
@@ -55,21 +63,21 @@ func host(port: int = DEFAULT_PORT) -> Dictionary:
 		"world_options": {}, "scenario_id": "landfall", "storyteller_id": "steady", "difficulty_id": "frontier",
 		"players": [1], "ready": {"1": true}, "started": false}
 	lobby_changed.emit(get_lobby())
-	connection_changed.emit(true, "Oda %d portunda açık." % port)
+	connection_changed.emit(true, _net_text("Room is open on port %d.", "Oda %d portunda açık.", "Pokój otwarty na porcie %d.") % port)
 	return {"ok": true, "port": port}
 
 
 func join(address: String, port: int = DEFAULT_PORT) -> Dictionary:
 	_close_peer()
 	if address.strip_edges().is_empty():
-		return {"ok": false, "error": "Sunucu adresi boş."}
+		return {"ok": false, "error": _net_text("Server address is empty.", "Sunucu adresi boş.", "Adres serwera jest pusty.")}
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(address.strip_edges(), port)
 	if err != OK:
-		return {"ok": false, "error": "Bağlantı başlatılamadı (hata %d)." % err}
+		return {"ok": false, "error": _net_text("Could not start connection (error %d).", "Bağlantı başlatılamadı (hata %d).", "Nie można rozpocząć połączenia (błąd %d).") % err}
 	multiplayer.multiplayer_peer = peer
 	mode = "client"
-	connection_changed.emit(false, "Sunucuya bağlanılıyor…")
+	connection_changed.emit(false, _net_text("Connecting to server…", "Sunucuya bağlanılıyor…", "Łączenie z serwerem…"))
 	return {"ok": true}
 
 
@@ -80,15 +88,14 @@ func disconnect_session() -> void:
 
 func configure_lobby(rules: Dictionary) -> Dictionary:
 	if mode == "client":
-		return {"ok": false, "error": "Kuralları yalnızca ev sahibi değiştirebilir."}
+		return {"ok": false, "error": _net_text("Only the host can change game rules.", "Kuralları yalnızca ev sahibi değiştirebilir.", "Tylko gospodarz może zmieniać zasady gry.")}
 	if bool(_lobby.get("started", false)):
-		return {"ok": false, "error": "Oyun başladı."}
+		return {"ok": false, "error": _net_text("The game has already started.", "Oyun başladı.", "Gra już się rozpoczęła.")}
 	var selected_mode := str(rules.get("mode", _lobby.get("mode", "coop")))
 	if selected_mode not in ["solo", "coop", "competitive"]:
-		return {"ok": false, "error": "Geçersiz oyun modu."}
+		return {"ok": false, "error": _net_text("Invalid game mode.", "Geçersiz oyun modu.", "Nieprawidłowy tryb gry.")}
 	_lobby["mode"] = selected_mode
 	_lobby["seed"] = str(rules.get("seed", _lobby.get("seed", "")))
-	_lobby["colonists_per_faction"] = clampi(int(rules.get("colonists_per_faction", 3)), 1, 3)
 	var supplied_options: Variant = rules.get("world_options", {})
 	if supplied_options is Dictionary:
 		var options: Dictionary = {}
@@ -97,6 +104,7 @@ func configure_lobby(rules: Dictionary) -> Dictionary:
 		_lobby["world_options"] = options
 	for key in ["scenario_id", "storyteller_id", "difficulty_id"]:
 		_lobby[key] = str(rules.get(key, _lobby.get(key, "")))
+	_lobby["colonists_per_faction"] = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(_lobby["scenario_id"])).get("colonist_count", 3))
 	_player_setups.clear()
 	_lobby["ready"] = {"1": true}
 	_broadcast_lobby()
@@ -106,7 +114,7 @@ func configure_lobby(rules: Dictionary) -> Dictionary:
 func submit_player_setup(spec: Dictionary) -> Dictionary:
 	if mode == "client":
 		if multiplayer.multiplayer_peer == null:
-			return {"ok": false, "error": "Bağlantı yok."}
+			return {"ok": false, "error": _net_text("No connection.", "Bağlantı yok.", "Brak połączenia.")}
 		_server_submit_setup.rpc_id(1, _clean_setup(spec))
 		return {"ok": true, "pending": true}
 	if mode == "host":
@@ -119,14 +127,15 @@ func submit_player_setup(spec: Dictionary) -> Dictionary:
 
 func start_game(config: Dictionary) -> Dictionary:
 	if mode == "client":
-		return {"ok": false, "error": "Oyunu ev sahibi başlatır."}
+		return {"ok": false, "error": _net_text("Only the host can start the game.", "Oyunu ev sahibi başlatır.", "Tylko gospodarz może rozpocząć grę.")}
 	var setup := config.duplicate(true)
 	var selected_mode := str(setup.get("mode", "solo"))
 	if mode == "solo": selected_mode = "solo"
 	if selected_mode not in ["solo", "coop", "competitive"]:
-		return {"ok": false, "error": "Geçersiz oyun modu."}
+		return {"ok": false, "error": _net_text("Invalid game mode.", "Geçersiz oyun modu.", "Nieprawidłowy tryb gry.")}
 	setup["mode"] = selected_mode
-	setup["colonists_per_faction"] = clampi(int(setup.get("colonists_per_faction", setup.get("colonist_count", 3))), 1, 3)
+	var scenario: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(setup.get("scenario_id", "landfall")))
+	setup["colonists_per_faction"] = int(scenario.get("colonist_count", 3))
 	var supplied: Array = setup.get("faction_specs", [])
 	var host_spec: Dictionary = supplied[0].duplicate(true) if not supplied.is_empty() else {}
 	host_spec["players"] = [1]
@@ -134,7 +143,7 @@ func start_game(config: Dictionary) -> Dictionary:
 	if mode == "host":
 		for peer_id in _connected_peers:
 			if not _player_setups.has(str(peer_id)):
-				return {"ok": false, "error": "%d numaralı oyuncu henüz hazır değil." % peer_id}
+				return {"ok": false, "error": _net_text("Player %d is not ready yet.", "%d numaralı oyuncu henüz hazır değil.", "Gracz %d nie jest jeszcze gotowy.") % peer_id}
 			if selected_mode == "coop":
 				host_spec["players"].append(peer_id)
 			else:
@@ -146,7 +155,7 @@ func start_game(config: Dictionary) -> Dictionary:
 		for spec in specs:
 			var site_id := str(spec.get("site_id", ""))
 			if site_id.is_empty() or selected_sites.has(site_id):
-				return {"ok": false, "error": "Her koloni ayrı bir boş yerleşke seçmeli."}
+				return {"ok": false, "error": _net_text("Each colony must choose a different empty settlement.", "Her koloni ayrı bir boş yerleşke seçmeli.", "Każda kolonia musi wybrać inną pustą osadę.")}
 			selected_sites[site_id] = true
 	setup["faction_specs"] = specs
 	var started: Dictionary = Game.start_new_game(setup)
@@ -159,7 +168,7 @@ func start_game(config: Dictionary) -> Dictionary:
 func send_command(command: Dictionary) -> Dictionary:
 	if mode == "client":
 		if multiplayer.multiplayer_peer == null:
-			return {"ok": false, "error": "Bağlantı yok."}
+			return {"ok": false, "error": _net_text("No connection.", "Bağlantı yok.", "Brak połączenia.")}
 		_server_command.rpc_id(1, command)
 		return {"ok": true, "pending": true}
 	var result: Dictionary = Game.issue_command(1, command)
@@ -282,25 +291,25 @@ func _on_peer_disconnected(peer_id: int) -> void:
 
 
 func _on_connected_to_server() -> void:
-	connection_changed.emit(true, "Sunucuya bağlandı.")
+	connection_changed.emit(true, _net_text("Connected to server.", "Sunucuya bağlandı.", "Połączono z serwerem."))
 	_server_request_lobby.rpc_id(1)
 
 
 func _on_connection_failed() -> void:
-	connection_changed.emit(false, "Sunucuya bağlanılamadı.")
+	connection_changed.emit(false, _net_text("Could not connect to server.", "Sunucuya bağlanılamadı.", "Nie można połączyć się z serwerem."))
 	_close_peer()
 	mode = "solo"
 
 
 func _on_server_disconnected() -> void:
-	connection_changed.emit(false, "Sunucu bağlantısı kesildi.")
+	connection_changed.emit(false, _net_text("Disconnected from server.", "Sunucu bağlantısı kesildi.", "Rozłączono z serwerem."))
 	_close_peer()
 	mode = "solo"
 
 
 func _on_game_state_changed(_snapshot: Dictionary) -> void:
 	if mode == "client": return
-	snapshot_received.emit(get_snapshot())
+	snapshot_received.emit(Game.state)
 	if mode == "host":
 		for peer_id in _connected_peers:
 			_receive_snapshot.rpc_id(peer_id, Game.get_snapshot(peer_id))

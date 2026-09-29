@@ -579,3 +579,230 @@ static func missing_keys(locale: String) -> Array[String]:
 		if not table.has(key):
 			missing.append(str(key))
 	return missing
+
+
+## Simulation messages are part of save files and may arrive from a host using
+## another language. Translate at the presentation boundary on each client.
+const MODEL_ERROR_TRANSLATIONS := {
+	"Oyun başlamadı.": ["Game has not started.", "Gra jeszcze się nie rozpoczęła."],
+	"Oyuncu bir koloniye bağlı değil.": ["Player is not assigned to a colony.", "Gracz nie należy do kolonii."],
+	"Bu yerleşkede emir veremezsiniz.": ["You cannot issue orders at this settlement.", "Nie możesz wydawać rozkazów w tej osadzie."],
+	"Harita dışında.": ["Outside the map.", "Poza mapą."],
+	"Geçersiz iş türü.": ["Invalid work type.", "Nieprawidłowy rodzaj pracy."],
+	"Yerleşke haritası bulunamadı.": ["Settlement map was not found.", "Nie znaleziono mapy osady."],
+	"Su üzerine işaretleme yapılamaz.": ["You cannot designate water.", "Nie można wyznaczyć zadania na wodzie."],
+	"Burada uygun kaynak yok.": ["There is no suitable resource here.", "Nie ma tu odpowiedniego surowca."],
+	"Burada taşınacak malzeme yok.": ["There is nothing to haul here.", "Nie ma tu nic do przeniesienia."],
+	"Burada zaten bir yapı var.": ["A structure is already here.", "W tym miejscu stoi już budowla."],
+	"Önce Taş İşçiliği araştırılmalı.": ["Research Stonework first.", "Najpierw zbadaj obróbkę kamienia."],
+	"Önce Barikat araştırılmalı.": ["Research Barriers first.", "Najpierw zbadaj barykady."],
+	"Önce Tarım araştırılmalı.": ["Research Farming first.", "Najpierw zbadaj rolnictwo."],
+	"Bu iş zaten işaretlenmiş.": ["This job is already designated.", "To zadanie zostało już wyznaczone."],
+	"Kolonist bulunamadı veya size ait değil.": ["Colonist was not found or does not belong to you.", "Nie znaleziono kolonisty lub nie należy on do ciebie."],
+	"İş önceliği Kapalı (0) veya 1-9 olmalı.": ["Work priority must be Off (0) or 1–9.", "Priorytet pracy musi wynosić Wył. (0) lub 1–9."],
+	"Geçersiz günlük plan hücresi.": ["Invalid schedule slot.", "Nieprawidłowa komórka harmonogramu."],
+	"İş emri bulunamadı.": ["Work order was not found.", "Nie znaleziono zlecenia pracy."],
+	"Emir önceliği 1-9 olmalı.": ["Order priority must be 1–9.", "Priorytet rozkazu musi wynosić 1–9."],
+	"Tamamlanmış iş iptal edilemez.": ["A completed job cannot be cancelled.", "Nie można anulować ukończonej pracy."],
+	"Kolonist bulunamadı.": ["Colonist was not found.", "Nie znaleziono kolonisty."],
+	"Geçersiz doğrudan emir.": ["Invalid direct order.", "Nieprawidłowy bezpośredni rozkaz."],
+	"Taşınacak malzeme bulunamadı.": ["No item is available to haul.", "Nie ma przedmiotu do przeniesienia."],
+	"Bu malzemeyi kabul eden bir depolama alanı yok.": ["No stockpile accepts this item.", "Żaden magazyn nie przyjmuje tego przedmiotu."],
+	"Tüccar kervanı bulunamadı.": ["Trade caravan was not found.", "Nie znaleziono karawany handlowej."],
+	"Bu hücreye gidilemez.": ["This tile cannot be reached.", "Nie można dotrzeć do tego pola."],
+	"Bu eşya kuşanılamaz.": ["This item cannot be equipped.", "Nie można wyposażyć tego przedmiotu."],
+	"Depoda eşya yok.": ["The item is not in storage.", "Tego przedmiotu nie ma w magazynie."],
+	"Düşman bulunamadı.": ["Enemy was not found.", "Nie znaleziono wroga."],
+	"Emir uygulanamadı.": ["Order could not be carried out.", "Nie można wykonać rozkazu."],
+	"Araştırma bulunamadı.": ["Research project was not found.", "Nie znaleziono projektu badawczego."],
+	"Bu araştırma tamamlandı.": ["This research is complete.", "Te badania są ukończone."],
+	"Ön koşul tamamlanmadı.": ["Prerequisite research is incomplete.", "Wymagane badania nie są ukończone."],
+	"Görünüş seçimi boş.": ["No appearance changes were selected.", "Nie wybrano zmian wyglądu."],
+	"Geçersiz görünüş değeri.": ["Invalid appearance value.", "Nieprawidłowa wartość wyglądu."],
+	"Hedef koloni bulunamadı.": ["Target colony was not found.", "Nie znaleziono docelowej kolonii."],
+	"Takasın iki tarafı da doldurulmalı.": ["Both sides of the trade must contain items.", "Obie strony wymiany muszą zawierać przedmioty."],
+	"Geçersiz ticaret miktarı.": ["Invalid trade quantity.", "Nieprawidłowa ilość przedmiotów."],
+	"Teklif için kaynak yetersiz.": ["Not enough resources for this offer.", "Za mało zasobów na tę ofertę."],
+	"Bekleyen teklif bulunamadı.": ["Pending offer was not found.", "Nie znaleziono oczekującej oferty."],
+	"Takas için kaynak yetersiz.": ["Not enough resources for this trade.", "Za mało zasobów na tę wymianę."],
+	"Alınacak veya satılacak eşya seçin.": ["Choose an item to buy or sell.", "Wybierz przedmiot do kupienia lub sprzedaży."],
+	"Eşya stoğu yetersiz.": ["Not enough items in stock.", "Za mało przedmiotów w magazynie."],
+	"Gümüş yetersiz.": ["Not enough silver.", "Za mało srebra."],
+	"Tüccarın gümüşü yetersiz.": ["The trader does not have enough silver.", "Kupiec nie ma dość srebra."],
+	"Ad 1-32 karakter olmalı.": ["Name must contain 1–32 characters.", "Nazwa musi mieć od 1 do 32 znaków."],
+	"Geçersiz adlandırma hedefi.": ["Invalid naming target.", "Nieprawidłowy cel nazwania."],
+	"Ticaret kabul edildi; kervan yola çıktı.": ["Trade accepted; the caravan is on its way.", "Wymiana zaakceptowana; karawana jest w drodze."],
+	"Tüccarla alışveriş tamamlandı.": ["Trade with the merchant is complete.", "Handel z kupcem zakończony."],
+	"Bir akıncı etkisiz hale getirildi.": ["A raider was defeated.", "Najeźdźca został pokonany."],
+	"Koloniler arası ticaret kervanı ulaştı.": ["The colony trade caravan has arrived.", "Karawana handlowa dotarła do kolonii."],
+}
+
+const MODEL_ENGLISH_TRANSLATIONS := {
+	"No walkable route to this job.": ["Bu işe yürünebilir bir yol yok.", "Nie ma drogi do tego zadania."],
+	"No walkable route to these supplies.": ["Bu malzemelere yürünebilir bir yol yok.", "Nie ma drogi do tych zasobów."],
+	"No walkable route from these supplies to a stockpile.": ["Bu malzemelerden depoya yürünebilir bir yol yok.", "Nie ma drogi od tych zasobów do magazynu."],
+	"No walkable route to the trader.": ["Tüccara yürünebilir bir yol yok.", "Nie ma drogi do kupca."],
+	"No walkable route to the styling table.": ["Stil masasına yürünebilir bir yol yok.", "Nie ma drogi do stołu stylizacji."],
+	"No walkable route to this tile.": ["Bu kareye yürünebilir bir yol yok.", "Nie ma drogi do tego pola."],
+	"No walkable route to this enemy.": ["Bu düşmana yürünebilir bir yol yok.", "Nie ma drogi do tego wroga."],
+	"This item has no accessible stockpile.": ["Bu eşya için ulaşılabilir depo yok.", "Nie ma dostępnego magazynu na ten przedmiot."],
+	"Build a research bench first.": ["Önce araştırma masası inşa et.", "Najpierw zbuduj stół badawczy."],
+	"Styling table not found.": ["Stil masası bulunamadı.", "Nie znaleziono stołu stylizacji."],
+	"Use a styling table before changing appearance.": ["Görünüşü değiştirmeden önce stil masası kullan.", "Przed zmianą wyglądu użyj stołu stylizacji."],
+	"Speak to a caravan trader first.": ["Önce kervan tüccarıyla konuş.", "Najpierw porozmawiaj z kupcem karawany."],
+	"Stockpile not found.": ["Depo bulunamadı.", "Nie znaleziono magazynu."],
+	"Stockpile needs at least one accepted item.": ["Depo en az bir eşya türünü kabul etmeli.", "Magazyn musi przyjmować co najmniej jeden rodzaj przedmiotów."],
+	"Stockpile overlaps blocked land or another zone.": ["Depo engelli araziyle veya başka bir bölgeyle çakışıyor.", "Magazyn nachodzi na zablokowany teren lub inną strefę."],
+	"Invalid stockpile area.": ["Geçersiz depo alanı.", "Nieprawidłowy obszar magazynu."],
+}
+
+const SITE_NAME_TRANSLATIONS := {
+	"Çınar": ["Sycamore", "Platan"], "Kavak": ["Poplar", "Topola"],
+	"Akkaya": ["White Rock", "Biała Skała"], "Yeşilova": ["Green Plain", "Zielona Równina"],
+	"Güneydere": ["Southbrook", "Południowy Potok"], "Kuzeyyaka": ["Northbank", "Północny Brzeg"],
+	"Taşlık": ["Stoneland", "Kamienisko"], "Yelbayır": ["Windridge", "Wietrzny Grzbiet"],
+	"Söğüt": ["Willow", "Wierzba"], "Gökova": ["Blue Vale", "Błękitna Dolina"],
+	"Kızıltepe": ["Red Hill", "Czerwone Wzgórze"], "Ilıca": ["Warm Spring", "Ciepłe Źródło"],
+	"Umut": ["Hope", "Nadzieja"], "Serin": ["Coolwater", "Chłodna Woda"],
+	"Akpınar": ["White Spring", "Białe Źródło"], "Günyeli": ["Sunwind", "Słoneczny Wiatr"],
+}
+
+
+static func localize_site_name(raw: String, locale: String) -> String:
+	var language := normalize_locale(locale)
+	if language == "tr": return raw
+	var words := raw.split(" ")
+	var base := str(words[0])
+	if SITE_NAME_TRANSLATIONS.has(base):
+		var translations: Array = SITE_NAME_TRANSLATIONS[base]
+		words[0] = str(translations[1] if language == "pl" else translations[0])
+		return " ".join(words)
+	return raw
+
+
+static func localize_caravan_name(raw: String, locale: String) -> String:
+	if not raw.ends_with(" Ticaret Kervanı"):
+		return raw
+	var source := localize_site_name(raw.trim_suffix(" Ticaret Kervanı"), locale)
+	match normalize_locale(locale):
+		"tr": return raw
+		"pl": return "%s — karawana handlowa" % source
+		_: return "%s trade caravan" % source
+
+
+const MODEL_EVENT_TRANSLATIONS := {
+	"event.player_joined": ["{faction_name} established a new colony.", "{faction_name} yeni bir koloni kurdu.", "{faction_name} założyła nową kolonię."],
+	"event.trade_offer": ["{faction_name} sent a trade offer.", "{faction_name} ticaret teklifi gönderdi.", "{faction_name} przesłała ofertę handlową."],
+	"event.trade_accept": ["Trade accepted; the caravan is on its way.", "Ticaret kabul edildi; kervan yola çıktı.", "Wymiana zaakceptowana; karawana jest w drodze."],
+	"event.npc_trade": ["Trade with the merchant is complete.", "Tüccarla alışveriş tamamlandı.", "Handel z kupcem zakończony."],
+	"event.raid_warning": ["Enemy tracks were spotted near {settlement_name}.", "{settlement_name} yakınlarında düşman izleri görüldü.", "W pobliżu {settlement_name} zauważono ślady wrogów."],
+	"event.death": ["{colonist_name} has died.", "{colonist_name} hayatını kaybetti.", "{colonist_name} zmarł."],
+	"event.naming_prompt": ["Your settlers are ready to name their colony and settlement.", "Yerleşimciler kolonilerine ve yerleşkelerine ad vermeye hazır.", "Osadnicy mogą już nazwać kolonię i osadę."],
+	"event.social_argument": ["{first_name} and {second_name} argued.", "{first_name} ile {second_name} tartıştı.", "{first_name} i {second_name} pokłócili się."],
+	"event.social_talk": ["{first_name} and {second_name} talked.", "{first_name} ile {second_name} sohbet etti.", "{first_name} i {second_name} rozmawiali."],
+	"event.trade_ready": ["{colonist_name} is ready to trade with the merchant.", "{colonist_name} tüccarla görüşmeye hazır.", "{colonist_name} może już handlować z kupcem."],
+	"event.styling_ready": ["{colonist_name} is ready to change appearance.", "{colonist_name} görünüşünü değiştirmeye hazır.", "{colonist_name} może zmienić wygląd."],
+	"event.unreachable_manual": ["{colonist_name} cannot reach the ordered destination.", "{colonist_name} emredilen hedefe ulaşamıyor.", "{colonist_name} nie może dotrzeć do celu rozkazu."],
+	"event.unreachable_order": ["A colonist cannot reach a designated job.", "Bir kolonist işaretlenen işe ulaşamıyor.", "Kolonista nie może dotrzeć do wyznaczonej pracy."],
+	"event.build": ["{building_name} was completed.", "{building_name} tamamlandı.", "Ukończono: {building_name}."],
+	"event.research": ["Research completed: {project_name}.", "{project_name} araştırması tamamlandı.", "Ukończono badania: {project_name}."],
+	"event.raid_provoked": ["The raiders have been provoked.", "Akıncılar kışkırtıldı.", "Najeźdźcy zostali sprowokowani."],
+	"event.raid_attack": ["The raiders begin their attack.", "Akıncılar saldırıya başladı.", "Najeźdźcy rozpoczynają atak."],
+	"event.raid_defeated": ["A raider was defeated.", "Bir akıncı etkisiz hale getirildi.", "Najeźdźca został pokonany."],
+	"event.raid": ["Raiders entered {settlement_name} and are preparing to attack.", "{settlement_name} yerleşkesine akıncılar girdi; saldırıya hazırlanıyorlar.", "Najeźdźcy weszli do {settlement_name} i szykują atak."],
+	"event.caravan_arrived": ["{source_name} trade caravan has arrived.", "{source_name} ticaret kervanı geldi.", "Przybyła karawana handlowa z {source_name}."],
+	"event.caravan_left": ["{source_name} trade caravan has left.", "{source_name} ticaret kervanı ayrıldı.", "Karawana handlowa z {source_name} odjechała."],
+	"event.trade_complete": ["The colony trade caravan has arrived.", "Koloniler arası ticaret kervanı ulaştı.", "Karawana handlowa dotarła do kolonii."],
+}
+
+
+static func localize_model_event(event: Dictionary, locale: String) -> String:
+	var key := str(event.get("message_key", ""))
+	if MODEL_EVENT_TRANSLATIONS.has(key):
+		var language := normalize_locale(locale)
+		var index := 1 if language == "tr" else 2 if language == "pl" else 0
+		var args: Dictionary = (event.get("message_args", {}) as Dictionary).duplicate()
+		if args.has("source_name"):
+			args["source_name"] = localize_site_name(str(args["source_name"]), language)
+		if args.has("building_kind"):
+			args["building_name"] = _localize_building_kind(str(args["building_kind"]), language)
+		if args.has("project_id"):
+			args["project_name"] = _localize_project_id(str(args["project_id"]), language)
+		return str((MODEL_EVENT_TRANSLATIONS[key] as Array)[index]).format(args)
+	return localize_model_text(str(event.get("message", "")), locale, str(event.get("kind", "")))
+
+
+static func _localize_building_kind(kind: String, language: String) -> String:
+	var names := {
+		"build_wall": ["Wood wall", "Ahşap duvar", "Drewniana ściana"],
+		"build_stone_wall": ["Stone wall", "Taş duvar", "Kamienna ściana"],
+		"build_bed": ["Bed", "Yatak", "Łóżko"],
+		"build_research_bench": ["Research bench", "Araştırma masası", "Stół badawczy"],
+		"build_styling_table": ["Styling table", "Stil masası", "Stół stylizacji"],
+		"build_barrier": ["Barrier", "Barikat", "Barykada"],
+		"build_farm": ["Grow zone", "Ekim alanı", "Pole uprawne"],
+	}
+	var index := 1 if language == "tr" else 2 if language == "pl" else 0
+	return str((names.get(kind, ["Structure", "Yapı", "Budowla"]) as Array)[index])
+
+
+static func _localize_project_id(project_id: String, language: String) -> String:
+	var names := {
+		"farming": ["Farming", "Tarım", "Rolnictwo"],
+		"first_aid": ["First Aid", "İlk Yardım", "Pierwsza pomoc"],
+		"stonework": ["Stonework", "Taş İşçiliği", "Obróbka kamienia"],
+		"barriers": ["Barriers", "Barikat", "Barykady"],
+	}
+	var index := 1 if language == "tr" else 2 if language == "pl" else 0
+	return str((names.get(project_id, [project_id, project_id, project_id]) as Array)[index])
+
+
+static func localize_model_text(raw: String, locale: String, kind: String = "") -> String:
+	var language := normalize_locale(locale)
+	if language != "en" and MODEL_ENGLISH_TRANSLATIONS.has(raw):
+		var localized: Array = MODEL_ENGLISH_TRANSLATIONS[raw]
+		return str(localized[0] if language == "tr" else localized[1])
+	if language == "tr": return raw
+	if MODEL_ERROR_TRANSLATIONS.has(raw):
+		var translations: Array = MODEL_ERROR_TRANSLATIONS[raw]
+		return str(translations[1] if language == "pl" else translations[0])
+	if raw.begins_with("Bilinmeyen komut: "):
+		var command := raw.trim_prefix("Bilinmeyen komut: ")
+		return ("Nieznane polecenie: %s" if language == "pl" else "Unknown command: %s") % command
+	match kind:
+		"trade_offer": return ("%s złożyła ofertę handlową." if language == "pl" else "%s sent a trade offer.") % raw.trim_suffix(" ticaret teklifi gönderdi.")
+		"raid_warning": return ("W pobliżu %s zauważono ślady wrogów." if language == "pl" else "Enemy tracks were spotted near %s.") % raw.trim_suffix(" yakınlarında düşman izleri görüldü.")
+		"death": return ("%s zmarł." if language == "pl" else "%s has died.") % raw.trim_suffix(" hayatını kaybetti.")
+		"trade_ready": return ("%s może już handlować z kupcem." if language == "pl" else "%s is ready to trade with the merchant.") % raw.trim_suffix(" tüccarla görüşmeye hazır.")
+		"build":
+			var building := raw.trim_suffix(" tamamlandı.")
+			return ("Ukończono: %s." if language == "pl" else "%s was completed.") % _localize_building_name(building, language)
+		"research":
+			var project := raw.trim_suffix(" araştırması tamamlandı.")
+			return ("Ukończono badania: %s." if language == "pl" else "Research completed: %s.") % _localize_research_name(project, language)
+		"raid": return ("Najeźdźcy weszli do %s i szykują atak." if language == "pl" else "Raiders entered %s and are preparing to attack.") % raw.trim_suffix(" yerleşkesine akıncılar girdi; saldırı hazırlığındalar.")
+		"caravan": return ("Przybyła karawana: %s." if language == "pl" else "%s has arrived.") % localize_caravan_name(raw.trim_suffix(" geldi."), language)
+		"caravan_left": return ("%s odjechała." if language == "pl" else "%s has left.") % localize_caravan_name(raw.trim_suffix(" ayrıldı."), language)
+	if raw.contains("ş") or raw.contains("ğ") or raw.contains("ı") or raw.contains("İ") or raw.contains("ç") or raw.contains("ö") or raw.contains("ü"):
+		return "Nie można ukończyć akcji." if language == "pl" else "The action could not be completed."
+	return raw
+
+
+static func _localize_building_name(raw: String, language: String) -> String:
+	var names := {
+		"Ahşap duvar": ["Wood wall", "Drewniana ściana"], "Taş duvar": ["Stone wall", "Kamienna ściana"],
+		"Yatak": ["Bed", "Łóżko"], "Araştırma masası": ["Research bench", "Stół badawczy"],
+		"Stil masası": ["Styling table", "Stół stylizacji"], "Barikat": ["Barrier", "Barykada"],
+		"Ekim alanı": ["Grow zone", "Pole uprawne"], "Yapı": ["Structure", "Budowla"],
+	}
+	var values: Array = names.get(raw, [raw, raw])
+	return str(values[1] if language == "pl" else values[0])
+
+
+static func _localize_research_name(raw: String, language: String) -> String:
+	var names := {
+		"Tarım": ["Farming", "Rolnictwo"], "İlk Yardım": ["First Aid", "Pierwsza pomoc"],
+		"Taş İşçiliği": ["Stonework", "Obróbka kamienia"], "Barikat": ["Barriers", "Barykady"],
+	}
+	var values: Array = names.get(raw, [raw, raw])
+	return str(values[1] if language == "pl" else values[0])

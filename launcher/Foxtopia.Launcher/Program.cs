@@ -18,6 +18,7 @@ internal static class Program
         if (!firstInstance) return 0;
 
         var installRoot = AppContext.BaseDirectory;
+        var uiLanguage = LauncherLocalization.ReadLanguage(installRoot);
         try
         {
             var config = ReadConfig(installRoot);
@@ -27,12 +28,12 @@ internal static class Program
             var state = updater.ReadState();
             var gamePath = updater.GetGamePath(state);
             if (!File.Exists(gamePath))
-                throw new FileNotFoundException("Oyun dosyası bulunamadı.", gamePath);
+                throw new FileNotFoundException(LauncherLocalization.Text(uiLanguage, "missing_game"), gamePath);
             var process = Process.Start(new ProcessStartInfo(gamePath)
             {
                 WorkingDirectory = Path.GetDirectoryName(gamePath)!,
                 UseShellExecute = false
-            }) ?? throw new InvalidOperationException("Oyun başlatılamadı.");
+            }) ?? throw new InvalidOperationException(LauncherLocalization.Text(uiLanguage, "start_failed"));
             process.WaitForExit();
             updater.CleanupOldVersions();
             return process.ExitCode;
@@ -90,7 +91,7 @@ internal sealed class UpdateWindow : Form
         MinimizeBox = false;
         ShowInTaskbar = true;
 
-        _status = new Label { Left = 22, Top = 22, Width = 380, Text = "Güncellemeler kontrol ediliyor…" };
+        _status = new Label { Left = 22, Top = 22, Width = 380, Text = LauncherLocalization.Text(updater.UiLanguage, "checking") };
         _progress = new ProgressBar { Left = 22, Top = 54, Width = 380, Height = 20, Style = ProgressBarStyle.Marquee };
         Controls.Add(_status);
         Controls.Add(_progress);
@@ -116,7 +117,7 @@ internal sealed class UpdateWindow : Form
         {
             _updater.Log($"Update failed: {ex}");
             MessageBox.Show(this,
-                "Güncelleme kurulamadı. Mevcut sürüm açılacak.\n\n" + ex.Message,
+                LauncherLocalization.Text(_updater.UiLanguage, "update_failed", ex.Message),
                 "Foxtopia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally { Close(); }

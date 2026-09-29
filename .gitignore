@@ -18,3 +18,4 @@ Thumbs.db
 # Local visual smoke-test captures
 /character-preview.png
 /ui-smoke.png
+/marketing/steam/*.zip

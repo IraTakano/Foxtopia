@@ -20,6 +20,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
         @"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", RegexOptions.CultureInvariant);
 
     private readonly string _root = Path.GetFullPath(installRoot);
+    public string UiLanguage { get; } = LauncherLocalization.ReadLanguage(installRoot);
     private readonly LauncherConfig _config = config;
     private readonly string? _fixtureDirectory = fixtureDirectory;
 
@@ -46,7 +47,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
         if (_fixtureDirectory is null && string.IsNullOrWhiteSpace(_config.Repository))
             return UpdateOutcome.NoRepository;
 
-        report("Güncellemeler kontrol ediliyor…", null);
+        report(LauncherLocalization.Text(UiLanguage, "checking"), null);
         ReleaseInfo? release;
         try
         {
@@ -81,7 +82,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
             return UpdateOutcome.AlreadyCurrent;
 
         ValidateManifest(release);
-        report($"{release.Version} indiriliyor…", 0);
+        report(LauncherLocalization.Text(UiLanguage, "downloading", release.Version), 0);
         var updatesRoot = Path.Combine(_root, "updates");
         var versionsRoot = Path.Combine(_root, "versions");
         Directory.CreateDirectory(updatesRoot);
@@ -100,7 +101,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
             if (!string.IsNullOrWhiteSpace(release.ArchiveDigest))
                 CheckDigest(archivePath, release.ArchiveDigest, "GitHub asset");
 
-            report("Güncelleme hazırlanıyor…", null);
+            report(LauncherLocalization.Text(UiLanguage, "preparing"), null);
             ExtractVerifiedZip(archivePath, stagingPath);
             var executable = Path.Combine(stagingPath, _config.GameExecutable);
             if (!File.Exists(executable))
@@ -109,7 +110,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
             Directory.Move(stagingPath, finalPath);
             SaveStateAtomically(new InstallState { Version = release.Version, Directory = finalDirectory });
             Log($"Installed release {release.Version} in {finalDirectory}.");
-            report("Güncelleme tamamlandı.", 100);
+            report(LauncherLocalization.Text(UiLanguage, "complete"), 100);
             return UpdateOutcome.Updated;
         }
         finally
@@ -248,7 +249,7 @@ internal sealed class Updater(string installRoot, LauncherConfig config, string?
                         throw new InvalidDataException("Release archive exceeds the size limit.");
                     await destination.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
                     if (release.ArchiveLength is > 0)
-                        report($"{release.Version} indiriliyor…", (int)Math.Min(99, copied * 100 / release.ArchiveLength.Value));
+                        report(LauncherLocalization.Text(UiLanguage, "downloading", release.Version), (int)Math.Min(99, copied * 100 / release.ArchiveLength.Value));
                 }
                 if (release.ArchiveLength is > 0 && copied != release.ArchiveLength)
                     throw new InvalidDataException("Downloaded archive length does not match GitHub metadata.");

@@ -37,7 +37,7 @@ func _initialize() -> void:
 	assert(local_preview["terrain"].size() == 2500)
 	var spec := {"id": "faction_1", "name": "Test colony", "settlement_name": "Test site",
 		"players": [1], "site_id": site_id, "colonists": [{}]}
-	var started := model.start_new_game({"seed": seed_text, "mode": "solo",
+	var started := model.start_new_game({"seed": seed_text, "mode": "solo", "scenario_id": "hard_landing",
 		"colonists_per_faction": 1, "faction_specs": [spec], "point_limit_enabled": false})
 	assert(started.has("maps"), str(started))
 	var playable: Dictionary = model.state["maps"][site_id]
@@ -57,7 +57,7 @@ func _initialize() -> void:
 	var custom_preview := model.preview_local_map(normal, custom_id)
 	assert(custom_preview["terrain"].size() == 2500)
 	spec["site_id"] = custom_id
-	started = model.start_new_game({"seed": seed_text, "mode": "solo",
+	started = model.start_new_game({"seed": seed_text, "mode": "solo", "scenario_id": "hard_landing",
 		"colonists_per_faction": 1, "faction_specs": [spec], "point_limit_enabled": false})
 	assert(started.has("maps"), str(started))
 	assert(model.state["maps"][custom_id]["terrain"] == custom_preview["terrain"])

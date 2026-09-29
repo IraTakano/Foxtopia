@@ -9,6 +9,8 @@ const MIN_ZOOM := 0.45
 const MAX_ZOOM := 3.4
 
 var map_data: Dictionary = {}
+var render_terrain_only := false
+var terrain_layer: Control
 var units: Array = []
 var raiders: Array = []
 var caravans: Array = []
@@ -30,6 +32,8 @@ var _visual_positions: Dictionary = {}
 var _target_positions: Dictionary = {}
 var _night_alpha := 0.0
 var _sim_time := 0
+var _animation_redraw_elapsed := 0.0
+var _animation_needs_redraw := false
 
 const GROUND_GRASS := Color("#718866")
 const GROUND_SOIL := Color("#8c765b")
@@ -38,10 +42,12 @@ const GROUND_WATER := Color("#426b76")
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE if render_terrain_only else Control.MOUSE_FILTER_STOP
 	clip_contents = true
 	custom_minimum_size = Vector2(500, 400)
 	_grass_texture = load("res://assets/grass.png")
+	if render_terrain_only:
+		return
 	_tree_texture = load("res://assets/tree.svg")
 	_pine_texture = load("res://assets/pine.svg")
 	_stone_texture = load("res://assets/stone.svg")
@@ -54,6 +60,7 @@ func _fit_initial_zoom() -> void:
 		return
 	var map_width := float(map_data.get("width", 50)) * TILE_SIZE
 	zoom = clampf(maxf(1.2, size.x / map_width * 1.025), MIN_ZOOM, MAX_ZOOM)
+	_sync_terrain_layer()
 	queue_redraw()
 
 
@@ -75,7 +82,22 @@ func set_world(local_map: Dictionary, colonists: Array, enemies: Array, visiting
 	orders = active_orders
 	selected_ids = selected
 	_fit_initial_zoom()
+	_sync_terrain_layer()
 	queue_redraw()
+
+
+func set_terrain_view(local_map: Dictionary, next_offset: Vector2, next_zoom: float) -> void:
+	if is_same(map_data, local_map) and camera_offset == next_offset and is_equal_approx(zoom, next_zoom):
+		return
+	map_data = local_map
+	camera_offset = next_offset
+	zoom = next_zoom
+	queue_redraw()
+
+
+func _sync_terrain_layer() -> void:
+	if is_instance_valid(terrain_layer):
+		terrain_layer.call("set_terrain_view", map_data, camera_offset, zoom)
 
 
 func set_day_time(sim_time: int, day_length: int) -> void:
@@ -92,6 +114,8 @@ func set_stockpile_inventory(items: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	if render_terrain_only:
+		return
 	var moved := false
 	for actor_id in _target_positions:
 		var target: Vector2 = _target_positions[actor_id]
@@ -100,13 +124,30 @@ func _process(delta: float) -> void:
 			_visual_positions[actor_id] = current.move_toward(target, delta * 2.9)
 			moved = true
 	if moved:
-		queue_redraw()
+		_animation_needs_redraw = true
+	if _animation_needs_redraw:
+		_animation_redraw_elapsed += delta
+		if _animation_redraw_elapsed >= 1.0 / 30.0:
+			_animation_redraw_elapsed = 0.0
+			_animation_needs_redraw = false
+			queue_redraw()
 
 
 func focus_tile(tile: Vector2i) -> void:
 	var scale := TILE_SIZE * zoom
 	camera_offset = size * 0.5 - Vector2(tile) * scale
+	_sync_terrain_layer()
 	queue_redraw()
+
+
+func pan_pixels(amount: Vector2) -> void:
+	camera_offset += amount
+	_sync_terrain_layer()
+	queue_redraw()
+
+
+func zoom_step(factor: float) -> void:
+	_zoom_at(size * 0.5, factor)
 
 
 func _tile_at(screen_point: Vector2) -> Vector2i:
@@ -145,6 +186,7 @@ func _gui_input(event: InputEvent) -> void:
 		var motion := event as InputEventMouseMotion
 		if _dragging:
 			camera_offset = _offset_start + motion.position - _drag_start
+			_sync_terrain_layer()
 			queue_redraw()
 		else:
 			var next_tile := _tile_at(motion.position)
@@ -158,6 +200,7 @@ func _zoom_at(pivot: Vector2, factor: float) -> void:
 	var old_zoom := zoom
 	zoom = clampf(zoom * factor, MIN_ZOOM, MAX_ZOOM)
 	camera_offset = pivot - (pivot - camera_offset) * (zoom / old_zoom)
+	_sync_terrain_layer()
 	queue_redraw()
 
 
@@ -176,22 +219,18 @@ func _enemy_at(tile: Vector2i) -> String:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), GROUND_GRASS)
 	var w := int(map_data.get("width", 50))
 	var h := int(map_data.get("height", 50))
 	var scale := TILE_SIZE * zoom
 	var biome := str(map_data.get("biome", "plains"))
-	_draw_grass_ground(w, h, scale, biome)
+	if render_terrain_only or not is_instance_valid(terrain_layer):
+		_draw_terrain(w, h, scale, biome)
+	if render_terrain_only:
+		return
 	var min_x := maxi(0, int(floor(-camera_offset.x / scale)))
 	var min_y := maxi(0, int(floor(-camera_offset.y / scale)))
 	var max_x := mini(w - 1, int(ceil((size.x - camera_offset.x) / scale)))
 	var max_y := mini(h - 1, int(ceil((size.y - camera_offset.y) / scale)))
-	var terrain: Array = map_data.get("terrain", [])
-	for y in range(min_y, max_y + 1):
-		for x in range(min_x, max_x + 1):
-			var p := _pos_for(x, y)
-			var tile_type := _terrain_at(terrain, w, h, x, y)
-			_draw_ground_tile(p, scale, tile_type, biome, terrain, w, h, x, y)
 	for zone in map_data.get("zones", []):
 		if str(zone.get("kind", "")) == "stockpile":
 			var zx := int(zone.get("x", 0))
@@ -258,6 +297,22 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.085, 0.16, _night_alpha))
 	if _tile_hover.x >= 0 and _tile_hover.y >= 0 and _tile_hover.x < w and _tile_hover.y < h:
 		draw_rect(Rect2(_pos_for(_tile_hover.x, _tile_hover.y), Vector2.ONE * scale), Color("#e8e6b9", 0.65), false, 1.6)
+
+
+func _draw_terrain(w: int, h: int, scale: float, biome: String) -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), GROUND_GRASS)
+	_draw_grass_ground(w, h, scale, biome)
+	var min_x := maxi(0, int(floor(-camera_offset.x / scale)))
+	var min_y := maxi(0, int(floor(-camera_offset.y / scale)))
+	var max_x := mini(w - 1, int(ceil((size.x - camera_offset.x) / scale)))
+	var max_y := mini(h - 1, int(ceil((size.y - camera_offset.y) / scale)))
+	var terrain: Array = map_data.get("terrain", [])
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var p := _pos_for(x, y)
+			var tile_type := _terrain_at(terrain, w, h, x, y)
+			_draw_ground_tile(p, scale, tile_type, biome, terrain, w, h, x, y)
+
 
 func _draw_grass_ground(width: int, height: int, scale: float, biome: String) -> void:
 	if _grass_texture == null:

@@ -28,7 +28,7 @@ func _initialize() -> void:
 				break
 		if not free_tile.is_empty(): break
 	assert(not free_tile.is_empty())
-	var invalid := {"seed": "regression-world", "faction_specs": [{"site_id": free_tile,
+	var invalid := {"seed": "regression-world", "scenario_id": "hard_landing", "faction_specs": [{"site_id": free_tile,
 		"colonists": [{"traits": ["hardworking", "calm", "quick"]}]}]}
 	assert(not model.validate_setup(invalid)["ok"], "Point limit was not enforced")
 	invalid["point_limit_enabled"] = false
@@ -37,7 +37,7 @@ func _initialize() -> void:
 		"Skill increases were not charged to preparation points")
 	assert(model.preparation_points({"starting_gear": {"weapon": "spear", "apparel": "jacket"}}) == 5,
 		"Starting gear was not charged to preparation points")
-	var prepare_spec := {"seed": "regression-world", "mode": "solo", "colonists_per_faction": 2,
+	var prepare_spec := {"seed": "regression-world", "mode": "solo", "scenario_id": "homesteaders", "colonists_per_faction": 2,
 		"point_limit_enabled": false, "faction_specs": [{"site_id": free_tile, "players": [1],
 			"colonists": [{"name": "Alex", "age": 42, "childhood": "apprentice",
 				"adulthood": "scholar", "starting_gear": {"weapon": "spear", "apparel": "jacket"},
@@ -76,7 +76,7 @@ func _initialize() -> void:
 	prepare_spec["faction_specs"][0]["colonists"][0]["starting_gear"]["weapon"] = "spear"
 	prepare_spec["faction_specs"][0]["colonists"][1]["starting_relationships"] = {"0": "rival"}
 	assert(not model.validate_setup(prepare_spec)["ok"], "Conflicting starting relationships were accepted")
-	var setup := {"seed": "regression-world", "mode": "competitive", "colonists_per_faction": 1,
+	var setup := {"seed": "regression-world", "mode": "competitive", "scenario_id": "hard_landing", "colonists_per_faction": 1,
 		"faction_specs": [{"site_id": free_tile, "players": [1],
 			"colonists": [{"name": "Alex", "sex": "male", "gender": "nonbinary",
 				"health_conditions": ["scar"], "traits": ["kind", "timid"]}]}]}
@@ -132,7 +132,7 @@ func _initialize() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://saves/%s.json" % save_id))
 	var raid_model := GameModel.new()
 	root.add_child(raid_model)
-	raid_model.start_new_game({"seed": "raid-regression", "mode": "solo", "colonists_per_faction": 1})
+	raid_model.start_new_game({"seed": "raid-regression", "mode": "solo", "scenario_id": "hard_landing", "colonists_per_faction": 1})
 	for i in range(150): raid_model.tick(1.0)
 	assert(not raid_model.state["raiders"].is_empty())
 	var raider: Dictionary = raid_model.state["raiders"][0]
@@ -145,7 +145,7 @@ func _initialize() -> void:
 	assert(raider["phase"] == "attacking", "Raider failed to leave preparation phase")
 	var coop := GameModel.new()
 	root.add_child(coop)
-	coop.start_new_game({"seed": "coop-regression", "mode": "coop", "colonists_per_faction": 1})
+	coop.start_new_game({"seed": "coop-regression", "mode": "coop", "scenario_id": "hard_landing", "colonists_per_faction": 1})
 	assert(coop.add_late_player(45)["ok"])
 	assert(coop.issue_command(45, {"type": "set_work_priority", "colonist_id": "colonist_1_1",
 		"work": "chop", "priority": 2})["ok"])

@@ -29,10 +29,10 @@ func _ready() -> void:
 		var result: Dictionary = Net.host(24579)
 		print("HOST_START:", result)
 		assert(result.get("ok", false))
-		Net.configure_lobby({"mode": game_mode, "seed": "network-test", "colonists_per_faction": 1})
+		Net.configure_lobby({"mode": game_mode, "seed": "network-test", "scenario_id": "hard_landing", "colonists_per_faction": 1})
 		if late_join:
 			started = true
-			var config := {"mode": game_mode, "seed": "network-test", "colonists_per_faction": 1,
+			var config := {"mode": game_mode, "seed": "network-test", "scenario_id": "hard_landing", "colonists_per_faction": 1,
 				"faction_specs": [{"name": "Host", "settlement_name": "Host Town", "site_id": "site_1", "colonists": [{"name": "Host Pawn"}]}]}
 			assert(Net.start_game(config).get("ok", false))
 			print("HOST_GAME_STARTED_LATE:", game_mode)
@@ -54,7 +54,7 @@ func _on_lobby(lobby: Dictionary) -> void:
 		var peer_id := int((lobby["players"] as Array)[1])
 		if bool((lobby.get("ready", {}) as Dictionary).get(str(peer_id), false)):
 			started = true
-			var config := {"mode": game_mode, "seed": "network-test", "colonists_per_faction": 1,
+			var config := {"mode": game_mode, "seed": "network-test", "scenario_id": "hard_landing", "colonists_per_faction": 1,
 				"faction_specs": [{"name": "Host", "settlement_name": "Host Town", "site_id": "site_1", "colonists": [{"name": "Host Pawn"}]}]}
 			var result: Dictionary = Net.start_game(config)
 			assert(result.get("ok", false))

@@ -25,7 +25,6 @@ const HUD_ACTIVE := Color("#4c6068")
 
 const JOBS := ["chop", "mine", "harvest", "haul", "build", "treat", "research"]
 const JOB_LABELS := ["Chop", "Mine", "Harvest", "Haul", "Build", "Care", "Research"]
-const TRAITS := ["Çalışkan", "Sakin", "Çevik", "Merhametli", "Ürkek", "Meraklı"]
 const TRAIT_IDS := ["", "hardworking", "calm", "quick", "curious", "kind", "night_owl", "timid", "abrasive", "lazy"]
 const TRAIT_NAMES := ["None", "Hardworking (+6)", "Calm (+4)", "Quick (+4)", "Curious (+3)", "Kind (+3)", "Night owl (+2)", "Timid (-4)", "Abrasive (-4)", "Lazy (-6)"]
 const CONDITION_IDS := ["", "asthma", "bad_back", "scar"]
@@ -36,11 +35,14 @@ const SKIN_OPTIONS := ["#f1c99f", "#dca979", "#b98057", "#80563f", "#52392d"]
 const OUTFIT_OPTIONS := ["#527a81", "#b16f59", "#7b8664", "#92759a", "#b89c65"]
 const HAIR_COLOR_OPTIONS := ["#4d3c32", "#8b6449", "#bb9b69", "#343a3a", "#8c5f56"]
 const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11}
+# The model uses 600 simulation steps per day. At normal speed, 0.6 steps per
+# real second makes a full day 1,000 real seconds (16 min 40 sec).
+const NORMAL_STEPS_PER_REAL_SECOND := 0.6
 const RESEARCH_PROJECTS := [
-	{"id": "farming", "name": "Tarım", "detail": "Ekim alanları ve güvenilir yiyecek üretimi."},
-	{"id": "first_aid", "name": "İlk Yardım", "detail": "Daha etkili bakım ve iyileşme."},
-	{"id": "stonework", "name": "Taş İşçiliği", "detail": "Dayanıklı taş duvarlar."},
-	{"id": "barriers", "name": "Barikat", "detail": "Yerleşkeyi baskınlara karşı güçlendir."}
+	{"id": "farming", "name": ["Farming", "Tarım", "Rolnictwo"], "detail": ["Grow crops for a steady food supply.", "Düzenli yiyecek için ekim alanları kur.", "Uprawiaj rośliny, by stale zdobywać żywność."]},
+	{"id": "first_aid", "name": ["First Aid", "İlk Yardım", "Pierwsza pomoc"], "detail": ["Improve treatment and recovery.", "Bakımı ve iyileşmeyi geliştir.", "Usprawnij leczenie i powrót do zdrowia."]},
+	{"id": "stonework", "name": ["Stonework", "Taş İşçiliği", "Obróbka kamienia"], "detail": ["Build durable stone walls.", "Dayanıklı taş duvarlar inşa et.", "Buduj trwałe kamienne ściany."]},
+	{"id": "barriers", "name": ["Barriers", "Barikat", "Barykady"], "detail": ["Strengthen the settlement against raids.", "Yerleşkeyi baskınlara karşı güçlendir.", "Wzmocnij osadę przed najazdami."]}
 ]
 
 class PawnPortrait extends Control:
@@ -82,6 +84,7 @@ var current_tool := ""
 var game_paused := false
 var speed := 1.0
 var _tick_accumulator := 0.0
+var _last_hud_render_ms := 0
 var _status_text := ""
 var _status_timer := 0.0
 var _game_root: Control
@@ -112,14 +115,11 @@ var _trade_caravan_pending_id := ""
 var _style_colonist_pending_id := ""
 var _world_view: Control
 var _world_settings_preview: Control
-var _site_info: Label
+var _site_info: VBoxContainer
 var _terrain_preview: Control
 var _seed_edit: LineEdit
 var _mode_option: OptionButton
-var _count_option: OptionButton
 var _host_port_input: SpinBox
-var _faction_name_edit: LineEdit
-var _settlement_name_edit: LineEdit
 var _character_inputs: Array = []
 var _roster_buttons: Array[Button] = []
 var _character_points: Label
@@ -129,9 +129,19 @@ var preferences = SettingsScript.load_settings()
 var _menu_overlay: Control
 var _settings_overlay: Control
 var _settings_return_paused := false
+var _exit_return_paused := false
+var _exit_warning_open := false
+var _pause_menu_open := false
+var _save_picker_open := false
+var _naming_prompt_open := false
+var _active_alerts: Array[String] = []
+var _settings_draft: Dictionary = {}
+var _settings_page: VBoxContainer
+var _capture_keybind_action := ""
 
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	preferences.apply_settings()
 	Game.state_changed.connect(_on_state_changed)
 	Game.event_emitted.connect(_on_event_emitted)
@@ -141,14 +151,29 @@ func _ready() -> void:
 	_show_menu()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if screen == "game":
+			if is_instance_valid(_settings_overlay):
+				_close_settings()
+			_request_exit(false)
+		else:
+			get_tree().quit()
+
+
 func _process(delta: float) -> void:
 	if _status_timer > 0.0:
 		_status_timer -= delta
 		if _status_timer <= 0.0 and is_instance_valid(_notice_label):
 			_notice_label.visible = false
-	if screen != "game" or game_paused:
+	if screen != "game":
 		return
-	_tick_accumulator += delta * speed
+	_pan_camera_from_keys(delta)
+	if game_paused:
+		return
+	if session_kind != "join" and Game.advance_autosave(delta, preferences.autosave_interval_minutes, preferences.autosave_count):
+		_notice(_prep_local("Autosaved.", "Otomatik kaydedildi.", "Zapisano automatycznie."))
+	_tick_accumulator += delta * speed * NORMAL_STEPS_PER_REAL_SECOND
 	while _tick_accumulator >= 0.25:
 		_tick_accumulator -= 0.25
 		if session_kind != "join":
@@ -168,6 +193,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if is_instance_valid(_settings_overlay) or is_instance_valid(_menu_overlay):
 		return
+	if screen == "game" and not _pause_menu_open and not _exit_warning_open and not _save_picker_open:
+		var focused := get_viewport().gui_get_focus_owner()
+		if focused is LineEdit or focused is TextEdit or focused is SpinBox:
+			return
+		var keybinds: Dictionary = preferences.keybinds
+		for action in keybinds:
+			if event.keycode != int(keybinds[action]):
+				continue
+			if _handle_game_shortcut(str(action)):
+				get_viewport().set_input_as_handled()
+			return
 	if event.keycode == KEY_F11:
 		if DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]:
 			preferences.window_mode = "windowed"
@@ -179,6 +215,132 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif event.keycode == KEY_ESCAPE and screen == "game":
 		_show_pause_menu()
 		get_viewport().set_input_as_handled()
+
+
+func _input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if not _capture_keybind_action.is_empty() and is_instance_valid(_settings_overlay):
+		get_viewport().set_input_as_handled()
+		var action := _capture_keybind_action
+		_capture_keybind_action = ""
+		if event.keycode in [KEY_ESCAPE, KEY_F11, 0]:
+			_build_settings_page(_settings_page, "controls", _settings_draft)
+			return
+		var binds: Dictionary = _settings_draft["keybinds"].duplicate()
+		var previous := int(binds[action])
+		for other in binds:
+			if other != action and int(binds[other]) == event.keycode:
+				binds[other] = previous
+				break
+		binds[action] = event.keycode
+		_settings_draft["keybinds"] = binds
+		_build_settings_page(_settings_page, "controls", _settings_draft)
+		return
+	if event.keycode == KEY_ESCAPE and screen == "game" and not _pause_menu_open and not _exit_warning_open and not _save_picker_open and not _naming_prompt_open and not is_instance_valid(_settings_overlay) and not is_instance_valid(_menu_overlay):
+		_show_pause_menu()
+		get_viewport().set_input_as_handled()
+		return
+	if screen != "game" or _pause_menu_open or _exit_warning_open or _save_picker_open or _naming_prompt_open or is_instance_valid(_settings_overlay) or is_instance_valid(_menu_overlay):
+		return
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused is LineEdit or focused is TextEdit or focused is SpinBox:
+		return
+	# Handle pause before GUI buttons see Space as ui_accept. Otherwise a
+	# focused HUD button can activate its tab on the same keypress.
+	if event.keycode == int(preferences.keybinds.get("pause", KEY_SPACE)):
+		_handle_game_shortcut("pause")
+		get_viewport().set_input_as_handled()
+		return
+	for action in ["tab_orders", "tab_work", "tab_schedule", "tab_health", "tab_research", "tab_world"]:
+		if event.keycode == int(preferences.keybinds.get(action, 0)):
+			if _handle_game_shortcut(action):
+				get_viewport().set_input_as_handled()
+			return
+
+
+func _handle_game_shortcut(action: String) -> bool:
+	match action:
+		"pause": _set_speed(speed if game_paused else 0.0)
+		"speed_1": _set_speed(1.0)
+		"speed_2": _set_speed(3.0)
+		"speed_3": _set_speed(6.0)
+		"draft": _toggle_draft_shortcut()
+		"clear_order": _clear_order_shortcut()
+		"zoom_in":
+			if is_instance_valid(_map_view): _map_view.zoom_step(1.12)
+		"zoom_out":
+			if is_instance_valid(_map_view): _map_view.zoom_step(1.0 / 1.12)
+		"tab_orders": _set_tab("Emirler")
+		"tab_work": _set_tab("İşler")
+		"tab_schedule": _set_tab("Günlük plan")
+		"tab_health": _set_tab("Sağlık")
+		"tab_research": _set_tab("Araştırma")
+		"tab_world": _set_tab("Dünya")
+		"previous_colonist": _select_next_colonist(-1)
+		"next_colonist": _select_next_colonist(1)
+		"focus_colonist": _focus_selected_colonist()
+		"pan_up", "pan_down", "pan_left", "pan_right": pass
+		_: return false
+	return true
+
+
+func _pan_camera_from_keys(delta: float) -> void:
+	if not is_instance_valid(_map_view) or is_instance_valid(_settings_overlay) or is_instance_valid(_menu_overlay):
+		return
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused is LineEdit or focused is TextEdit or focused is SpinBox:
+		return
+	var binds: Dictionary = preferences.keybinds
+	var direction := Vector2.ZERO
+	if Input.is_key_pressed(int(binds["pan_up"])) or Input.is_key_pressed(KEY_UP): direction.y += 1.0
+	if Input.is_key_pressed(int(binds["pan_down"])) or Input.is_key_pressed(KEY_DOWN): direction.y -= 1.0
+	if Input.is_key_pressed(int(binds["pan_left"])) or Input.is_key_pressed(KEY_LEFT): direction.x += 1.0
+	if Input.is_key_pressed(int(binds["pan_right"])) or Input.is_key_pressed(KEY_RIGHT): direction.x -= 1.0
+	if direction != Vector2.ZERO:
+		var fast := 2.0 if Input.is_key_pressed(KEY_SHIFT) else 1.0
+		_map_view.pan_pixels(direction.normalized() * delta * 480.0 * fast)
+
+
+func _select_next_colonist(direction: int) -> void:
+	var people := _local_colonists(_snapshot())
+	if people.is_empty(): return
+	var current_index := -1
+	for index in people.size():
+		if selected_ids.has(str(people[index].get("id", ""))):
+			current_index = index
+			break
+	var next_index := (0 if direction > 0 else people.size() - 1) if current_index < 0 else posmod(current_index + direction, people.size())
+	_select_colonist(str(people[next_index].get("id", "")))
+	_focus_selected_colonist()
+
+
+func _focus_selected_colonist() -> void:
+	if not is_instance_valid(_map_view): return
+	var person := _selected_person(_snapshot())
+	if person.is_empty(): return
+	_map_view.focus_tile(Vector2i(int(person.get("x", 0)), int(person.get("y", 0))))
+
+
+func _toggle_draft_shortcut() -> void:
+	var people := _local_colonists(_snapshot())
+	var targets: Array = []
+	for person in people:
+		if selected_ids.is_empty() or selected_ids.has(str(person.get("id", ""))):
+			targets.append(person)
+	if targets.is_empty(): return
+	var should_draft := false
+	for person in targets:
+		if not bool(person.get("drafted", false)):
+			should_draft = true
+			break
+	for person in targets:
+		_send_command({"type": "set_draft", "colonist_id": str(person.get("id", "")), "drafted": should_draft})
+
+
+func _clear_order_shortcut() -> void:
+	for person_id in selected_ids:
+		_send_command({"type": "direct", "colonist_id": person_id, "action": "clear"})
 
 
 func _style(color: Color, border: Color = Color.TRANSPARENT, radius: int = 2) -> StyleBoxFlat:
@@ -374,6 +536,53 @@ func _menu_button(label_text: String, action: Callable) -> Button:
 	return button
 
 
+func _setup_card(minimum := Vector2.ZERO, emphasis := false) -> PanelContainer:
+	var card := _panel(minimum)
+	var border := Color("#b99a65") if emphasis else Color("#746d5d")
+	var fill := Color("#172029f2") if emphasis else Color("#19232bdc")
+	var style := _style(fill, border, 2)
+	style.content_margin_left = 16
+	style.content_margin_top = 14
+	style.content_margin_right = 16
+	style.content_margin_bottom = 14
+	style.shadow_color = Color(0, 0, 0, 0.38)
+	style.shadow_size = 5
+	card.add_theme_stylebox_override("panel", style)
+	return card
+
+
+func _setup_button(label_text: String, action: Callable, selected := false, minimum := Vector2.ZERO) -> Button:
+	var button := _menu_button(label_text, action)
+	button.custom_minimum_size = minimum if minimum != Vector2.ZERO else Vector2(0, 40)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	for state in ["normal", "hover", "pressed"]:
+		var fill := Color("#765b37") if selected else Color("#28333a")
+		if state == "hover": fill = Color("#947347") if selected else Color("#394b51")
+		if state == "pressed": fill = Color("#624b30") if selected else Color("#1c282e")
+		var style := _style(fill, GOLD if selected or state == "hover" else Color("#67736f"), 2)
+		style.border_width_left = 3 if selected else 1
+		style.content_margin_left = 3 if minimum.x > 0.0 and minimum.x < 50.0 else 12
+		style.content_margin_right = 3 if minimum.x > 0.0 and minimum.x < 50.0 else 12
+		style.shadow_color = Color(0, 0, 0, 0.35)
+		style.shadow_size = 3
+		button.add_theme_stylebox_override(state, style)
+	return button
+
+
+func _setup_section(parent: VBoxContainer, title: String) -> void:
+	var heading := _label(title.to_upper(), 13, GOLD)
+	heading.add_theme_constant_override("outline_size", 2)
+	heading.add_theme_color_override("font_outline_color", Color("#0c1519"))
+	parent.add_child(heading)
+
+
+func _setup_copy(value: String, size := 15, color := CREAM) -> Label:
+	var copy := _label(value, size, color)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return copy
+
+
 func _show_new_game_menu() -> void:
 	if is_instance_valid(_menu_overlay):
 		return
@@ -439,6 +648,8 @@ func _begin_session(kind: String) -> void:
 	setup_mode = "solo" if kind == "solo" else "coop"
 	setup_seed = str(randi())
 	selected_site_id = ""
+	faction_name = "Unnamed colony"
+	settlement_name = "Unnamed settlement"
 	character_specs.clear()
 	starting_cargo.clear()
 	_cargo_search_text = ""
@@ -446,13 +657,15 @@ func _begin_session(kind: String) -> void:
 	preparation_tab = "characters"
 	if kind == "solo":
 		Net.start_solo()
-	_show_setup()
+		_show_scenario_selection()
+	else:
+		_show_setup()
 
 
 func _show_join() -> void:
 	screen = "join"
 	var root := _clear_screen()
-	_screen_header(root, "Odaya Katıl", "Ev sahibinin adresini gir.")
+	_screen_header(root, _prep_local("Join game", "Odaya katıl", "Dołącz do gry"), _prep_local("Enter the host's address.", "Ev sahibinin adresini gir.", "Wpisz adres gospodarza."))
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(center)
@@ -460,10 +673,10 @@ func _show_join() -> void:
 	center.add_child(panel)
 	var inner := _vbox(16)
 	panel.add_child(inner)
-	inner.add_child(_label("Sunucu adresi", 18))
+	inner.add_child(_label(_prep_local("Server address", "Sunucu adresi", "Adres serwera"), 18))
 	var address := LineEdit.new()
 	address.text = "127.0.0.1"
-	address.placeholder_text = "IP veya alan adı"
+	address.placeholder_text = _prep_local("IP address or domain", "IP veya alan adı", "Adres IP lub domena")
 	inner.add_child(address)
 	inner.add_child(_label("Port", 18))
 	var port := SpinBox.new()
@@ -473,75 +686,149 @@ func _show_join() -> void:
 	inner.add_child(port)
 	var row := _hbox()
 	inner.add_child(row)
-	row.add_child(_button("Geri", _show_menu))
-	row.add_child(_button("Bağlan", func(): _connect_to_host(address.text, int(port.value)), true))
+	row.add_child(_button(_tr("common.back"), _show_menu))
+	row.add_child(_button(_prep_local("Connect", "Bağlan", "Połącz"), func(): _connect_to_host(address.text, int(port.value)), true))
 
 
 func _connect_to_host(address: String, port: int) -> void:
 	var result = Net.join(address.strip_edges(), port)
 	if result is Dictionary and not bool(result.get("ok", true)):
-		_notice(str(result.get("error", "Bağlanılamadı.")))
+		_notice(str(result.get("error", _prep_local("Could not connect.", "Bağlanılamadı.", "Nie można połączyć się."))))
 		return
 	session_kind = "join"
-	_show_waiting_room("Ev sahibinin oyunu başlatması bekleniyor. Bağlantı kurulduğunda dünya açılır.")
+	_show_waiting_room(_prep_local("Waiting for the host to start the game. The world opens when the connection is ready.", "Ev sahibinin oyunu başlatması bekleniyor. Bağlantı kurulduğunda dünya açılır.", "Oczekiwanie na rozpoczęcie gry przez gospodarza. Świat otworzy się po połączeniu."))
 
 
 func _show_setup() -> void:
 	screen = "setup"
 	var inner := _setup_stage(_prep_local("New game", "Yeni oyun", "Nowa gra"),
-		_prep_local("Choose how many people will share each colony.", "Her kolonide kaç kişi başlayacağını seç.", "Wybierz liczbę osób na początku każdej kolonii."))
+		_prep_local("Choose how you will play. Your scenario sets the starting crew.", "Nasıl oynayacağını seç. Başlangıç ekibini senaryo belirler.", "Wybierz tryb gry. Scenariusz określa początkową załogę."))
 	var body := _hbox(24)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inner.add_child(body)
-	var choices := _vbox(16)
-	choices.custom_minimum_size = Vector2(470, 0)
-	body.add_child(choices)
-	choices.add_child(_label(_prep_local("Play mode", "Oyun modu", "Tryb gry"), 19, GOLD))
+	var mode_panel := _setup_card(Vector2(420, 0))
+	body.add_child(mode_panel)
+	var choices := _vbox(17)
+	mode_panel.add_child(choices)
+	_setup_section(choices, _prep_local("01 / Session", "01 / Oturum", "01 / Sesja"))
+	choices.add_child(_label(_prep_local("Choose a play mode", "Oyun modunu seç", "Wybierz tryb gry"), 22, CREAM))
+	choices.add_child(_setup_copy(_prep_local("Decide who shares this planet before choosing the expedition.", "Keşif ekibini seçmeden önce bu gezegeni kimin paylaşacağına karar ver.", "Zdecyduj, kto podzieli tę planetę, zanim wybierzesz wyprawę."), 14, MUTED))
 	_mode_option = OptionButton.new()
 	_mode_option.add_item(_tr("setup.mode_solo"), 0)
 	_mode_option.add_item(_tr("setup.mode_coop"), 1)
 	_mode_option.add_item(_tr("setup.mode_competitive"), 2)
 	_mode_option.select(0 if setup_mode == "solo" else 1 if setup_mode == "coop" else 2)
 	_mode_option.disabled = session_kind == "solo"
+	_mode_option.custom_minimum_size.y = 42
+	_compact_option(_mode_option)
 	choices.add_child(_mode_option)
-	choices.add_child(_label(_tr("setup.colonists"), 19, GOLD))
-	_count_option = OptionButton.new()
-	for i in range(1, 4):
-		_count_option.add_item(_tr("setup.colonist_count", {"count": i}), i)
-	_count_option.select(colonist_count - 1)
-	choices.add_child(_count_option)
 	if session_kind == "host":
-		choices.add_child(_label(_prep_local("Host port", "Oda portu", "Port gospodarza"), 18, GOLD))
+		_setup_section(choices, _prep_local("Host port", "Oda portu", "Port gospodarza"))
 		_host_port_input = SpinBox.new()
 		_host_port_input.min_value = 1024
 		_host_port_input.max_value = 65535
 		_host_port_input.value = host_port
 		choices.add_child(_host_port_input)
-	var explanation := _panel()
+	choices.add_child(HSeparator.new())
+	_setup_section(choices, _prep_local("Play together", "Birlikte oyna", "Gra razem"))
+	for guide in [
+		[_prep_local("Single player", "Tek oyunculu", "Jeden gracz"), _prep_local("Build and manage one colony on your own.", "Tek bir koloniyi tek başına kur ve yönet.", "Buduj i prowadź jedną kolonię samodzielnie.")],
+		[_prep_local("Co-op colony", "Ortak koloni", "Kolonia wspólna"), _prep_local("Share the same people and settlement with friends.", "Aynı insanları ve yerleşkeyi arkadaşlarınla paylaş.", "Dzielcie ludzi i osadę ze znajomymi.")],
+		[_prep_local("Separate colonies", "Ayrı koloniler", "Osobne kolonie"), _prep_local("Each player chooses a site on the same planet.", "Her oyuncu aynı gezegende ayrı bir yer seçer.", "Każdy gracz wybiera miejsce na tej samej planecie.")],
+	]:
+		var guide_row := _vbox(2)
+		choices.add_child(guide_row)
+		guide_row.add_child(_label(str(guide[0]), 14, CREAM))
+		guide_row.add_child(_setup_copy(str(guide[1]), 12, MUTED))
+	choices.add_child(_spacer())
+	choices.add_child(_setup_copy(_prep_local("Your next choices set the crew, event pacing and world.", "Sonraki seçimlerin ekibi, olay temposunu ve dünyayı belirler.", "Kolejne wybory określą załogę, tempo wydarzeń i świat."), 13, MUTED))
+	var explanation := _setup_card(Vector2.ZERO, true)
 	explanation.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(explanation)
-	var copy := _vbox(15)
+	var copy := _vbox(18)
 	explanation.add_child(copy)
-	copy.add_child(_label(_prep_local("A shared story or separate settlements", "Ortak hikâye veya ayrı yerleşkeler", "Wspólna opowieść albo osobne osady"), 21, GOLD))
+	_setup_section(copy, _prep_local("The journey", "Yolculuk", "Podróż"))
+	copy.add_child(_label(_prep_local("One planet. Your way to settle it.", "Bir gezegen. Onu kurmanın yolu senin.", "Jedna planeta. Wasz sposób na osiedlenie."), 24, CREAM))
 	var text_body := _prep_local("Single player controls one colony. In co-op, everyone controls the same people. Separate colonies begin in different places of the same generated world. Each player can choose a different settlement map.", "Tek oyunculu tek koloniyi yönetir. Ortak oyunda herkes aynı insanları yönetir. Ayrı koloniler aynı oluşturulan dünyanın farklı yerlerinde başlar; her oyuncu farklı bir yerleşke haritası seçebilir.", "W grze jednoosobowej zarządzasz jedną kolonią. W kooperacji wszyscy kontrolują tych samych ludzi. Osobne kolonie zaczynają w różnych miejscach tego samego świata; każdy wybiera własną mapę osady.")
-	var explanation_text := _label(text_body, 16, CREAM)
-	explanation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	copy.add_child(explanation_text)
+	copy.add_child(_setup_copy(text_body, 16))
+	copy.add_child(HSeparator.new())
+	_setup_section(copy, _prep_local("Coming next", "Sonraki adımlar", "Następne kroki"))
+	copy.add_child(_setup_copy(_prep_local("Select a starting scenario, shape the story's pace, generate the planet, choose a landing site and prepare your colonists.", "Başlangıç senaryosunu seç, hikâyenin temposunu belirle, gezegeni oluştur, iniş yerini seç ve kolonistlerini hazırla.", "Wybierz scenariusz, ustal tempo opowieści, wygeneruj planetę, wskaż miejsce lądowania i przygotuj kolonistów."), 14, MUTED))
+	var art_frame := PanelContainer.new()
+	art_frame.custom_minimum_size.y = 220
+	art_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var art_border := _style(Color("#111a21"), Color("#8e7651"), 2)
+	art_border.content_margin_left = 1
+	art_border.content_margin_top = 1
+	art_border.content_margin_right = 1
+	art_border.content_margin_bottom = 1
+	art_frame.add_theme_stylebox_override("panel", art_border)
+	copy.add_child(art_frame)
+	var art := TextureRect.new()
+	art.texture = load("res://assets/menu_world_v2.png") if ResourceLoader.exists("res://assets/menu_world_v2.png") else load("res://assets/menu_world_illustrated.png")
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_frame.add_child(art)
 	_setup_footer(inner, _show_menu, _advance_to_scenario)
 
 
 func _setup_stage(title: String, subtitle: String) -> VBoxContainer:
 	var root := _clear_screen()
 	_add_menu_backdrop()
-	var frame := _panel()
+	var frame := _setup_card(Vector2.ZERO, true)
 	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	frame.add_theme_stylebox_override("panel", _style(Color("#171b20f4"), Color("#6e6453"), 1))
 	root.add_child(frame)
-	var inner := _vbox(13)
+	var inner := _vbox(11)
 	frame.add_child(inner)
-	inner.add_child(_label(title, 25, CREAM))
-	inner.add_child(_label(subtitle, 14, MUTED))
+	var brand := _hbox(10)
+	inner.add_child(brand)
+	var mark := TextureRect.new()
+	mark.texture = load("res://assets/foxtopia_mark.svg")
+	mark.custom_minimum_size = Vector2(44, 44)
+	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	brand.add_child(mark)
+	var brand_name := _label("FOXTOPIA", 21, Color("#f5e9c9"))
+	brand_name.add_theme_constant_override("outline_size", 3)
+	brand_name.add_theme_color_override("font_outline_color", Color("#17232a"))
+	brand.add_child(brand_name)
+	var brand_gap := Control.new()
+	brand_gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	brand.add_child(brand_gap)
+	brand.add_child(_label(_prep_local("NEW COLONY", "YENİ KOLONİ", "NOWA KOLONIA"), 12, GOLD))
 	inner.add_child(HSeparator.new())
+	var title_row := _hbox(16)
+	inner.add_child(title_row)
+	var headings := _vbox(3)
+	headings.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(headings)
+	headings.add_child(_label(title, 27, CREAM))
+	headings.add_child(_setup_copy(subtitle, 13, MUTED))
+	var step_names := [
+		_prep_local("MODE", "MOD", "TRYB"),
+		_prep_local("SCENARIO", "SENARYO", "SCENARIUSZ"),
+		_prep_local("STORY", "HİKÂYE", "OPOWIEŚĆ"),
+		_prep_local("PLANET", "GEZEGEN", "PLANETA"),
+		_prep_local("LANDING", "İNİŞ", "LĄDOWANIE"),
+		_prep_local("CREW", "EKİP", "ZAŁOGA"),
+	]
+	var step_ids := ["setup", "scenario", "storyteller", "world_settings", "world_select", "characters"]
+	if session_kind == "solo":
+		step_names.remove_at(0)
+		step_ids.remove_at(0)
+	var current_step := maxi(0, step_ids.find(screen))
+	var progress := _hbox(5)
+	inner.add_child(progress)
+	for index in step_names.size():
+		var step := PanelContainer.new()
+		step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		step.add_theme_stylebox_override("panel", _style(Color("#705537") if index == current_step else Color("#26353d9c"), GOLD if index == current_step else Color("#57666a"), 2))
+		progress.add_child(step)
+		var text_label := _label("%02d  %s" % [index + 1, step_names[index]], 11, Color("#fff0cd") if index == current_step else MUTED)
+		text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		step.add_child(text_label)
 	return inner
 
 
@@ -549,16 +836,15 @@ func _setup_footer(parent: VBoxContainer, back_action: Callable, next_action: Ca
 	parent.add_child(HSeparator.new())
 	var row := _hbox(12)
 	parent.add_child(row)
-	row.add_child(_button(_tr("common.back"), back_action, false, Vector2(150, 38)))
+	row.add_child(_setup_button("←  " + _tr("common.back"), back_action, false, Vector2(150, 40)))
 	var filler := Control.new()
 	filler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(filler)
-	row.add_child(_button(_prep_local("Next", "İleri", "Dalej"), next_action, true, Vector2(150, 38)))
+	row.add_child(_setup_button(_prep_local("Continue", "Devam et", "Kontynuuj") + "  →", next_action, true, Vector2(164, 40)))
 
 
 func _advance_to_scenario() -> void:
 	setup_mode = ["solo", "coop", "competitive"][_mode_option.selected]
-	colonist_count = _count_option.selected + 1
 	if session_kind == "host" and is_instance_valid(_host_port_input):
 		host_port = int(_host_port_input.value)
 	_show_scenario_selection()
@@ -573,36 +859,66 @@ func _show_scenario_selection() -> void:
 	var body := _hbox(18)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inner.add_child(body)
-	var list := _vbox(7)
-	list.custom_minimum_size = Vector2(330, 0)
-	body.add_child(list)
+	var list_panel := _setup_card(Vector2(330, 0))
+	body.add_child(list_panel)
+	var list := _vbox(11)
+	list_panel.add_child(list)
+	_setup_section(list, _prep_local("Choose your beginning", "Başlangıcını seç", "Wybierz początek"))
 	for entry in SetupCatalog.SCENARIOS:
 		var chosen_id := str(entry["id"])
-		var button_text := "%s\n%s" % [SetupCatalog.localized(entry["name"], preferences.language), SetupCatalog.localized(entry["summary"], preferences.language)]
-		var button := _button(button_text, func(): _select_scenario(chosen_id), chosen_id == scenario_id, Vector2(0, 72))
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		list.add_child(button)
+		var entry_card := _setup_card(Vector2.ZERO, chosen_id == scenario_id)
+		list.add_child(entry_card)
+		var entry_copy := _vbox(5)
+		entry_card.add_child(entry_copy)
+		var button_text := "%02d   %s" % [SetupCatalog.SCENARIOS.find(entry) + 1, SetupCatalog.localized(entry["name"], preferences.language)]
+		entry_copy.add_child(_setup_button(button_text, func(): _select_scenario(chosen_id), chosen_id == scenario_id, Vector2(0, 38)))
+		entry_copy.add_child(_setup_copy(SetupCatalog.localized(entry["summary"], preferences.language), 12, MUTED))
 	var selected: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id)
-	var detail := _panel()
+	colonist_count = int(selected.get("colonist_count", 3))
+	var detail := _setup_card(Vector2.ZERO, true)
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(detail)
-	var description := _vbox(12)
-	detail.add_child(description)
-	description.add_child(_label(SetupCatalog.localized(selected["name"], preferences.language), 24, GOLD))
-	var story := _label(SetupCatalog.localized(selected["story"], preferences.language), 17, CREAM)
-	story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.add_child(story)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	detail.add_child(scroll)
+	var description := _vbox(10)
+	description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(description)
+	_setup_section(description, _prep_local("Scenario dossier", "Senaryo dosyası", "Opis scenariusza"))
+	description.add_child(_label(SetupCatalog.localized(selected["name"], preferences.language), 27, CREAM))
+	description.add_child(_setup_copy(SetupCatalog.localized(selected["summary"], preferences.language), 15, GOLD))
 	description.add_child(HSeparator.new())
-	description.add_child(_label(_prep_local("Starting supplies", "Başlangıç erzakı", "Zapas początkowy"), 18, GOLD))
+	_setup_section(description, _prep_local("The story", "Hikâye", "Opowieść"))
+	description.add_child(_setup_copy(SetupCatalog.localized(selected["story"], preferences.language), 15))
+	_setup_section(description, _prep_local("The first days", "İlk günler", "Pierwsze dni"))
+	description.add_child(_setup_copy(SetupCatalog.localized(selected["first_days"], preferences.language), 14, MUTED))
+	description.add_child(HSeparator.new())
+	_setup_section(description, _prep_local("Starting conditions", "Başlangıç koşulları", "Warunki początkowe"))
+	description.add_child(_setup_copy(SetupCatalog.localized(selected["conditions"], preferences.language), 14))
+	description.add_child(_label(_prep_local("%d colonists" % colonist_count, "%d kolonist" % colonist_count, "%d kolonistów" % colonist_count), 17, GOLD))
+	_setup_section(description, _prep_local("Starting supplies", "Başlangıç malzemeleri", "Zapasy początkowe"))
+	var supplies := GridContainer.new()
+	supplies.columns = 2
+	supplies.add_theme_constant_override("h_separation", 10)
+	supplies.add_theme_constant_override("v_separation", 5)
+	description.add_child(supplies)
 	for kind in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
-		description.add_child(_label("%s  × %d" % [kind.capitalize(), int(selected["inventory"].get(kind, 0))], 15))
-	description.add_child(_spacer())
-	description.add_child(_label(_prep_local("Crew size is chosen separately: 1, 2 or 3 people.", "Ekip büyüklüğü ayrı seçilir: 1, 2 veya 3 kişi.", "Liczebność załogi wybierasz osobno: 1, 2 lub 3 osoby."), 13, MUTED))
-	_setup_footer(inner, _show_setup, _show_storyteller_selection)
+		var supply := _hbox(8)
+		supply.custom_minimum_size.x = 210
+		supplies.add_child(supply)
+		var supply_name := _label(_cargo_label(kind), 14, CREAM)
+		supply_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		supply.add_child(supply_name)
+		supply.add_child(_label("× %d" % int(selected["inventory"].get(kind, 0)), 14, GOLD))
+	description.add_child(_setup_copy(_prep_local("You can adjust the cargo and each colonist's gear during crew preparation.", "Ekip hazırlığında yükü ve her kolonistin ekipmanını değiştirebilirsin.", "Ładunek i wyposażenie każdego kolonisty można zmienić podczas przygotowywania załogi."), 12, MUTED))
+	_setup_footer(inner, _show_menu if session_kind == "solo" else _show_setup, _show_storyteller_selection)
 
 
 func _select_scenario(id: String) -> void:
 	scenario_id = id
+	colonist_count = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("colonist_count", 3))
 	starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
 	_show_scenario_selection()
 
@@ -614,43 +930,52 @@ func _show_storyteller_selection() -> void:
 	var body := _hbox(18)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inner.add_child(body)
-	var storytellers := _vbox(8)
-	storytellers.custom_minimum_size.x = 360
-	body.add_child(storytellers)
-	storytellers.add_child(_label(_prep_local("Storyteller", "Anlatıcı", "Narrator"), 21, GOLD))
+	var teller_panel := _setup_card(Vector2(310, 0))
+	body.add_child(teller_panel)
+	var storytellers := _vbox(10)
+	teller_panel.add_child(storytellers)
+	_setup_section(storytellers, _prep_local("Event rhythm", "Olay temposu", "Rytm wydarzeń"))
+	storytellers.add_child(_label(_prep_local("Narrator", "Anlatıcı", "Narrator"), 22, CREAM))
 	for entry in SetupCatalog.STORYTELLERS:
 		var chosen_id := str(entry["id"])
-		var text_value := "%s\n%s" % [SetupCatalog.localized(entry["name"], preferences.language), SetupCatalog.localized(entry["summary"], preferences.language)]
-		var button := _button(text_value, func(): _select_storyteller(chosen_id), chosen_id == storyteller_id, Vector2(0, 78))
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		storytellers.add_child(button)
-	var difficulty := _vbox(8)
-	difficulty.custom_minimum_size.x = 340
-	body.add_child(difficulty)
-	difficulty.add_child(_label(_prep_local("Difficulty", "Zorluk", "Trudność"), 21, GOLD))
-	for entry in SetupCatalog.DIFFICULTIES:
-		var chosen_id := str(entry["id"])
-		var text_value := "%s\n%s" % [SetupCatalog.localized(entry["name"], preferences.language), SetupCatalog.localized(entry["summary"], preferences.language)]
-		var button := _button(text_value, func(): _select_difficulty(chosen_id), chosen_id == difficulty_id, Vector2(0, 60))
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		difficulty.add_child(button)
-	var portrait_panel := _panel()
+		var choice := _setup_card(Vector2.ZERO, chosen_id == storyteller_id)
+		storytellers.add_child(choice)
+		var choice_copy := _vbox(4)
+		choice.add_child(choice_copy)
+		choice_copy.add_child(_setup_button(SetupCatalog.localized(entry["name"], preferences.language), func(): _select_storyteller(chosen_id), chosen_id == storyteller_id, Vector2(0, 34)))
+		choice_copy.add_child(_setup_copy(SetupCatalog.localized(entry["summary"], preferences.language), 12, MUTED))
+	var portrait_panel := _setup_card(Vector2(370, 0), true)
 	portrait_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(portrait_panel)
-	var portrait_content := _vbox(8)
+	var portrait_content := _vbox(7)
 	portrait_panel.add_child(portrait_content)
 	var selected_storyteller: Dictionary = SetupCatalog.find_by_id(SetupCatalog.STORYTELLERS, storyteller_id)
-	portrait_content.add_child(_label(SetupCatalog.localized(selected_storyteller["name"], preferences.language), 22, GOLD))
+	_setup_section(portrait_content, _prep_local("Your narrator", "Anlatıcın", "Twój narrator"))
+	portrait_content.add_child(_label(SetupCatalog.localized(selected_storyteller["name"], preferences.language), 23, CREAM))
 	var portrait := TextureRect.new()
 	portrait.texture = load("res://assets/storyteller_%s.png" % {"steady": "mira", "gentle": "elian", "erratic": "rook"}.get(storyteller_id, "mira"))
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.custom_minimum_size.y = 230
 	portrait.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	portrait.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	portrait_content.add_child(portrait)
-	var portrait_caption := _label(SetupCatalog.localized(selected_storyteller["summary"], preferences.language), 13, MUTED)
-	portrait_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	portrait_content.add_child(portrait_caption)
+	portrait_content.add_child(HSeparator.new())
+	portrait_content.add_child(_setup_copy(SetupCatalog.localized(selected_storyteller["summary"], preferences.language), 14, CREAM))
+	var difficulty_panel := _setup_card(Vector2(280, 0))
+	body.add_child(difficulty_panel)
+	var difficulty := _vbox(8)
+	difficulty_panel.add_child(difficulty)
+	_setup_section(difficulty, _prep_local("Threat level", "Tehdit düzeyi", "Poziom zagrożenia"))
+	difficulty.add_child(_label(_prep_local("Difficulty", "Zorluk", "Trudność"), 22, CREAM))
+	for entry in SetupCatalog.DIFFICULTIES:
+		var chosen_id := str(entry["id"])
+		var choice := _setup_card(Vector2.ZERO, chosen_id == difficulty_id)
+		difficulty.add_child(choice)
+		var choice_copy := _vbox(3)
+		choice.add_child(choice_copy)
+		choice_copy.add_child(_setup_button(SetupCatalog.localized(entry["name"], preferences.language), func(): _select_difficulty(chosen_id), chosen_id == difficulty_id, Vector2(0, 31)))
+		choice_copy.add_child(_setup_copy(SetupCatalog.localized(entry["summary"], preferences.language), 11, MUTED))
 	_setup_footer(inner, _show_scenario_selection, _show_world_settings)
 
 
@@ -671,37 +996,42 @@ func _show_world_settings() -> void:
 	var body := _hbox(20)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inner.add_child(body)
-	var controls := _vbox(15)
-	controls.custom_minimum_size = Vector2(530, 0)
-	body.add_child(controls)
-	controls.add_child(_label(_tr("setup.seed"), 18, GOLD))
+	var controls_panel := _setup_card(Vector2(440, 0))
+	body.add_child(controls_panel)
+	var controls := _vbox(12)
+	controls_panel.add_child(controls)
+	_setup_section(controls, _prep_local("Planet parameters", "Gezegen ayarları", "Parametry planety"))
+	controls.add_child(_label(_tr("setup.seed"), 19, CREAM))
 	_seed_edit = LineEdit.new()
 	_seed_edit.text = setup_seed
+	_seed_edit.custom_minimum_size.y = 37
 	controls.add_child(_seed_edit)
-	controls.add_child(_button(_prep_local("Randomize seed", "Yeni tohum üret", "Losuj klucz"), func():
+	controls.add_child(_setup_button(_prep_local("Randomize seed", "Yeni tohum üret", "Losuj klucz"), func():
 		_seed_edit.text = str(randi())
 		_refresh_world_settings_preview(), false, Vector2(190, 36)))
 	_seed_edit.text_submitted.connect(func(_submitted: String): _refresh_world_settings_preview())
+	controls.add_child(HSeparator.new())
 	_world_setting_row(controls, "coverage", _prep_local("Land coverage", "Kara oranı", "Udział lądu"), 0.25, 0.75)
 	_world_setting_row(controls, "rainfall", _prep_local("Rainfall", "Yağış", "Opady"), 0.0, 1.0)
 	_world_setting_row(controls, "temperature", _prep_local("Temperature", "Sıcaklık", "Temperatura"), 0.0, 1.0)
 	_world_setting_row(controls, "population", _prep_local("Other settlements", "Diğer yerleşkeler", "Inne osady"), 0.0, 1.0)
-	var detail := _panel()
+	controls.add_child(_spacer())
+	controls.add_child(_setup_copy(_prep_local("A seed keeps the layout reproducible. Change any setting, then generate to see the full planet.", "Tohum, yerleşimi tekrar oluşturulabilir kılar. Ayarları değiştirip tüm gezegeni görmek için oluştur.", "Klucz pozwala odtworzyć układ. Zmień ustawienia i wygeneruj całą planetę."), 12, MUTED))
+	var detail := _setup_card(Vector2.ZERO, true)
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(detail)
-	var detail_content := _vbox(12)
+	var detail_content := _vbox(8)
 	detail.add_child(detail_content)
-	detail_content.add_child(_label(_prep_local("Your planet", "Gezegenin", "Twoja planeta"), 22, GOLD))
-	var world_copy := _label(_prep_local("Land coverage shapes continents and ocean. Rainfall and temperature affect local biomes. Other settlements changes how many friendly and hostile neighbors are generated. Select any unoccupied land tile after generating.", "Kara oranı kıtaları ve okyanusu biçimlendirir. Yağış ve sıcaklık yerel biyomları etkiler. Diğer yerleşkeler dost ve düşman komşuların sayısını değiştirir. Oluşturduktan sonra işgal edilmemiş herhangi bir kara parçasını seçebilirsin.", "Udział lądu kształtuje kontynenty i oceany. Opady oraz temperatura wpływają na lokalne biomy. Liczba osad zmienia liczbę przyjaznych i wrogich sąsiadów. Po wygenerowaniu możesz wybrać dowolny wolny obszar lądu."), 16)
-	world_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail_content.add_child(world_copy)
+	_setup_section(detail_content, _prep_local("Live preview", "Canlı önizleme", "Podgląd na żywo"))
+	detail_content.add_child(_label(_prep_local("Your planet", "Gezegenin", "Twoja planeta"), 22, CREAM))
+	detail_content.add_child(_setup_copy(_prep_local("Land coverage shapes continents; rainfall and temperature influence local biomes. Other settlements affect the number of friendly and hostile neighbors.", "Kara oranı kıtaları biçimlendirir; yağış ve sıcaklık yerel biyomları etkiler. Diğer yerleşkeler dost ve düşman komşuların sayısını değiştirir.", "Udział lądu kształtuje kontynenty; opady i temperatura wpływają na lokalne biomy. Liczba osad zmienia liczbę przyjaznych i wrogich sąsiadów."), 13, MUTED))
 	_world_settings_preview = WorldViewScript.new()
-	_world_settings_preview.custom_minimum_size = Vector2(580, 420)
+	_world_settings_preview.custom_minimum_size = Vector2(420, 300)
 	_world_settings_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_world_settings_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail_content.add_child(_world_settings_preview)
 	_refresh_world_settings_preview()
-	var preview_hint := _label(_prep_local("The preview follows your seed and planet settings. Drag to inspect it.", "Önizleme tohum ve gezegen ayarlarını izler. İncelemek için sürükle.", "Podgląd odzwierciedla ustawienia planety. Przeciągnij, aby ją obejrzeć."), 12, MUTED)
+	var preview_hint := _setup_copy(_prep_local("Drag to rotate the preview. After generation, select any unoccupied land tile for your settlement.", "Önizlemeyi döndürmek için sürükle. Oluşturduktan sonra yerleşken için boş bir kara parçası seç.", "Przeciągnij, aby obrócić podgląd. Po wygenerowaniu wybierz wolny obszar lądu na osadę."), 12, MUTED)
 	detail_content.add_child(preview_hint)
 	_setup_footer(inner, _show_storyteller_selection, _advance_to_world)
 
@@ -737,7 +1067,6 @@ func _world_setting_row(parent: VBoxContainer, key: String, title: String, minim
 func _advance_to_world() -> void:
 	if is_instance_valid(_mode_option) and _mode_option.is_inside_tree():
 		setup_mode = ["solo", "coop", "competitive"][_mode_option.selected]
-		colonist_count = _count_option.selected + 1
 	if is_instance_valid(_seed_edit) and _seed_edit.is_inside_tree():
 		setup_seed = _seed_edit.text.strip_edges()
 	if setup_seed.is_empty():
@@ -745,7 +1074,7 @@ func _advance_to_world() -> void:
 	if session_kind == "host":
 		var host_result = Net.host(host_port)
 		if host_result is Dictionary and not bool(host_result.get("ok", true)):
-			_notice(str(host_result.get("error", "Oda açılamadı.")))
+			_notice(str(host_result.get("error", _prep_local("Could not open the game room.", "Oda açılamadı.", "Nie można otworzyć pokoju gry."))))
 			return
 		Net.configure_lobby({"mode": setup_mode, "seed": setup_seed, "colonists_per_faction": colonist_count,
 			"world_options": world_options, "scenario_id": scenario_id,
@@ -780,40 +1109,41 @@ func _show_world_selection() -> void:
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(overlay)
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var info_panel := _panel()
+	var arrival_panel := _setup_card(Vector2.ZERO, true)
+	overlay.add_child(arrival_panel)
+	_place(arrival_panel, 0.0, 0.0, 0.0, 0.0, 16, 18, 520, 126)
+	var arrival := _vbox(4)
+	arrival_panel.add_child(arrival)
+	_setup_section(arrival, _prep_local("05 / Landing site", "05 / İniş yeri", "05 / Miejsce lądowania"))
+	arrival.add_child(_label(_prep_local("Choose where to begin", "Başlangıç yerini seç", "Wybierz miejsce startu"), 21, CREAM))
+	arrival.add_child(_setup_copy(_prep_local("Select an unoccupied land tile on the planet.", "Gezegende işgal edilmemiş bir kara parçası seç.", "Wybierz wolny obszar lądu na planecie."), 12, MUTED))
+	var info_panel := _setup_card()
 	overlay.add_child(info_panel)
 	_place(info_panel, 0.0, 0.31, 0.0, 1.0, 16, 0, 350, -57)
-	info_panel.add_theme_stylebox_override("panel", _style(Color("#151a1eef"), Color("#667077"), 0))
 	var info_content := _vbox(6)
 	info_panel.add_child(info_content)
-	info_content.add_child(_label(_tr("world.choose_tile"), 17, GOLD))
-	var info_scroll := ScrollContainer.new()
-	info_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	info_content.add_child(info_scroll)
-	_site_info = _label("", 13, CREAM)
-	_site_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_site_info.custom_minimum_size.x = 315
+	_setup_section(info_content, _prep_local("Selected region", "Seçilen bölge", "Wybrany region"))
+	_site_info = _vbox(4)
 	_site_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_scroll.add_child(_site_info)
-	var terrain_panel := _panel()
-	terrain_panel.add_theme_stylebox_override("panel", _style(Color("#151a1eef"), Color("#667077"), 0))
+	info_content.add_child(_site_info)
+	var terrain_panel := _setup_card()
 	overlay.add_child(terrain_panel)
 	_place(terrain_panel, 1.0, 0.0, 1.0, 0.0, -355, 18, -16, 376)
 	var terrain_content := _vbox(5)
 	terrain_panel.add_child(terrain_content)
-	terrain_content.add_child(_label(_prep_local("Landing area preview", "İniş bölgesi önizlemesi", "Podgląd miejsca lądowania"), 15, GOLD))
+	_setup_section(terrain_content, _prep_local("Landing area preview", "İniş bölgesi önizlemesi", "Podgląd miejsca lądowania"))
 	_terrain_preview = TerrainPreviewScript.new()
 	_terrain_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_terrain_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	terrain_content.add_child(_terrain_preview)
 	_update_site_info()
-	var back := _button(_tr("common.back"), _show_world_settings)
+	var back := _setup_button("←  " + _tr("common.back"), _show_world_settings)
 	overlay.add_child(back)
 	_place(back, 0.0, 1.0, 0.0, 1.0, 16, -47, 100, -10)
-	var random_button := _button(_prep_local("Random site", "Rastgele yer", "Losowe miejsce"), _select_random_site)
+	var random_button := _setup_button(_prep_local("Random site", "Rastgele yer", "Losowe miejsce"), _select_random_site)
 	overlay.add_child(random_button)
 	_place(random_button, 0.0, 1.0, 0.0, 1.0, 110, -47, 272, -10)
-	var next := _button(_tr("world.continue"), _show_characters, true)
+	var next := _setup_button(_tr("world.continue") + "  →", _show_characters, true)
 	overlay.add_child(next)
 	_place(next, 1.0, 1.0, 1.0, 1.0, -220, -47, -16, -10)
 	var rotate_hint := _label(_prep_local("Drag to rotate  ·  Scroll to zoom", "Döndürmek için sürükle  ·  Yakınlaştırmak için kaydır", "Przeciągnij, aby obrócić  ·  Przewiń, aby przybliżyć"), 13, MUTED)
@@ -847,9 +1177,12 @@ func _select_site(site_id: String) -> void:
 func _update_site_info() -> void:
 	if not is_instance_valid(_site_info):
 		return
+	for child in _site_info.get_children():
+		_site_info.remove_child(child)
+		child.queue_free()
 	var chosen: Dictionary = Game.describe_site(world_preview, selected_site_id)
 	if chosen.is_empty():
-		_site_info.text = _tr("world.choose_tile")
+		_site_info.add_child(_setup_copy(_tr("world.choose_tile"), 13, CREAM))
 		if is_instance_valid(_terrain_preview): _terrain_preview.set_map({})
 		return
 	var nearby_friendly := 0
@@ -860,24 +1193,125 @@ func _update_site_info() -> void:
 		if separation > 20: continue
 		if str(other.get("kind", "")) == "friendly": nearby_friendly += 1
 		if str(other.get("kind", "")) == "hostile": nearby_hostile += 1
-	var info_lines := [
-		str(chosen.get("name", "Unsettled land")),
-		"%s  ·  %s" % [str(chosen.get("biome", "plains")).capitalize(), str(chosen.get("terrain", "Flat"))],
-		"%.1f° %s  ·  %.1f° %s" % [absf(float(chosen.get("latitude", 0.0))), "N" if float(chosen.get("latitude", 0.0)) >= 0.0 else "S", absf(float(chosen.get("longitude", 0.0))), "E" if float(chosen.get("longitude", 0.0)) >= 0.0 else "W"],
-		"",
-		"Elevation                 %d m" % int(chosen.get("elevation", 0)),
-		"Temperature            %.1f °C" % float(chosen.get("temperature", 0.0)),
-		"Rainfall                    %d mm/year" % int(chosen.get("rainfall", 0)),
-		"Growing season         %d days" % int(chosen.get("growing_days", 0)),
-		"Coast                        %s" % ("Yes" if bool(chosen.get("coastal", false)) else "No"),
-		"Stone                       %s" % ", ".join(chosen.get("stone_types", [])),
-		"",
-		"Nearby friendly          %d" % nearby_friendly,
-		"Nearby hostile           %d" % nearby_hostile,
-	]
-	_site_info.text = "\n".join(info_lines)
+	_site_info.add_child(_label(I18n.localize_site_name(str(chosen.get("name", "Unsettled land")), preferences.language), 18, GOLD))
+	_site_info.add_child(_setup_copy("%s  ·  %s" % [_localized_site_feature(str(chosen.get("biome", "plains"))), _localized_site_feature(str(chosen.get("terrain", "Flat")))], 13, CREAM))
+	_site_info.add_child(_setup_copy("%.1f° %s  ·  %.1f° %s" % [absf(float(chosen.get("latitude", 0.0))), "N" if float(chosen.get("latitude", 0.0)) >= 0.0 else "S", absf(float(chosen.get("longitude", 0.0))), "E" if float(chosen.get("longitude", 0.0)) >= 0.0 else "W"], 12, MUTED))
+	_site_info.add_child(HSeparator.new())
+	var annual_range := "%.1f–%.1f °C" % [float(chosen.get("temperature_min", chosen.get("temperature", 0.0))), float(chosen.get("temperature_max", chosen.get("temperature", 0.0)))]
+	for entry in [
+		[_prep_local("Elevation", "Rakım", "Wysokość"), "%d m  ·  %s" % [int(chosen.get("elevation", 0)), _prep_local("Coast", "Kıyı", "Wybrzeże") if bool(chosen.get("coastal", false)) else _prep_local("Inland", "İç bölge", "W głębi lądu")]],
+		[_prep_local("Yearly range", "Yıllık aralık", "Zakres roczny"), annual_range],
+		[_prep_local("Annual mean", "Yıllık ortalama", "Średnia roczna"), "%.1f °C" % float(chosen.get("temperature", 0.0))],
+		[_prep_local("Growing days", "Ekim günleri", "Dni uprawy"), _prep_local("%d / 60 days", "%d / 60 gün", "%d / 60 dni") % int(chosen.get("growing_days", 0))],
+		[_prep_local("Local seasons", "Yerel mevsimler", "Lokalne pory roku"), _climate_pattern_name(str(chosen.get("season_pattern", "four_seasons")))],
+		[_prep_local("Rainfall", "Yağış", "Opady"), _prep_local("%d mm/year", "%d mm/yıl", "%d mm/rok") % int(chosen.get("rainfall", 0))],
+		[_prep_local("Stone", "Taş", "Kamień"), ", ".join((chosen.get("stone_types", []) as Array).map(func(stone): return _localized_site_feature(str(stone))))],
+		[_prep_local("Nearby", "Yakında", "W pobliżu"), _prep_local("%d friendly · %d hostile", "%d dost · %d düşman", "%d przyjaciół · %d wrogów") % [nearby_friendly, nearby_hostile]],
+	]:
+		var row := _hbox(5)
+		_site_info.add_child(row)
+		var key := _label(str(entry[0]), 12, MUTED)
+		key.custom_minimum_size.x = 124
+		row.add_child(key)
+		var value := _setup_copy(str(entry[1]), 12, CREAM)
+		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(value)
+	_site_info.add_child(_setup_button(_prep_local("Climate by period  →", "Dönemlere göre iklim  →", "Klimat według okresu  →"), func(): _show_site_climate_details(chosen), false, Vector2(0, 29)))
 	if is_instance_valid(_terrain_preview):
 		_terrain_preview.set_map(Game.preview_local_map(world_preview, selected_site_id))
+
+
+func _climate_pattern_name(pattern: String) -> String:
+	match pattern:
+		"permanent_winter": return _prep_local("Permanent winter", "Sürekli kış", "Wieczna zima")
+		"permanent_summer": return _prep_local("Permanent summer", "Sürekli yaz", "Wieczne lato")
+		"two_seasons": return _prep_local("Two seasons", "İki mevsim", "Dwie pory roku")
+		_: return _prep_local("Four seasons", "Dört mevsim", "Cztery pory roku")
+
+
+func _climate_period_name(index: int) -> String:
+	match posmod(index, 4):
+		0: return _prep_local("Seedtime", "Tohumvakti", "Czas siewu")
+		1: return _prep_local("Highsun", "Günzirvesi", "Pełne słońce")
+		2: return _prep_local("Harvestfall", "Hasatsonu", "Czas zbiorów")
+		_: return _prep_local("Frostrest", "Kırağıvakti", "Czas mrozu")
+
+
+func _local_season_name(season: String) -> String:
+	match season:
+		"spring": return _prep_local("Spring", "İlkbahar", "Wiosna")
+		"summer": return _prep_local("Summer", "Yaz", "Lato")
+		"autumn": return _prep_local("Autumn", "Sonbahar", "Jesień")
+		"winter": return _prep_local("Winter", "Kış", "Zima")
+		"warm": return _prep_local("Warm", "Sıcak", "Ciepła")
+		_: return _prep_local("Cool", "Serin", "Chłodna")
+
+
+func _climate_year_day_label(year_day: int) -> String:
+	var normalized := clampi(year_day, 1, ClimateCalendar.DAYS_PER_YEAR)
+	return "%d %s" % [(normalized - 1) % ClimateCalendar.DAYS_PER_PERIOD + 1, _climate_period_name((normalized - 1) / ClimateCalendar.DAYS_PER_PERIOD)]
+
+
+func _show_site_climate_details(chosen: Dictionary) -> void:
+	var popup := Control.new()
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(popup)
+	popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var shade := ColorRect.new()
+	shade.color = Color(0.0, 0.0, 0.0, 0.58)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	popup.add_child(shade)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed: popup.queue_free())
+	var card := _setup_card(Vector2.ZERO, true)
+	popup.add_child(card)
+	_place(card, 0.5, 0.5, 0.5, 0.5, -260, -185, 260, 185)
+	var content := _vbox(8)
+	card.add_child(content)
+	content.add_child(_label(_prep_local("Regional climate", "Bölgesel iklim", "Klimat regionu"), 20, GOLD))
+	content.add_child(_setup_copy(_prep_local("4 periods × 15 days = 60 days per year", "4 dönem × 15 gün = yılda 60 gün", "4 okresy × 15 dni = 60 dni w roku"), 13, CREAM))
+	content.add_child(_setup_copy(_climate_pattern_name(str(chosen.get("season_pattern", "four_seasons"))) + "  ·  " + _prep_local("yearly %.1f–%.1f °C", "yıllık %.1f–%.1f °C", "rocznie %.1f–%.1f °C") % [float(chosen.get("temperature_min", 0.0)), float(chosen.get("temperature_max", 0.0))], 12, MUTED))
+	content.add_child(HSeparator.new())
+	for period in chosen.get("monthly_temperatures", []):
+		if not period is Dictionary: continue
+		var period_index := int(period.get("period_index", 0))
+		var row := _hbox(8)
+		content.add_child(row)
+		var name := _label(_climate_period_name(period_index), 13, GOLD)
+		name.custom_minimum_size.x = 105
+		row.add_child(name)
+		var season := _label(_local_season_name(str(period.get("season", "spring"))), 12, CREAM)
+		season.custom_minimum_size.x = 65
+		row.add_child(season)
+		row.add_child(_label("%.1f–%.1f °C" % [float(period.get("min", 0.0)), float(period.get("max", 0.0))], 12, CREAM))
+		var fill := Control.new()
+		fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(fill)
+		row.add_child(_label(_prep_local("%d/15 grow", "%d/15 ekim", "%d/15 uprawy") % int(period.get("growing_days", 0)), 12, MUTED))
+	content.add_child(HSeparator.new())
+	var windows: Array = chosen.get("growing_periods", [])
+	var window_text := _prep_local("No outdoor growing days", "Açık havada ekim günü yok", "Brak dni uprawy na zewnątrz") if windows.is_empty() else _prep_local("All year", "Bütün yıl", "Cały rok") if int(chosen.get("growing_days", 0)) == ClimateCalendar.DAYS_PER_YEAR else ", ".join(windows.map(func(window): return "%s – %s" % [_climate_year_day_label(int(window.get("start_day", 1))), _climate_year_day_label(int(window.get("end_day", 1)))]))
+	content.add_child(_setup_copy(_prep_local("Outdoor growing: ", "Açık hava ekimi: ", "Uprawa na zewnątrz: ") + window_text, 12, CREAM))
+	content.add_child(_setup_copy(_prep_local("Seasonal averages; weather events may differ.", "Mevsimsel ortalama; hava olayları farklılık gösterebilir.", "Średnie sezonowe; pogoda może się różnić."), 11, MUTED))
+	content.add_child(_setup_button(_tr("common.close"), func(): popup.queue_free(), false, Vector2(0, 30)))
+
+
+func _localized_site_feature(value: String) -> String:
+	match value.to_lower():
+		"plains": return _prep_local("Plains", "Ova", "Równina")
+		"forest": return _prep_local("Forest", "Orman", "Las")
+		"rocky": return _prep_local("Rocky terrain", "Kayalık arazi", "Teren skalisty")
+		"tundra": return _prep_local("Tundra", "Tundra", "Tundra")
+		"arid": return _prep_local("Arid", "Kurak", "Suchy")
+		"flat": return _prep_local("Flat", "Düz", "Płaski")
+		"hilly": return _prep_local("Hilly", "Tepelik", "Pagórkowaty")
+		"mountainous": return _prep_local("Mountainous", "Dağlık", "Górzysty")
+		"granite": return _prep_local("Granite", "Granit", "Granit")
+		"slate": return _prep_local("Slate", "Arduvaz", "Łupek")
+		"limestone": return _prep_local("Limestone", "Kireçtaşı", "Wapień")
+		"sandstone": return _prep_local("Sandstone", "Kumtaşı", "Piaskowiec")
+		_: return value
 
 
 func _select_random_site() -> void:
@@ -899,20 +1333,28 @@ func _show_characters() -> void:
 		character_specs.append({"name": ["Ada", "Baran", "Deniz"][i], "hair_index": i % HAIR_OPTIONS.size(), "hair_color_index": 0, "skin_index": i % SKIN_OPTIONS.size(), "outfit_index": i % OUTFIT_OPTIONS.size(), "trait_ids": ["hardworking"] if i == 0 else ["calm"] if i == 1 else ["quick"], "condition_ids": [], "sex": "female" if i != 1 else "male", "gender": "woman" if i != 1 else "man", "age": 25 + i * 4, "childhood": "rural_child", "adulthood": ["farmer", "builder", "medic"][i], "starting_gear": {"weapon": "fists", "apparel": "clothes"}, "starting_relationships": {}, "skills": {}})
 	_editing_character_index = clampi(_editing_character_index, 0, colonist_count - 1)
 	var root := _clear_screen()
+	_add_menu_backdrop()
+	var frame := _setup_card(Vector2.ZERO, true)
+	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(frame)
+	var inner := _vbox(7)
+	frame.add_child(inner)
 	var heading := _hbox(12)
-	root.add_child(heading)
-	heading.add_child(_label(_tr("characters.title"), 23))
+	inner.add_child(heading)
+	heading.add_child(_label(_tr("characters.title"), 22, CREAM))
+	heading.add_child(_label(" · ", 18, MUTED))
+	heading.add_child(_label(_prep_local("Crew preparation", "Ekip hazırlığı", "Przygotowanie załogi"), 14, GOLD))
 	var head_fill := Control.new()
 	head_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(head_fill)
 	_character_points = _label("", 15, GOLD)
 	heading.add_child(_character_points)
 	var tabs := _hbox(3)
-	root.add_child(tabs)
+	inner.add_child(tabs)
 	for tab_id in ["characters", "relationships", "equipment"]:
 		var chosen_tab: String = tab_id
 		var tab_name := _prep_local("Characters", "Karakterler", "Postacie") if tab_id == "characters" else _prep_local("Relationships", "İlişkiler", "Relacje") if tab_id == "relationships" else _prep_local("Equipment", "Ekipman", "Wyposażenie")
-		tabs.add_child(_button(tab_name, func(): _switch_preparation_tab(chosen_tab), tab_id == preparation_tab, Vector2(150, 32)))
+		tabs.add_child(_setup_button(tab_name, func(): _switch_preparation_tab(chosen_tab), tab_id == preparation_tab, Vector2(150, 34)))
 	var tab_fill := Control.new()
 	tab_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.add_child(tab_fill)
@@ -921,15 +1363,17 @@ func _show_characters() -> void:
 	limit_toggle.button_pressed = point_limit_enabled
 	limit_toggle.toggled.connect(func(enabled: bool): point_limit_enabled = enabled; _refresh_character_points())
 	tabs.add_child(limit_toggle)
-	root.add_child(HSeparator.new())
-	var center := CenterContainer.new()
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(center)
+	inner.add_child(HSeparator.new())
+	var body_scroll := ScrollContainer.new()
+	body_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	body_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	inner.add_child(body_scroll)
 	var body := _hbox(8)
-	body.custom_minimum_size = Vector2(minf(1280.0, get_viewport_rect().size.x - 40.0), 580)
-	body.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	body.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_child(body)
+	body.custom_minimum_size = Vector2(maxf(800.0, size.x - 95.0), 640)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_scroll.add_child(body)
 	_character_inputs.clear()
 	_roster_buttons.clear()
 	if preparation_tab == "relationships":
@@ -940,17 +1384,17 @@ func _show_characters() -> void:
 		_build_preparation_character(body)
 	_refresh_character_points()
 	var footer := _hbox(8)
-	root.add_child(footer)
-	footer.add_child(_button(_tr("common.back"), _return_to_world_from_characters, false, Vector2(120, 36)))
+	inner.add_child(footer)
+	footer.add_child(_setup_button("←  " + _tr("common.back"), _return_to_world_from_characters, false, Vector2(120, 38)))
 	var foot_fill := Control.new()
 	foot_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(foot_fill)
-	footer.add_child(_button(_prep_local("Load preset", "Hazır ayar yükle", "Wczytaj zestaw"), _load_preparation_preset))
-	footer.add_child(_button(_prep_local("Save preset", "Hazır ayar kaydet", "Zapisz zestaw"), _save_preparation_preset))
+	footer.add_child(_setup_button(_prep_local("Load preset", "Hazır ayar yükle", "Wczytaj zestaw"), _load_preparation_preset))
+	footer.add_child(_setup_button(_prep_local("Save preset", "Hazır ayar kaydet", "Zapisz zestaw"), _save_preparation_preset))
 	var foot_fill_right := Control.new()
 	foot_fill_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(foot_fill_right)
-	footer.add_child(_button(_tr("characters.start"), _advance_to_lobby, true, Vector2(170, 36)))
+	footer.add_child(_setup_button(_prep_local("Continue", "Devam et", "Kontynuuj") + "  →", _advance_to_lobby, true, Vector2(170, 38)))
 
 
 func _prep_local(en: String, tr: String, pl: String) -> String:
@@ -964,7 +1408,7 @@ func _switch_preparation_tab(tab_id: String) -> void:
 
 
 func _preparation_roster(body: HBoxContainer) -> void:
-	var panel := _panel(Vector2(206, 0))
+	var panel := _setup_card(Vector2(206, 0))
 	body.add_child(panel)
 	var roster := _vbox(6)
 	panel.add_child(roster)
@@ -979,7 +1423,7 @@ func _preparation_roster(body: HBoxContainer) -> void:
 		portrait.appearance = _spec_appearance(spec)
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(portrait)
-		var button := _button(str(spec.get("name", "Colonist")), func(): _select_character_editor(index_copy), i == _editing_character_index, Vector2(142, 43))
+		var button := _setup_button(str(spec.get("name", "Colonist")), func(): _select_character_editor(index_copy), i == _editing_character_index, Vector2(142, 43))
 		button.add_theme_font_size_override("font_size", 12)
 		row.add_child(button)
 		_roster_buttons.append(button)
@@ -994,43 +1438,68 @@ func _preparation_roster(body: HBoxContainer) -> void:
 func _build_preparation_character(body: HBoxContainer) -> void:
 	_preparation_roster(body)
 	var old: Dictionary = character_specs[_editing_character_index]
-	var editor := _vbox(7)
-	editor.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var editor := _vbox(9)
+	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(editor)
 	var name_row := _hbox(5)
 	editor.add_child(name_row)
-	name_row.add_child(_button("⚄", _randomize_prepared_colonist, false, Vector2(38, 36)))
+	var random_button := _setup_button("⚄", _randomize_prepared_colonist, false, Vector2(38, 36))
+	random_button.tooltip_text = _prep_local("Randomize this colonist", "Bu kolonisti rastgele oluştur", "Wylosuj tę postać")
+	name_row.add_child(random_button)
 	name_row.add_child(_label(_prep_local("Name", "Ad", "Imię"), 13, MUTED))
 	var name_edit := LineEdit.new()
 	name_edit.text = str(old.get("name", "Colonist"))
 	name_edit.custom_minimum_size = Vector2(230, 34)
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_row.add_child(name_edit)
-	name_row.add_child(_button(_prep_local("Load character", "Karakter yükle", "Wczytaj postać"), _load_character_preset))
-	name_row.add_child(_button(_prep_local("Save character", "Karakter kaydet", "Zapisz postać"), _save_character_preset))
-	var columns := _hbox(7)
+	name_row.add_child(_setup_button(_prep_local("Load character", "Karakter yükle", "Wczytaj postać"), _load_character_preset))
+	name_row.add_child(_setup_button(_prep_local("Save character", "Karakter kaydet", "Zapisz postać"), _save_character_preset))
+	var columns: Container
+	if size.x < 1450.0:
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 7)
+		grid.add_theme_constant_override("v_separation", 7)
+		columns = grid
+	else:
+		columns = _hbox(7)
+	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	editor.add_child(columns)
-	var appearance_panel := _panel(Vector2(255, 0))
+	var appearance_panel := _setup_card(Vector2(255, 0), true)
+	appearance_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(appearance_panel)
 	var appearance_fields := _vbox(5)
 	appearance_panel.add_child(appearance_fields)
-	appearance_fields.add_child(_label(_prep_local("APPEARANCE", "GÖRÜNÜŞ", "WYGLĄD"), 14, GOLD))
+	appearance_fields.add_child(_label(_prep_local("01  /  APPEARANCE", "01  /  GÖRÜNÜŞ", "01  /  WYGLĄD"), 14, GOLD))
 	var preview := PawnPreviewScript.new()
 	appearance_fields.add_child(preview)
-	preview.custom_minimum_size = Vector2(235, 230)
+	preview.custom_minimum_size = Vector2(235, 188 if size.x < 1450.0 else 220)
 	preview.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var sex := _cycle_field(appearance_fields, _prep_local("Sex", "Cinsiyet", "Płeć"), [_prep_local("Female", "Kadın", "Kobieta"), _prep_local("Male", "Erkek", "Mężczyzna")], 0 if str(old.get("sex", "female")) == "female" else 1, _refresh_character_editor, 75, 79)
-	var gender := _cycle_field(appearance_fields, _tr("characters.gender"), [_tr("characters.gender_female"), _tr("characters.gender_male"), _tr("characters.gender_nonbinary")], maxi(0, ["woman", "man", "nonbinary"].find(str(old.get("gender", "woman")))), _refresh_character_editor, 75, 79)
+	var preview_hint := _label(_prep_local("Changes appear on the colonist above.", "Değişiklikler yukarıdaki koloniste yansır.", "Zmiany pojawiają się na postaci powyżej."), 11, MUTED)
+	preview_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	appearance_fields.add_child(preview_hint)
+	appearance_fields.add_child(HSeparator.new())
+	var sex := _choice_field(appearance_fields, _prep_local("Biology", "Biyoloji", "Biologia"), [_prep_local("Female", "Dişi", "Żeńska"), _prep_local("Male", "Erkek", "Męska")], 0 if str(old.get("sex", "female")) == "female" else 1, _refresh_character_editor, 75, 135)
+	(sex["row"] as Control).tooltip_text = _prep_local("Biological sex in this colonist's record.", "Kolonistin kaydındaki biyolojik cinsiyet.", "Płeć biologiczna w karcie kolonisty.")
+	var gender := _choice_field(appearance_fields, _prep_local("Identity", "Kimlik", "Tożsamość"), [_prep_local("Woman", "Kadın", "Kobieta"), _prep_local("Man", "Erkek", "Mężczyzna"), _prep_local("Non-binary", "İkili olmayan", "Niebinarna")], maxi(0, ["woman", "man", "nonbinary"].find(str(old.get("gender", "woman")))), _refresh_character_editor, 75, 135)
+	(gender["row"] as Control).tooltip_text = _prep_local("How this colonist identifies socially.", "Kolonistin toplumsal kimliği.", "Tożsamość społeczna kolonisty.")
 	var hair := _cycle_field(appearance_fields, _tr("characters.hair"), _hair_options(), int(old.get("hair_index", 0)), _refresh_character_editor, 75, 79)
 	var hair_color := _cycle_field(appearance_fields, _tr("characters.hair_color"), [_prep_local("Dark brown", "Koyu kahve", "Ciemny brąz"), _prep_local("Chestnut", "Kestane", "Kasztan"), _prep_local("Blond", "Sarı", "Blond"), _prep_local("Black", "Siyah", "Czarny"), _prep_local("Copper", "Bakır", "Miedziany")], int(old.get("hair_color_index", 0)), _refresh_character_editor, 75, 79)
 	var skin := _cycle_field(appearance_fields, _tr("characters.skin"), [_prep_local("Light", "Açık", "Jasna"), _prep_local("Fair", "Buğday", "Śniada"), _prep_local("Medium", "Orta", "Średnia"), _prep_local("Brown", "Esmer", "Brązowa"), _prep_local("Dark", "Koyu", "Ciemna")], int(old.get("skin_index", 0)), _refresh_character_editor, 75, 79)
 	var outfit := _cycle_field(appearance_fields, _tr("characters.outfit"), [_prep_local("Blue", "Mavi", "Niebieski"), _prep_local("Rust", "Kızıl", "Rdzawy"), _prep_local("Olive", "Zeytin", "Oliwkowy"), _prep_local("Purple", "Mor", "Fioletowy"), _prep_local("Ochre", "Hardal", "Ochra")], int(old.get("outfit_index", 0)), _refresh_character_editor, 75, 79)
-	var history_panel := _panel(Vector2(375, 0))
+	appearance_fields.add_child(HSeparator.new())
+	var palettes := [
+		_preparation_palette(appearance_fields, _prep_local("Hair", "Saç", "Włosy"), HAIR_COLOR_OPTIONS, hair_color),
+		_preparation_palette(appearance_fields, _prep_local("Skin", "Ten", "Skóra"), SKIN_OPTIONS, skin),
+		_preparation_palette(appearance_fields, _prep_local("Clothes", "Giysi", "Ubranie"), OUTFIT_OPTIONS, outfit),
+	]
+	var history_panel := _setup_card(Vector2(300, 0))
+	history_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(history_panel)
 	var history := _vbox(6)
 	history_panel.add_child(history)
-	history.add_child(_label(_prep_local("BACKSTORY", "GEÇMİŞ", "HISTORIA"), 14, GOLD))
+	history.add_child(_label(_prep_local("02  /  LIFE STORY", "02  /  YAŞAM ÖYKÜSÜ", "02  /  HISTORIA ŻYCIA"), 14, GOLD))
 	var age_row := _hbox(5)
 	history.add_child(age_row)
 	age_row.add_child(_label(_prep_local("Age", "Yaş", "Wiek"), 12, MUTED))
@@ -1047,42 +1516,86 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 	age_row.add_child(_label(_prep_local("biological years", "biyolojik yıl", "lat biologicznych"), 11, MUTED))
 	var childhood_ids := ["rural_child", "town_child", "apprentice"]
 	var adulthood_ids := ["farmer", "builder", "medic", "scholar"]
-	var childhood := _cycle_field(history, _prep_local("Childhood", "Çocukluk", "Dzieciństwo"), [_prep_local("Rural child", "Köy çocuğu", "Dziecko ze wsi"), _prep_local("Town child", "Kasaba çocuğu", "Dziecko z miasta"), _prep_local("Apprentice", "Çırak", "Uczeń")], maxi(0, childhood_ids.find(str(old.get("childhood", "rural_child")))), _refresh_character_editor, 95, 118)
-	var adulthood := _cycle_field(history, _prep_local("Adulthood", "Yetişkinlik", "Dorosłość"), [_prep_local("Farmer", "Çiftçi", "Rolnik"), _prep_local("Builder", "İnşaatçı", "Budowniczy"), _prep_local("Medic", "Sağlıkçı", "Medyk"), _prep_local("Scholar", "Araştırmacı", "Badacz")], maxi(0, adulthood_ids.find(str(old.get("adulthood", "farmer")))), _refresh_character_editor, 95, 118)
+	var childhood := _choice_field(history, _prep_local("Childhood", "Çocukluk", "Dzieciństwo"), [_prep_local("Rural child", "Köy çocuğu", "Dziecko ze wsi"), _prep_local("Town child", "Kasaba çocuğu", "Dziecko z miasta"), _prep_local("Apprentice", "Çırak", "Uczeń")], maxi(0, childhood_ids.find(str(old.get("childhood", "rural_child")))), _refresh_character_editor, 95, 154)
+	var adulthood := _choice_field(history, _prep_local("Adulthood", "Yetişkinlik", "Dorosłość"), [_prep_local("Farmer", "Çiftçi", "Rolnik"), _prep_local("Builder", "İnşaatçı", "Budowniczy"), _prep_local("Medic", "Sağlıkçı", "Medyk"), _prep_local("Scholar", "Araştırmacı", "Badacz")], maxi(0, adulthood_ids.find(str(old.get("adulthood", "farmer")))), _refresh_character_editor, 95, 154)
 	history.add_child(HSeparator.new())
-	history.add_child(_label(_prep_local("TRAITS", "ÖZELLİKLER", "CECHY"), 14, GOLD))
+	var childhood_note := _setup_copy("", 12, MUTED)
+	history.add_child(childhood_note)
+	var adulthood_note := _setup_copy("", 12, MUTED)
+	history.add_child(adulthood_note)
+	history.add_child(HSeparator.new())
+	history.add_child(_label(_prep_local("ARRIVAL RECORD", "VARIŞ KAYDI", "KARTA PRZYBYCIA"), 12, GOLD))
+	var arrival_note := _setup_copy(_prep_local("Gear and relationships can be adjusted in the tabs above.", "Ekipman ve ilişkileri üstteki sekmelerden değiştirebilirsin.", "Wyposażenie i relacje zmienisz w kartach u góry."), 12, MUTED)
+	history.add_child(arrival_note)
+	var gear: Dictionary = old.get("starting_gear", {"weapon": "fists", "apparel": "clothes"})
+	var weapon_name := _prep_local("Spear", "Mızrak", "Włócznia") if str(gear.get("weapon", "fists")) == "spear" else _prep_local("Unarmed", "Silahsız", "Bez broni")
+	var apparel_name := _prep_local("Jacket", "Ceket", "Kurtka") if str(gear.get("apparel", "clothes")) == "jacket" else _prep_local("Clothes", "Giysi", "Ubranie")
+	history.add_child(_label("%s  ·  %s" % [weapon_name, apparel_name], 12, CREAM))
+	var traits_panel := _setup_card(Vector2(280, 0))
+	traits_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(traits_panel)
+	var traits_column := _vbox(6)
+	traits_panel.add_child(traits_column)
+	traits_column.add_child(_label(_prep_local("03  /  TRAITS & HEALTH", "03  /  ÖZELLİK VE SAĞLIK", "03  /  CECHY I ZDROWIE"), 14, GOLD))
+	traits_column.add_child(_setup_copy(_prep_local("Choose up to three traits.", "En fazla üç özellik seç.", "Wybierz do trzech cech."), 11, MUTED))
 	var old_traits: Array = old.get("trait_ids", [TRAIT_IDS[clampi(int(old.get("trait_index", 0)) + 1, 1, TRAIT_IDS.size() - 1)]])
-	var trait_fields: Array = []
-	for slot in range(3):
-		var trait_id: String = str(old_traits[slot]) if slot < old_traits.size() else ""
-		trait_fields.append(_cycle_field(history, _prep_local("Trait %d" % (slot + 1), "Özellik %d" % (slot + 1), "Cecha %d" % (slot + 1)), _preparation_trait_names(), maxi(0, TRAIT_IDS.find(trait_id)), _refresh_character_editor, 95, 118))
-	history.add_child(HSeparator.new())
-	history.add_child(_label(_tr("characters.health").to_upper(), 14, GOLD))
+	var trait_fields := _preparation_choice_chips(traits_column, TRAIT_IDS, _preparation_trait_names(), old_traits,
+		_prep_local("Add trait", "Özellik ekle", "Dodaj cechę"))
+	traits_column.add_child(HSeparator.new())
+	traits_column.add_child(_label(_tr("characters.health").to_upper(), 14, GOLD))
 	var old_conditions: Array = old.get("condition_ids", [])
-	var condition_fields: Array = []
-	for slot in range(3):
-		var condition_id: String = str(old_conditions[slot]) if slot < old_conditions.size() else ""
-		condition_fields.append(_cycle_field(history, _prep_local("Condition %d" % (slot + 1), "Durum %d" % (slot + 1), "Stan %d" % (slot + 1)), _preparation_condition_names(), maxi(0, CONDITION_IDS.find(condition_id)), _refresh_character_editor, 95, 118))
-	var skill_panel := _panel(Vector2(242, 0))
+	var condition_fields := _preparation_choice_chips(traits_column, CONDITION_IDS, _preparation_condition_names(), old_conditions,
+		_prep_local("Add condition", "Sağlık durumu ekle", "Dodaj schorzenie"))
+	traits_column.add_child(HSeparator.new())
+	var trait_note := _setup_copy(_prep_local("Strengths cost points. Drawbacks return points. Starting conditions carry into the colony.", "Güçlü özellikler puan harcar, zayıflıklar geri kazandırır. Sağlık durumları oyuna taşınır.", "Zalety kosztują punkty, wady je zwracają. Stan zdrowia przechodzi do gry."), 12, MUTED)
+	traits_column.add_child(trait_note)
+	traits_column.add_child(_setup_button(_prep_local("Edit starting gear →", "Başlangıç ekipmanını düzenle →", "Edytuj wyposażenie →"), func(): _switch_preparation_tab("equipment"), false, Vector2(0, 32)))
+	var skill_panel := _setup_card(Vector2(242, 0))
+	skill_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(skill_panel)
 	var skill_column := _vbox(5)
 	skill_panel.add_child(skill_column)
-	skill_column.add_child(_label(_tr("characters.skills").to_upper(), 14, GOLD))
-	skill_column.add_child(_label(_prep_local("Levels above 5 cost points", "5 üstü seviyeler puan harcar", "Poziomy powyżej 5 kosztują punkty"), 11, MUTED))
+	skill_column.add_child(_label(_prep_local("04  /  SKILLS", "04  /  BECERİLER", "04  /  UMIEJĘTNOŚCI"), 14, GOLD))
+	var skill_hint := _setup_copy(_prep_local("Auto uses the background aptitude. Set a level to override it; levels above 5 cost points.", "Otomatik, geçmiş yatkınlığını kullanır. Seviye seçerek değiştirebilirsin; 5 üstü puan harcar.", "Auto uwzględnia predyspozycje z historii. Wybrany poziom je zastępuje; powyżej 5 kosztuje punkty."), 11, MUTED)
+	skill_column.add_child(skill_hint)
 	var skill_fields: Dictionary = {}
+	var skill_bars: Dictionary = {}
 	var old_skills: Dictionary = old.get("skills", {})
-	var levels: Array = []
-	for rating in range(11): levels.append(str(rating))
 	for skill in SKILL_IDS:
-		var level := _cycle_field(skill_column, str(skill).capitalize(), levels, clampi(int(old_skills.get(skill, 5)), 0, 10), _refresh_character_editor, 88, 24)
+		var saved_level := clampi(int(old_skills.get(skill, 5)), 0, 10) + 1 if old_skills.has(skill) else 0
+		var level := _preparation_skill_field(skill_column, _localized_skill(str(skill)), saved_level, _refresh_character_editor)
 		skill_fields[skill] = level
+		var meter := ProgressBar.new()
+		meter.custom_minimum_size.y = 5
+		meter.max_value = 10
+		meter.value = 5 if int(level["index"]) == 0 else int(level["index"]) - 1
+		meter.modulate.a = 0.35 if int(level["index"]) == 0 else 1.0
+		meter.show_percentage = false
+		meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		meter.add_theme_stylebox_override("background", _style(Color("#10181d"), Color.TRANSPARENT, 0))
+		meter.add_theme_stylebox_override("fill", _style(Color("#809c93"), Color.TRANSPARENT, 0))
+		skill_column.add_child(meter)
+		skill_bars[skill] = meter
 	skill_column.add_child(HSeparator.new())
 	skill_column.add_child(_label(_prep_local("INCAPABLE OF", "YAPAMADIĞI İŞLER", "NIEZDOLNOŚCI"), 13, GOLD))
 	var incapable := _label(_prep_local("None", "Yok", "Brak"), 12, MUTED)
 	skill_column.add_child(incapable)
-	_character_inputs.append({"index": _editing_character_index, "name": name_edit, "age": age, "childhood": childhood, "adulthood": adulthood, "sex": sex, "gender": gender, "hair": hair, "hair_color": hair_color, "skin": skin, "outfit": outfit, "traits": trait_fields, "conditions": condition_fields, "skills": skill_fields, "preview": preview})
+	_character_inputs.append({"index": _editing_character_index, "name": name_edit, "age": age, "childhood": childhood, "adulthood": adulthood, "childhood_note": childhood_note, "adulthood_note": adulthood_note, "sex": sex, "gender": gender, "hair": hair, "hair_color": hair_color, "skin": skin, "outfit": outfit, "palettes": palettes, "traits": trait_fields, "conditions": condition_fields, "skills": skill_fields, "skill_bars": skill_bars, "preview": preview})
 	name_edit.text_changed.connect(func(_text: String): _refresh_character_editor())
 	_refresh_character_editor()
+
+
+func _localized_skill(skill: String) -> String:
+	match skill:
+		"chop": return _prep_local("Chop", "Odunculuk", "Wycinka")
+		"mine": return _prep_local("Mine", "Madencilik", "Górnictwo")
+		"harvest": return _prep_local("Harvest", "Hasat", "Zbiory")
+		"haul": return _prep_local("Haul", "Taşıma", "Transport")
+		"build": return _prep_local("Build", "İnşa", "Budowa")
+		"research": return _prep_local("Research", "Araştırma", "Badania")
+		"treat": return _prep_local("Treat", "Tedavi", "Leczenie")
+		"combat": return _prep_local("Combat", "Savaş", "Walka")
+		_: return skill.capitalize()
 
 
 func _spec_appearance(spec: Dictionary) -> Dictionary:
@@ -1093,7 +1606,7 @@ func _spec_appearance(spec: Dictionary) -> Dictionary:
 
 
 func _build_preparation_relationships(body: HBoxContainer) -> void:
-	var panel := _panel()
+	var panel := _setup_card(Vector2.ZERO, true)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(panel)
 	var content := _vbox(12)
@@ -1116,7 +1629,7 @@ func _build_preparation_relationships(body: HBoxContainer) -> void:
 			first_portrait.appearance = _spec_appearance(first)
 			row.add_child(first_portrait)
 			var pair_label := _label("%s  ↔  %s" % [str(first.get("name", "Colonist")), str(second.get("name", "Colonist"))], 15)
-			pair_label.custom_minimum_size = Vector2(280, 0)
+			pair_label.custom_minimum_size = Vector2(100 if size.x < 1200.0 else 280, 0)
 			row.add_child(pair_label)
 			var second_portrait := PawnPortrait.new()
 			second_portrait.custom_minimum_size = Vector2(46, 48)
@@ -1145,13 +1658,16 @@ func _set_starting_relation(first_index: int, second_index: int, relation_id: St
 
 func _build_preparation_equipment(body: HBoxContainer) -> void:
 	_preparation_roster(body)
+	var gear_columns: BoxContainer = _vbox(7) if size.x < 1200.0 else _hbox(7)
+	gear_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(gear_columns)
 	var spec: Dictionary = character_specs[_editing_character_index]
 	var gear: Dictionary = spec.get("starting_gear", {"weapon": "fists", "apparel": "clothes"})
 	if starting_cargo.is_empty():
 		starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
-	var available_panel := _panel(Vector2(350, 0))
+	var available_panel := _setup_card(Vector2(350, 0))
 	available_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(available_panel)
+	gear_columns.add_child(available_panel)
 	var available := _vbox(7)
 	available_panel.add_child(available)
 	available.add_child(_label(_prep_local("AVAILABLE CARGO", "KULLANILABİLİR YÜK", "DOSTĘPNY ŁADUNEK"), 16, GOLD))
@@ -1163,7 +1679,7 @@ func _build_preparation_equipment(body: HBoxContainer) -> void:
 	var available_rows: Dictionary = {}
 	for item_id in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
 		var chosen_id: String = item_id
-		var button := _button("+  %s" % _cargo_label(chosen_id), func(): _adjust_starting_cargo(chosen_id, 1), false, Vector2(0, 43))
+		var button := _setup_button("+  %s" % _cargo_label(chosen_id), func(): _adjust_starting_cargo(chosen_id, 1), false, Vector2(0, 43))
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		available.add_child(button)
 		available_rows[chosen_id] = button
@@ -1176,9 +1692,9 @@ func _build_preparation_equipment(body: HBoxContainer) -> void:
 	var help := _label(_prep_local("Choose what arrives with this colony. Your scenario supplies are the starting template.", "Bu koloniyle gelecek yükü seç. Senaryo erzakı başlangıç şablonudur.", "Wybierz ładunek kolonii. Zapasy scenariusza to szablon początkowy."), 12, MUTED)
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	available.add_child(help)
-	var selected_panel := _panel(Vector2(490, 0))
+	var selected_panel := _setup_card(Vector2(490, 0), true)
 	selected_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(selected_panel)
+	gear_columns.add_child(selected_panel)
 	var selected := _vbox(6)
 	selected_panel.add_child(selected)
 	selected.add_child(_label(_prep_local("START WITH", "BAŞLANGIÇ YÜKÜ", "ŁADUNEK POCZĄTKOWY"), 16, GOLD))
@@ -1198,8 +1714,8 @@ func _build_preparation_equipment(body: HBoxContainer) -> void:
 		count.custom_minimum_size = Vector2(105, 32)
 		count.value_changed.connect(func(value: float): starting_cargo[chosen_id] = int(value))
 		row.add_child(count)
-		row.add_child(_button("−10", func(): count.value = maxi(0, int(count.value) - 10), false, Vector2(51, 32)))
-		row.add_child(_button("+10", func(): count.value = mini(999, int(count.value) + 10), false, Vector2(51, 32)))
+		row.add_child(_setup_button("−10", func(): count.value = maxi(0, int(count.value) - 10), false, Vector2(51, 32)))
+		row.add_child(_setup_button("+10", func(): count.value = mini(999, int(count.value) + 10), false, Vector2(51, 32)))
 	selected.add_child(HSeparator.new())
 	selected.add_child(_label(_prep_local("EQUIP SELECTED COLONIST", "SEÇİLİ KOLONİSTİ KUŞAN", "WYPOSAŻ WYBRANEGO KOLONISTĘ"), 14, GOLD))
 	for item in [{"slot": "weapon", "id": "fists", "en": "Unarmed", "tr": "Silahsız", "pl": "Bez broni"}, {"slot": "weapon", "id": "spear", "en": "Spear", "tr": "Mızrak", "pl": "Włócznia"}, {"slot": "apparel", "id": "clothes", "en": "Clothes", "tr": "Giysi", "pl": "Ubranie"}, {"slot": "apparel", "id": "jacket", "en": "Jacket", "tr": "Ceket", "pl": "Kurtka"}]:
@@ -1207,7 +1723,7 @@ func _build_preparation_equipment(body: HBoxContainer) -> void:
 		var item_id := str(item["id"])
 		var is_equipped := str(gear.get(slot_id, "")) == item_id
 		var label_text := _prep_local(str(item["en"]), str(item["tr"]), str(item["pl"]))
-		selected.add_child(_button("✓  %s" % label_text if is_equipped else label_text, func(): _set_starting_gear(slot_id, item_id), is_equipped, Vector2(0, 33)))
+		selected.add_child(_setup_button("✓  %s" % label_text if is_equipped else label_text, func(): _set_starting_gear(slot_id, item_id), is_equipped, Vector2(0, 33)))
 
 
 func _cargo_label(item_id: String) -> String:
@@ -1220,6 +1736,50 @@ func _cargo_label(item_id: String) -> String:
 		"spear": return _prep_local("Spear", "Mızrak", "Włócznia")
 		"jacket": return _prep_local("Jacket", "Ceket", "Kurtka")
 	return item_id.capitalize()
+
+
+func _display_item(item_id: String) -> String:
+	match item_id:
+		"fists": return _prep_local("Unarmed", "Silahsız", "Bez broni")
+		"clothes": return _prep_local("Clothes", "Giysi", "Ubranie")
+		"none", "": return _tr("common.none")
+		_: return _cargo_label(item_id)
+
+
+func _display_trait(trait_id: String) -> String:
+	match trait_id:
+		"hardworking": return _prep_local("Hardworking", "Çalışkan", "Pracowity")
+		"calm": return _prep_local("Calm", "Sakin", "Spokojny")
+		"quick": return _prep_local("Quick", "Çevik", "Szybki")
+		"curious": return _prep_local("Curious", "Meraklı", "Ciekawy")
+		"kind": return _prep_local("Kind", "İyi kalpli", "Życzliwy")
+		"night_owl": return _prep_local("Night owl", "Gece kuşu", "Nocny marek")
+		"timid": return _prep_local("Timid", "Çekingen", "Nieśmiały")
+		"abrasive": return _prep_local("Abrasive", "Geçimsiz", "Kłótliwy")
+		"lazy": return _prep_local("Lazy", "Tembel", "Leniwy")
+		_: return trait_id.replace("_", " ").capitalize()
+
+
+func _display_work(work_id: String) -> String:
+	match work_id:
+		"chop": return _prep_local("Chop", "Ağaç kes", "Ścinanie")
+		"mine": return _prep_local("Mine", "Maden", "Wydobycie")
+		"harvest": return _prep_local("Harvest", "Hasat", "Zbiory")
+		"haul": return _prep_local("Haul", "Taşı", "Transport")
+		"build": return _prep_local("Build", "İnşa", "Budowa")
+		"treat": return _prep_local("Care", "Tedavi", "Opieka")
+		"research": return _tr("tabs.research")
+		"combat": return _prep_local("Combat", "Savaş", "Walka")
+		_: return work_id.capitalize()
+
+
+func _display_site_kind(kind: String) -> String:
+	match kind:
+		"friendly": return _tr("world.friendly")
+		"hostile": return _tr("world.hostile")
+		"player": return _prep_local("Player settlement", "Oyuncu yerleşkesi", "Osada gracza")
+		"vacant": return _tr("world.vacant")
+		_: return kind.capitalize()
 
 
 func _adjust_starting_cargo(item_id: String, delta: int) -> void:
@@ -1300,7 +1860,7 @@ func _load_preparation_preset() -> void:
 		_notice(_prep_local("Preset is invalid.", "Hazır ayar geçersiz.", "Zestaw jest nieprawidłowy."))
 		return
 	var data: Dictionary = loaded
-	colonist_count = clampi(int(data.get("colonist_count", 3)), 1, 3)
+	colonist_count = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("colonist_count", 3))
 	point_limit_enabled = bool(data.get("point_limit_enabled", true))
 	character_specs = (data["characters"] as Array).duplicate(true)
 	_editing_character_index = 0
@@ -1315,21 +1875,193 @@ func _cycle_field(parent: Control, title: String, values: Array, initial_index: 
 	var title_label := _label(title, 12, MUTED)
 	title_label.custom_minimum_size = Vector2(label_width, 0)
 	row.add_child(title_label)
-	var value_label := _label(str(values[int(state["index"])]), 13, CREAM)
-	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	value_label.custom_minimum_size = Vector2(value_width, 0)
-	row.add_child(_button("◀", func():
-		state["index"] = (int(state["index"]) - 1 + values.size()) % values.size()
-		value_label.text = str(values[int(state["index"])])
-		changed.call()
-	, false, Vector2(28, 25)))
-	row.add_child(value_label)
-	row.add_child(_button("▶", func():
-		state["index"] = (int(state["index"]) + 1) % values.size()
-		value_label.text = str(values[int(state["index"])])
-		changed.call()
-	, false, Vector2(28, 25)))
+	var choice := _preparation_option(values, value_width)
+	choice.select(int(state["index"]))
+	choice.item_selected.connect(func(index: int):
+		state["index"] = index
+		changed.call())
+	row.add_child(_setup_button("◀", func(): _step_preparation_choice(state, choice, -1, changed), false, Vector2(28, 27)))
+	row.add_child(choice)
+	row.add_child(_setup_button("▶", func(): _step_preparation_choice(state, choice, 1, changed), false, Vector2(28, 27)))
+	state["option"] = choice
+	state["values"] = values
+	state["row"] = row
 	return state
+
+
+func _step_preparation_choice(state: Dictionary, choice: OptionButton, direction: int, changed: Callable) -> void:
+	state["index"] = posmod(int(state["index"]) + direction, choice.item_count)
+	choice.select(int(state["index"]))
+	changed.call()
+
+
+func _preparation_option(values: Array, minimum_width: float) -> OptionButton:
+	var choice := OptionButton.new()
+	for value in values:
+		choice.add_item(str(value))
+	choice.custom_minimum_size = Vector2(minimum_width, 28)
+	choice.clip_text = true
+	choice.add_theme_font_size_override("font_size", 12)
+	for mode in ["normal", "hover", "pressed"]:
+		choice.add_theme_stylebox_override(mode, _style(Color("#28333a") if mode == "normal" else Color("#394b51"), Color("#67736f"), 2))
+	return choice
+
+
+func _choice_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, value_width := 170) -> Dictionary:
+	var state := {"index": clampi(initial_index, 0, values.size() - 1)}
+	var row := _hbox(5)
+	parent.add_child(row)
+	var caption := _label(title, 12, MUTED)
+	caption.custom_minimum_size.x = label_width
+	row.add_child(caption)
+	var choice := _preparation_option(values, value_width)
+	choice.select(int(state["index"]))
+	choice.item_selected.connect(func(index: int):
+		state["index"] = index
+		changed.call())
+	row.add_child(choice)
+	state["option"] = choice
+	state["row"] = row
+	return state
+
+
+func _preparation_choice_chips(parent: Control, ids: Array, names: Array, selected_ids: Array, add_caption: String) -> Array:
+	var states: Array = []
+	for slot in range(3):
+		var selected_id := str(selected_ids[slot]) if slot < selected_ids.size() else ""
+		states.append({"index": maxi(0, ids.find(selected_id))})
+	var selected_count := 0
+	for slot in range(states.size()):
+		var choice_index := int(states[slot]["index"])
+		if choice_index == 0:
+			continue
+		selected_count += 1
+		var chip_row := _hbox(4)
+		parent.add_child(chip_row)
+		var chip := _preparation_option([], 180)
+		for candidate in range(1, ids.size()):
+			if candidate != choice_index and _preparation_index_taken(states, candidate):
+				continue
+			chip.add_item(str(names[candidate]), candidate)
+		for item_index in range(chip.item_count):
+			if chip.get_item_id(item_index) == choice_index:
+				chip.select(item_index)
+				break
+		var target_slot := slot
+		chip.item_selected.connect(func(item_index: int):
+			states[target_slot]["index"] = chip.get_item_id(item_index)
+			_save_character_inputs()
+			_show_characters())
+		chip_row.add_child(chip)
+		var remove := _setup_button("×", func():
+			states[target_slot]["index"] = 0
+			_save_character_inputs()
+			_show_characters(), false, Vector2(30, 28))
+		remove.tooltip_text = _prep_local("Remove", "Kaldır", "Usuń")
+		chip_row.add_child(remove)
+	if selected_count < 3:
+		var add_choice := _preparation_option(["+  " + add_caption], 180)
+		var empty_slot := -1
+		for slot in range(states.size()):
+			if int(states[slot]["index"]) == 0:
+				empty_slot = slot
+				break
+		for candidate in range(1, ids.size()):
+			if not _preparation_index_taken(states, candidate):
+				add_choice.add_item(str(names[candidate]), candidate)
+		var target_slot := empty_slot
+		add_choice.item_selected.connect(func(item_index: int):
+			var selected_index := add_choice.get_item_id(item_index)
+			if selected_index == 0:
+				return
+			states[target_slot]["index"] = selected_index
+			_save_character_inputs()
+			_show_characters())
+		parent.add_child(add_choice)
+	return states
+
+
+func _preparation_index_taken(states: Array, candidate: int) -> bool:
+	for state in states:
+		if int(state["index"]) == candidate:
+			return true
+	return false
+
+
+func _preparation_skill_field(parent: Control, title: String, initial_index: int, changed: Callable) -> Dictionary:
+	var state := {"index": clampi(initial_index, 0, 11)}
+	var row := _hbox(5)
+	parent.add_child(row)
+	var caption := _label(title, 12, MUTED)
+	caption.custom_minimum_size.x = 76
+	row.add_child(caption)
+	var level := SpinBox.new()
+	level.min_value = 0
+	level.max_value = 10
+	level.step = 1
+	level.custom_minimum_size = Vector2(54, 28)
+	level.value = 5 if int(state["index"]) == 0 else int(state["index"]) - 1
+	level.editable = int(state["index"]) != 0
+	row.add_child(level)
+	var auto := CheckButton.new()
+	auto.text = _prep_local("Auto", "Oto", "Auto")
+	auto.button_pressed = int(state["index"]) == 0
+	auto.add_theme_font_size_override("font_size", 11)
+	row.add_child(auto)
+	level.value_changed.connect(func(value: float):
+		if auto.button_pressed:
+			return
+		state["index"] = int(value) + 1
+		changed.call())
+	auto.toggled.connect(func(enabled: bool):
+		level.editable = not enabled
+		state["index"] = 0 if enabled else int(level.value) + 1
+		changed.call())
+	state["level"] = level
+	state["auto"] = auto
+	return state
+
+
+func _preparation_palette(parent: VBoxContainer, title: String, colors: Array, field: Dictionary) -> Dictionary:
+	var row := _hbox(5)
+	parent.add_child(row)
+	var caption := _label(title, 11, MUTED)
+	caption.custom_minimum_size.x = 75
+	row.add_child(caption)
+	var buttons: Array[Button] = []
+	for color_index in colors.size():
+		var choice := color_index
+		var swatch := Button.new()
+		swatch.custom_minimum_size = Vector2(23, 23)
+		swatch.tooltip_text = str(field["values"][color_index])
+		swatch.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		swatch.pressed.connect(func():
+			field["index"] = choice
+			(field["option"] as OptionButton).select(choice)
+			_refresh_character_editor())
+		row.add_child(swatch)
+		buttons.append(swatch)
+	return {"colors": colors, "buttons": buttons, "field": field}
+
+
+func _refresh_preparation_palette(palette: Dictionary) -> void:
+	var buttons: Array = palette["buttons"]
+	var colors: Array = palette["colors"]
+	var field: Dictionary = palette["field"]
+	for i in buttons.size():
+		var selected: bool = i == int(field["index"])
+		var swatch: Button = buttons[i]
+		for style_name in ["normal", "hover", "pressed"]:
+			var style := _style(Color(str(colors[i])), GOLD if selected else Color("#53626a"), 2)
+			style.border_width_left = 3 if selected else 1
+			style.border_width_top = 3 if selected else 1
+			style.border_width_right = 3 if selected else 1
+			style.border_width_bottom = 3 if selected else 1
+			style.content_margin_left = 0
+			style.content_margin_right = 0
+			style.content_margin_top = 0
+			style.content_margin_bottom = 0
+			swatch.add_theme_stylebox_override(style_name, style)
 
 
 func _hair_options() -> Array:
@@ -1378,7 +2110,9 @@ func _save_character_inputs() -> void:
 		spec["condition_ids"] = conditions
 		var skills: Dictionary = {}
 		for skill in input.skills:
-			skills[skill] = int(input.skills[skill]["index"])
+			var selection := int(input.skills[skill]["index"])
+			if selection > 0:
+				skills[skill] = selection - 1
 		spec["skills"] = skills
 		character_specs[int(input.index)] = spec
 
@@ -1389,9 +2123,31 @@ func _refresh_character_editor() -> void:
 	var spec: Dictionary = character_specs[_editing_character_index]
 	var input: Dictionary = _character_inputs[0]
 	(input.preview as Control).call("set_appearance", _spec_appearance(spec))
+	for palette in input.get("palettes", []):
+		_refresh_preparation_palette(palette)
+	(input.childhood_note as Label).text = [
+		_prep_local("Grew up among fields and practical work.", "Tarlalar ve günlük işler arasında büyüdü.", "Dorastał pośród pól i codziennej pracy."),
+		_prep_local("Learned to adapt to a crowded town.", "Kalabalık bir kasabada uyum sağlamayı öğrendi.", "Nauczył się żyć w zatłoczonym mieście."),
+		_prep_local("Spent their early years learning a trade.", "İlk yıllarını bir zanaat öğrenerek geçirdi.", "Młode lata spędził na nauce fachu."),
+	][int(input.childhood["index"])]
+	(input.adulthood_note as Label).text = [
+		_prep_local("Worked the land before this expedition.", "Bu yolculuktan önce toprağı işledi.", "Przed wyprawą pracował na roli."),
+		_prep_local("Helped raise and repair settlements.", "Yerleşkeler kurup onarmaya yardım etti.", "Pomagał budować i naprawiać osady."),
+		_prep_local("Cared for the injured and sick.", "Yaralılarla ve hastalarla ilgilendi.", "Opiekował się rannymi i chorymi."),
+		_prep_local("Studied and pursued new discoveries.", "Çalışıp yeni keşiflerin peşinden gitti.", "Studiował i szukał nowych odkryć."),
+	][int(input.adulthood["index"])]
+	for skill in input.get("skill_bars", {}):
+		var selection := int(input.skills[skill]["index"])
+		var meter: ProgressBar = input.skill_bars[skill]
+		meter.value = 5 if selection == 0 else selection - 1
+		meter.modulate.a = 0.35 if selection == 0 else 1.0
 	for i in mini(_roster_buttons.size(), character_specs.size()):
 		var traits: Array = character_specs[i].get("trait_ids", [])
-		var first_trait := str(traits[0]).replace("_", " ").capitalize() if not traits.is_empty() else _prep_local("No trait", "Özellik yok", "Brak cechy")
+		var first_trait := _prep_local("No trait", "Özellik yok", "Brak cechy")
+		if not traits.is_empty():
+			var trait_index := TRAIT_IDS.find(str(traits[0]))
+			if trait_index > 0:
+				first_trait = str(_preparation_trait_names()[trait_index]).split(" (")[0]
 		_roster_buttons[i].text = "%s\n%s" % [str(character_specs[i].get("name", "Colonist")), first_trait]
 	_refresh_character_points()
 
@@ -1425,20 +2181,21 @@ func _advance_to_lobby() -> void:
 	_save_character_inputs()
 	for spec in character_specs:
 		if str(spec.get("name", "")).is_empty():
-			_notice("Every colonist needs a name.")
+			_notice(_prep_local("Every colonist needs a name.", "Her kolonistin bir adı olmalı.", "Każdy kolonista musi mieć imię."))
 			return
 	var prepared := _game_setup_config()
 	var validation: Dictionary = Game.validate_setup(prepared)
 	if not bool(validation.get("ok", false)):
 		_notice(str(validation.get("error", "Colonist setup is invalid.")))
 		return
+	# Naming happens after the colonists have spent time in their new home.
+	# It must never block starting a solo or multiplayer colony.
 	if session_kind == "join":
 		_submit_joiner_setup()
-		return
-	if session_kind == "solo":
+	elif session_kind == "solo":
 		_start_prepared_game()
-		return
-	_show_lobby()
+	else:
+		_show_lobby()
 
 
 func _show_lobby() -> void:
@@ -1500,18 +2257,18 @@ func _show_waiting_room(message: String) -> void:
 func _submit_coop_ready() -> void:
 	var result = Net.submit_player_setup({})
 	if result is Dictionary and not bool(result.get("ok", true)):
-		_notice(str(result.get("error", "Hazır durumu gönderilemedi.")))
+		_notice(str(result.get("error", _prep_local("Could not send ready status.", "Hazır durumu gönderilemedi.", "Nie można przesłać gotowości."))))
 		return
-	_show_waiting_room("Hazırsın. Ev sahibinin başlaması bekleniyor.")
+	_show_waiting_room(_prep_local("You are ready. Waiting for the host to start.", "Hazırsın. Ev sahibinin başlaması bekleniyor.", "Gotowość potwierdzona. Oczekiwanie na gospodarza."))
 
 
 func _submit_joiner_setup() -> void:
 	var spec := _build_faction_spec()
 	var result = Net.submit_player_setup(spec)
 	if result is Dictionary and not bool(result.get("ok", true)):
-		_notice(str(result.get("error", "Hazırlık gönderilemedi.")))
+		_notice(str(result.get("error", _prep_local("Could not send colony setup.", "Hazırlık gönderilemedi.", "Nie można przesłać ustawień kolonii."))))
 		return
-	_show_waiting_room("Kolonin hazır. Ev sahibinin oyunu başlatması bekleniyor.")
+	_show_waiting_room(_prep_local("Your colony is ready. Waiting for the host to start.", "Kolonin hazır. Ev sahibinin oyunu başlatması bekleniyor.", "Twoja kolonia jest gotowa. Oczekiwanie na gospodarza."))
 
 
 func _on_lobby_changed(lobby: Dictionary) -> void:
@@ -1520,7 +2277,7 @@ func _on_lobby_changed(lobby: Dictionary) -> void:
 	elif session_kind == "join" and screen == "waiting" and not bool(lobby.get("started", false)):
 		setup_mode = str(lobby.get("mode", "coop"))
 		setup_seed = str(lobby.get("seed", ""))
-		colonist_count = clampi(int(lobby.get("colonists_per_faction", 3)), 1, 3)
+		colonist_count = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(lobby.get("scenario_id", "landfall"))).get("colonist_count", 3))
 		world_options = (lobby.get("world_options", {}) as Dictionary).duplicate(true)
 		scenario_id = str(lobby.get("scenario_id", "landfall"))
 		storyteller_id = str(lobby.get("storyteller_id", "steady"))
@@ -1536,13 +2293,13 @@ func _on_lobby_changed(lobby: Dictionary) -> void:
 					break
 			_show_world_selection()
 		elif setup_mode == "coop" and (Net.get_lobby().get("ready", {}) as Dictionary).get(str(Net.get_local_peer_id()), false):
-			_show_waiting_room("Hazırsın. Ev sahibinin başlaması bekleniyor.")
+			_show_waiting_room(_prep_local("You are ready. Waiting for the host to start.", "Hazırsın. Ev sahibinin başlaması bekleniyor.", "Gotowość potwierdzona. Oczekiwanie na gospodarza."))
 		elif setup_mode == "coop":
-			_show_waiting_room("Co-op odasına bağlandın. Aynı koloni ve karakterleri yöneteceksin.")
+			_show_waiting_room(_prep_local("Connected to a co-op room. You share the colony and colonists.", "Co-op odasına bağlandın. Aynı koloni ve karakterleri yöneteceksin.", "Połączono z pokojem kooperacyjnym. Dzielicie kolonię i kolonistów."))
 
 
 func _on_connection_changed(connected: bool, message: String) -> void:
-	if session_kind == "join" and not connected and screen == "waiting" and not message.contains("bağlanılıyor"):
+	if session_kind == "join" and not connected and screen == "waiting" and message != _prep_local("Connecting to server…", "Sunucuya bağlanılıyor…", "Łączenie z serwerem…"):
 		_notice(message)
 
 
@@ -1551,8 +2308,8 @@ func _on_network_snapshot(snapshot: Dictionary) -> void:
 		for faction in _values_array(snapshot.get("factions", [])):
 			if faction is Dictionary and (faction.get("players", []) as Array).has(Net.get_local_peer_id()):
 				selected_site_id = str(faction.get("site_id", ""))
-				faction_name = str(faction.get("name", "Koloni"))
-				settlement_name = str(faction.get("settlement_name", "Yerleşke"))
+				faction_name = str(faction.get("name", _prep_local("Colony", "Koloni", "Kolonia")))
+				settlement_name = str(faction.get("settlement_name", _prep_local("Settlement", "Yerleşke", "Osada")))
 				break
 		_show_game()
 
@@ -1561,12 +2318,12 @@ func _start_prepared_game() -> void:
 	if screen == "game":
 		return
 	if session_kind == "host" and setup_mode == "competitive" and (Net.get_lobby().get("players", []) as Array).size() < 2:
-		_notice("Ayrı Koloniler için en az bir oyuncu daha bağlanmalı.")
+		_notice(_prep_local("Separate colonies requires at least one other player.", "Ayrı Koloniler için en az bir oyuncu daha bağlanmalı.", "Osobne kolonie wymagają co najmniej jeszcze jednego gracza."))
 		return
 	var config := _game_setup_config()
 	var result = Net.start_game(config)
 	if result is Dictionary and not bool(result.get("ok", true)):
-		_notice(str(result.get("error", "Oyun başlatılamadı.")))
+		_notice(str(result.get("error", _prep_local("Could not start the game.", "Oyun başlatılamadı.", "Nie można rozpocząć gry."))))
 		return
 	_show_game()
 
@@ -1583,7 +2340,7 @@ func _build_faction_spec() -> Dictionary:
 	var people: Array = []
 	for spec in character_specs:
 		people.append({
-			"name": str(spec.get("name", "Kolonist")),
+			"name": str(spec.get("name", "Colonist")),
 			"sex": str(spec.get("sex", "female")),
 			"gender": str(spec.get("gender", "woman")),
 			"age": int(spec.get("age", 25)),
@@ -1621,14 +2378,14 @@ func _choose_rival_site() -> String:
 
 
 func _snapshot() -> Dictionary:
-	var data = Net.get_snapshot()
-	if data is Dictionary and not data.is_empty():
-		return data
-	return Game.get_snapshot()
+	# The local UI only reads model data. Copies are made for saves and remote
+	# peers, avoiding repeated 50×50 map clones during every screen refresh.
+	return Game.state
 
 
 func _show_game() -> void:
 	screen = "game"
+	_active_alerts.clear()
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -1637,7 +2394,12 @@ func _show_game() -> void:
 	add_child(root)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_game_root = root
+	var terrain_layer := MapViewScript.new()
+	terrain_layer.render_terrain_only = true
+	root.add_child(terrain_layer)
+	terrain_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_map_view = MapViewScript.new()
+	_map_view.terrain_layer = terrain_layer
 	_map_view.map_pressed.connect(_on_map_pressed)
 	root.add_child(_map_view)
 	_map_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1676,12 +2438,13 @@ func _show_game() -> void:
 	_place(tab_row, 0.0, 1.0, 1.0, 1.0, 1, -37, -1, -1)
 	_tab_buttons.clear()
 	for entry in [["Emirler", "tabs.architect"], ["İşler", "tabs.work"], ["Günlük plan", "tabs.schedule"],
-		["Araştırma", "tabs.research"], ["Sağlık", "tabs.health"], ["Ticaret", "trade"], ["Dünya", "tabs.world"]]:
+		["Araştırma", "tabs.research"], ["Dünya", "tabs.world"]]:
 		var name_copy: String = entry[0]
-		var tab_label := _prep_local("Trade", "Ticaret", "Handel") if entry[1] == "trade" else _tr(entry[1])
+		var tab_label := _tr(entry[1])
 		var tab_button := _hud_button(tab_label, func(): _set_tab(name_copy), name_copy == current_tab, Vector2(138, 36))
 		tab_row.add_child(tab_button)
 		_tab_buttons[name_copy] = tab_button
+	_update_tab_shortcut_hints()
 	var tab_spacer := Control.new()
 	tab_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1731,9 +2494,10 @@ func _show_game() -> void:
 	overlay.add_child(speeds)
 	_place(speeds, 1.0, 1.0, 1.0, 1.0, -213, -108, -10, -67)
 	_speed_buttons.clear()
-	for entry in [["Ⅱ", 0.0], ["▶", 1.0], ["▶▶", 2.0], ["▶▶▶", 3.0]]:
+	for entry in [["Ⅱ", 0.0], ["▶", 1.0], ["▶▶", 3.0], ["▶▶▶", 6.0]]:
 		var speed_value: float = entry[1]
 		var speed_button := _hud_button(str(entry[0]), func(): _set_speed(speed_value), false, Vector2(48, 33))
+		speed_button.tooltip_text = _prep_local("Pause", "Duraklat", "Pauza") if speed_value == 0.0 else "%d×" % int(speed_value)
 		speeds.add_child(speed_button)
 		_speed_buttons[str(entry[0])] = speed_button
 	_update_speed_buttons()
@@ -1779,6 +2543,18 @@ func _place(control: Control, left_anchor: float, top_anchor: float, right_ancho
 
 
 func _set_tab(name: String) -> void:
+	if name == "Sağlık":
+		if selected_ids.is_empty():
+			_notice(_prep_local("Select a colonist to see health.", "Sağlığı görmek için bir kolonist seç.", "Wybierz kolonistę, aby zobaczyć zdrowie."))
+		else:
+			pawn_tab = "" if pawn_tab == "Health" else "Health"
+			_render_selected_pawn(_snapshot())
+		return
+	if name == "Ticaret":
+		_notice(_prep_local("Select a colonist and speak to a visiting trader, or use World for colony offers.", "Bir kolonist seçip gelen tüccarla konuş veya koloniler arası teklif için Dünya'yı aç.", "Wybierz kolonistę i porozmawiaj z handlarzem albo otwórz Świat, aby handlować z kolonią."))
+		return
+	if is_instance_valid(_command_strip):
+		_command_strip.set_meta("pending_direct_action", "")
 	current_tab = "" if current_tab == name else name
 	current_tool = ""
 	if not current_tab.is_empty():
@@ -1787,6 +2563,9 @@ func _set_tab(name: String) -> void:
 		_render_game()
 	if is_instance_valid(_tool_panel):
 		_tool_panel.visible = not current_tab.is_empty()
+		_tool_panel.offset_top = -185 if current_tab == "Emirler" else -292
+	if is_instance_valid(_notice_label):
+		_notice_label.text = ""
 	for tab_name in _tab_buttons:
 		var button := _tab_buttons[tab_name] as Button
 		button.add_theme_stylebox_override("normal", _hud_style(HUD_ACTIVE if tab_name == current_tab else HUD_TAB))
@@ -1808,9 +2587,10 @@ func _set_speed(value: float) -> void:
 	_update_speed_buttons()
 
 func _update_speed_buttons() -> void:
+	var speed_for_button := {"Ⅱ": 0.0, "▶": 1.0, "▶▶": 3.0, "▶▶▶": 6.0}
 	for key in _speed_buttons:
 		var button := _speed_buttons[key] as Button
-		var active: bool = (game_paused and key == "Ⅱ") or (not game_paused and key == "▶".repeat(int(speed)))
+		var active: bool = (game_paused and key == "Ⅱ") or (not game_paused and is_equal_approx(speed, float(speed_for_button[key])))
 		button.add_theme_stylebox_override("normal", _hud_style(HUD_ACTIVE if active else HUD_TAB))
 		button.add_theme_color_override("font_color", Color.WHITE if active else CREAM)
 
@@ -1860,20 +2640,34 @@ func _show_settings() -> void:
 	var page := _vbox(12)
 	page.custom_minimum_size = Vector2(500, 0)
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(page)
+	var page_scroll := ScrollContainer.new()
+	page_scroll.custom_minimum_size = Vector2(510, 0)
+	page_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	columns.add_child(page_scroll)
+	page_scroll.add_child(page)
 	var draft := {
 		"window_mode": preferences.window_mode,
+		"display_index": preferences.display_index,
 		"resolution": preferences.resolution,
 		"language": preferences.language,
 		"master_volume": preferences.master_volume,
 		"music_volume": preferences.music_volume,
 		"effects_volume": preferences.effects_volume,
+		"autosave_interval_minutes": preferences.autosave_interval_minutes,
+		"autosave_count": preferences.autosave_count,
+		"keybinds": preferences.keybinds.duplicate(),
 	}
+	_settings_draft = draft
+	_settings_page = page
 	var selected_category := ["general"]
 	var category_buttons: Dictionary = {}
 	for entry in [["general", "settings.general"], ["graphics", "settings.display"], ["audio", "settings.audio"], ["controls", "settings.controls"]]:
 		var category_id := str(entry[0])
 		var button := _button(_tr(str(entry[1])), func():
+			_capture_keybind_action = ""
 			selected_category[0] = category_id
 			_build_settings_page(page, category_id, draft)
 			for key in category_buttons:
@@ -1893,23 +2687,35 @@ func _show_settings() -> void:
 	actions.add_child(_button(_tr("settings.restore"), func():
 		var defaults = SettingsScript.new()
 		draft["window_mode"] = defaults.window_mode
+		draft["display_index"] = defaults.display_index
 		draft["resolution"] = defaults.resolution
 		draft["language"] = defaults.language
 		draft["master_volume"] = defaults.master_volume
 		draft["music_volume"] = defaults.music_volume
 		draft["effects_volume"] = defaults.effects_volume
+		draft["autosave_interval_minutes"] = defaults.autosave_interval_minutes
+		draft["autosave_count"] = defaults.autosave_count
+		draft["keybinds"] = defaults.keybinds.duplicate()
+		for volume_key in ["master_volume", "music_volume", "effects_volume"]:
+			AudioDirector.preview_volume(volume_key, float(draft[volume_key]))
 		_build_settings_page(page, str(selected_category[0]), draft)
 	, false, Vector2(140, 34)))
 	actions.add_child(_button(_tr("common.apply"), func():
 		preferences.window_mode = str(draft["window_mode"])
+		preferences.display_index = int(draft["display_index"])
 		preferences.resolution = draft["resolution"]
 		preferences.language = str(draft["language"])
 		preferences.master_volume = float(draft["master_volume"])
 		preferences.music_volume = float(draft["music_volume"])
 		preferences.effects_volume = float(draft["effects_volume"])
+		preferences.autosave_interval_minutes = int(draft["autosave_interval_minutes"])
+		preferences.autosave_count = int(draft["autosave_count"])
+		preferences.keybinds = (draft["keybinds"] as Dictionary).duplicate()
 		preferences.apply_settings()
 		var saved := preferences.save_settings()
 		_close_settings()
+		_update_tab_shortcut_hints()
+		if screen == "game": _render_selected_pawn(_snapshot())
 		if screen == "menu":
 			_show_menu()
 		_notice(_tr("settings.saved") if saved else _tr("settings.save_failed"))
@@ -1946,8 +2752,40 @@ func _build_settings_page(page: VBoxContainer, category: String, draft: Dictiona
 				DirAccess.make_dir_recursive_absolute(path)
 				OS.shell_open(path)
 			, false, Vector2(145, 32)))
+			page.add_child(HSeparator.new())
+			page.add_child(_label(_prep_local("Autosave interval", "Otomatik kayıt sıklığı", "Odstęp autozapisu"), 14, CREAM))
+			var intervals := OptionButton.new()
+			_compact_option(intervals)
+			var interval_values := [0, 1, 5, 10, 20, 30, 60]
+			for minutes in interval_values:
+				intervals.add_item(_prep_local("Off", "Kapalı", "Wyłączone") if minutes == 0 else _prep_local("%d minutes" % minutes, "%d dakika" % minutes, "%d minut" % minutes))
+				if minutes == int(draft["autosave_interval_minutes"]):
+					intervals.select(intervals.item_count - 1)
+			intervals.item_selected.connect(func(index: int): draft["autosave_interval_minutes"] = interval_values[index])
+			page.add_child(intervals)
+			page.add_child(_label(_prep_local("Autosaves to keep", "Saklanacak otomatik kayıt", "Liczba autozapisów"), 14, CREAM))
+			var autosave_count := SpinBox.new()
+			autosave_count.min_value = 1
+			autosave_count.max_value = 20
+			autosave_count.step = 1
+			autosave_count.value = int(draft["autosave_count"])
+			autosave_count.value_changed.connect(func(value: float): draft["autosave_count"] = int(value))
+			page.add_child(autosave_count)
 		"graphics":
 			page.add_child(_label(_tr("settings.display"), 19, GOLD))
+			page.add_child(_label(_prep_local("Display", "Ekran", "Ekran"), 14, CREAM))
+			var displays := OptionButton.new()
+			_compact_option(displays)
+			var display_count := maxi(1, DisplayServer.get_screen_count())
+			for screen_index in display_count:
+				var screen_size := DisplayServer.screen_get_size(screen_index) if DisplayServer.get_name() != "headless" else Vector2i.ZERO
+				displays.add_item(_prep_local("Display %d", "Ekran %d", "Ekran %d") % (screen_index + 1) + "  ·  %d × %d" % [screen_size.x, screen_size.y])
+				if screen_index == int(draft["display_index"]):
+					displays.select(screen_index)
+			displays.item_selected.connect(func(index: int):
+				draft["display_index"] = index
+				call_deferred("_build_settings_page", page, "graphics", draft))
+			page.add_child(displays)
 			page.add_child(_label(_tr("settings.window_mode"), 14, CREAM))
 			var modes := OptionButton.new()
 			_compact_option(modes)
@@ -1961,7 +2799,7 @@ func _build_settings_page(page: VBoxContainer, category: String, draft: Dictiona
 			var resolutions := OptionButton.new()
 			_compact_option(resolutions)
 			resolutions.get_popup().max_size = Vector2i(4096, 320)
-			var sizes: Array[Vector2i] = SettingsScript.resolution_options()
+			var sizes: Array[Vector2i] = SettingsScript.resolution_options(int(draft["display_index"]))
 			if not sizes.has(draft["resolution"]):
 				sizes.append(draft["resolution"])
 			for size in sizes:
@@ -1996,14 +2834,67 @@ func _build_settings_page(page: VBoxContainer, category: String, draft: Dictiona
 				row.add_child(value)
 				slider.value_changed.connect(func(level: float):
 					draft[key] = level
-					value.text = "%d%%" % roundi(level * 100.0))
+					value.text = "%d%%" % roundi(level * 100.0)
+					AudioDirector.preview_volume(key, level))
 		"controls":
 			page.add_child(_label(_tr("settings.controls"), 19, GOLD))
-			for key in ["settings.control_pause", "settings.control_display", "settings.control_select", "settings.control_order", "settings.control_zoom"]:
-				page.add_child(_label(_tr(key), 14, CREAM))
+			var groups := [
+				[_prep_local("Time", "Zaman", "Czas"), [
+					["pause", "Pause / resume", "Duraklat / sürdür", "Pauza / wznów"],
+					["speed_1", "Speed 1", "Hız 1", "Prędkość 1"],
+					["speed_2", "Speed 2", "Hız 2", "Prędkość 2"],
+					["speed_3", "Speed 3", "Hız 3", "Prędkość 3"],
+				]],
+				[_prep_local("Colony panels", "Koloni panelleri", "Panele kolonii"), [
+					["tab_orders", "Orders", "Emirler", "Rozkazy"],
+					["tab_work", "Work", "İşler", "Praca"],
+					["tab_schedule", "Schedule", "Günlük plan", "Harmonogram"],
+					["tab_health", "Health", "Sağlık", "Zdrowie"],
+					["tab_research", "Research", "Araştırma", "Badania"],
+					["tab_world", "World", "Dünya", "Świat"],
+				]],
+				[_prep_local("Colonists", "Kolonistler", "Koloniści"), [
+					["previous_colonist", "Previous colonist", "Önceki kolonist", "Poprzedni kolonista"],
+					["next_colonist", "Next colonist", "Sonraki kolonist", "Następny kolonista"],
+					["focus_colonist", "Center selected", "Seçilene odaklan", "Wyśrodkuj wybranego"],
+					["draft", "Draft selected / all", "Seçili / herkesi hazırla", "Mobilizuj wybranych / wszystkich"],
+					["clear_order", "Clear selected orders", "Seçili emirleri temizle", "Wyczyść wybrane rozkazy"],
+				]],
+				[_prep_local("Camera", "Kamera", "Kamera"), [
+					["pan_up", "Pan up", "Yukarı kaydır", "Przesuń w górę"],
+					["pan_down", "Pan down", "Aşağı kaydır", "Przesuń w dół"],
+					["pan_left", "Pan left", "Sola kaydır", "Przesuń w lewo"],
+					["pan_right", "Pan right", "Sağa kaydır", "Przesuń w prawo"],
+					["zoom_in", "Zoom in", "Yakınlaştır", "Przybliż"],
+					["zoom_out", "Zoom out", "Uzaklaştır", "Oddal"],
+				]],
+			]
+			for group in groups:
+				page.add_child(_label(str(group[0]), 16, GOLD))
+				for entry in group[1]:
+					var action := str(entry[0])
+					var row := _hbox(8)
+					page.add_child(row)
+					var title := _label(_prep_local(str(entry[1]), str(entry[2]), str(entry[3])), 14, CREAM)
+					title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					row.add_child(title)
+					var code := int((draft["keybinds"] as Dictionary).get(action, 0))
+					var key_button := _button(OS.get_keycode_string(code), func(): _capture_keybind_action = action, false, Vector2(135, 30))
+					key_button.pressed.connect(func():
+						key_button.text = _prep_local("Press a key…", "Bir tuşa bas…", "Naciśnij klawisz…")
+						key_button.release_focus())
+					row.add_child(key_button)
+			page.add_child(HSeparator.new())
+			var tip := _label(_prep_local("Click a key to change it. Escape cancels; F11 is reserved for display mode. Conflicts swap keys.", "Değiştirmek için tuşa tıkla. Esc iptal eder; F11 görüntü modu içindir. Çakışan tuşlar yer değiştirir.", "Kliknij klawisz, aby go zmienić. Escape anuluje; F11 jest zarezerwowany dla trybu ekranu. Konflikty zamieniają klawisze."), 12, MUTED)
+			tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			page.add_child(tip)
 
 
 func _close_settings() -> void:
+	_capture_keybind_action = ""
+	_settings_draft = {}
+	_settings_page = null
+	AudioDirector.restore_volumes(preferences)
 	if is_instance_valid(_settings_overlay):
 		_settings_overlay.queue_free()
 	_settings_overlay = null
@@ -2012,7 +2903,21 @@ func _close_settings() -> void:
 		_update_speed_buttons()
 
 
+func _update_tab_shortcut_hints() -> void:
+	var mappings := {
+		"Emirler": "tab_orders", "İşler": "tab_work", "Günlük plan": "tab_schedule",
+		"Sağlık": "tab_health", "Araştırma": "tab_research", "Dünya": "tab_world",
+	}
+	for tab_name in mappings:
+		if _tab_buttons.has(tab_name) and is_instance_valid(_tab_buttons[tab_name]):
+			var code := int(preferences.keybinds.get(mappings[tab_name], 0))
+			(_tab_buttons[tab_name] as Button).tooltip_text = OS.get_keycode_string(code)
+
+
 func _show_pause_menu() -> void:
+	if _pause_menu_open:
+		return
+	_pause_menu_open = true
 	var resume_paused := game_paused
 	game_paused = true
 	_update_speed_buttons()
@@ -2022,18 +2927,66 @@ func _show_pause_menu() -> void:
 	var menu := _vbox(8)
 	menu.custom_minimum_size = Vector2(290, 0)
 	popup.add_child(menu)
-	menu.add_child(_label("Paused", 23, GOLD))
-	menu.add_child(_button("Resume", func(): popup.hide()))
-	menu.add_child(_button("Save game", _save_game))
-	menu.add_child(_button("Load game", func(): popup.hide(); _load_saved_game()))
-	menu.add_child(_button("Settings", func(): popup.hide(); _show_settings()))
-	menu.add_child(_button("Main menu", func(): popup.hide(); Net.start_solo(); _show_menu()))
-	menu.add_child(_button("Quit Foxtopia", func(): get_tree().quit()))
+	menu.add_child(_label(_prep_local("Paused", "Duraklatıldı", "Pauza"), 23, GOLD))
+	menu.add_child(_button(_prep_local("Resume", "Devam et", "Wznów"), func(): popup.hide()))
+	menu.add_child(_button(_tr("game.save_game"), func(): popup.hide(); call_deferred("_save_game")))
+	menu.add_child(_button(_tr("game.load_game"), func(): popup.hide(); call_deferred("_load_saved_game")))
+	menu.add_child(_button(_tr("settings.title"), func(): popup.hide(); _show_settings()))
+	menu.add_child(_button(_prep_local("Main menu", "Ana menü", "Menu główne"), func(): popup.hide(); call_deferred("_request_exit", true)))
+	menu.add_child(_button(_prep_local("Quit Foxtopia", "Foxtopia'dan çık", "Zamknij Foxtopia"), func(): popup.hide(); call_deferred("_request_exit", false)))
 	popup.popup_hide.connect(func():
+		_pause_menu_open = false
 		game_paused = resume_paused
 		_update_speed_buttons()
 		popup.queue_free())
 	popup.popup_centered(Vector2i(320, 370))
+
+
+func _request_exit(to_main_menu: bool) -> void:
+	if _exit_warning_open:
+		return
+	if session_kind == "join" or not Game.has_unsaved_changes():
+		_finish_exit(to_main_menu)
+		return
+	_exit_return_paused = game_paused
+	_exit_warning_open = true
+	game_paused = true
+	_update_speed_buttons()
+	var popup := PopupPanel.new()
+	popup.add_theme_stylebox_override("panel", _style(PANEL, GOLD))
+	add_child(popup)
+	var content := _vbox(10)
+	content.custom_minimum_size = Vector2(340, 0)
+	popup.add_child(content)
+	content.add_child(_label(_prep_local("Unsaved colony", "Kaydedilmemiş koloni", "Niezapisana kolonia"), 21, GOLD))
+	var warning := _label(_prep_local("Save your progress before leaving?", "Çıkmadan önce ilerlemeni kaydetmek ister misin?", "Zapisać postęp przed wyjściem?"), 14, CREAM)
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(warning)
+	var save_and_leave := _prep_local("Save and return to menu", "Kaydet ve ana menüye dön", "Zapisz i wróć do menu") if to_main_menu else _prep_local("Save and quit", "Kaydet ve oyundan çık", "Zapisz i zakończ")
+	content.add_child(_button(save_and_leave, func():
+		if Game.save_game():
+			popup.hide()
+			_finish_exit(to_main_menu)
+		else:
+			_notice(_prep_local("Save failed. Still in game.", "Kayıt başarısız. Oyunda kaldın.", "Nie udało się zapisać. Gra trwa dalej."))
+	, true))
+	content.add_child(_button(_prep_local("Leave without saving", "Kaydetmeden çık", "Wyjdź bez zapisu"), func(): popup.hide(); _finish_exit(to_main_menu)))
+	content.add_child(_button(_tr("common.cancel"), func(): popup.hide()))
+	popup.popup_hide.connect(func():
+		_exit_warning_open = false
+		if screen == "game":
+			game_paused = _exit_return_paused
+			_update_speed_buttons()
+		popup.queue_free())
+	popup.popup_centered(Vector2i(380, 220))
+
+
+func _finish_exit(to_main_menu: bool) -> void:
+	if to_main_menu:
+		Net.start_solo()
+		_show_menu()
+	else:
+		get_tree().quit()
 
 
 func _values_array(value: Variant) -> Array:
@@ -2091,7 +3044,7 @@ func _selected_person(snapshot: Dictionary) -> Dictionary:
 	return {}
 
 
-func _render_game() -> void:
+func _render_game(immediate_hud: bool = true) -> void:
 	if screen != "game" or not is_instance_valid(_map_view):
 		return
 	var data := _snapshot()
@@ -2100,6 +3053,10 @@ func _render_game() -> void:
 	_map_view.set_stockpile_inventory(resources)
 	if _map_view.has_method("set_day_time"):
 		_map_view.call("set_day_time", int(data.get("time", 0)), int(data.get("day_length", 600)))
+	var now := Time.get_ticks_msec()
+	if not immediate_hud and now - _last_hud_render_ms < 500:
+		return
+	_last_hud_render_ms = now
 	_render_resources(resources)
 	_render_alerts(data, resources)
 	_render_clock(data)
@@ -2135,10 +3092,10 @@ func _render_alerts(snapshot: Dictionary, resources: Dictionary) -> void:
 		child.queue_free()
 	var alerts: Array[String] = []
 	if int(resources.get("food", 0)) <= 5:
-		alerts.append("Low food")
+		alerts.append("low_food")
 	for person in _local_colonists(snapshot):
 		if float(person.get("needs", {}).get("hunger", 100)) < 25.0:
-			alerts.append("Colonist needs food")
+			alerts.append("hungry_colonist")
 			break
 	var has_bench := false
 	for structure in _local_map(snapshot).get("structures", []):
@@ -2146,9 +3103,19 @@ func _render_alerts(snapshot: Dictionary, resources: Dictionary) -> void:
 			has_bench = true
 			break
 	if not has_bench:
-		alerts.append("Research bench needed")
+		alerts.append("research_bench")
 	for alert in alerts:
-		var label := _label("!  " + alert, 13, CREAM)
+		if not _active_alerts.has(alert):
+			AudioDirector.play_effect("alert")
+			break
+	_active_alerts = alerts
+	for alert in alerts:
+		var description := ""
+		match alert:
+			"low_food": description = _prep_local("Low food", "Yiyecek az", "Mało żywności")
+			"hungry_colonist": description = _prep_local("Colonist needs food", "Kolonistin yiyeceğe ihtiyacı var", "Kolonista potrzebuje jedzenia")
+			"research_bench": description = _prep_local("Research bench needed", "Araştırma masası gerekli", "Potrzebny stół badawczy")
+		var label := _label("!  " + description, 13, CREAM)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_alert_stack.add_child(label)
@@ -2158,9 +3125,9 @@ func _render_clock(snapshot: Dictionary) -> void:
 		return
 	var elapsed := maxi(0, int(snapshot.get("time", 0)))
 	var day_length := maxi(1, int(snapshot.get("day_length", 600)))
-	var day := 1 + elapsed / day_length
+	var date := ClimateCalendar.date_from_steps(elapsed, day_length)
 	var minute_of_day := (480 + int(float(elapsed % day_length) * 1440.0 / float(day_length))) % 1440
-	_time_label.text = "Day %d, 5500    %02d:%02d" % [day, minute_of_day / 60, minute_of_day % 60]
+	_time_label.text = "%d %s, %d    %02d:%02d" % [int(date["period_day"]), _climate_period_name(int(date["period_index"])), int(date["year"]), minute_of_day / 60, minute_of_day % 60]
 
 
 func _local_resources(snapshot: Dictionary) -> Dictionary:
@@ -2197,6 +3164,9 @@ func _render_portraits(snapshot: Dictionary) -> void:
 		return
 	_portrait_signature = signature
 	for child in _portrait_strip.get_children():
+		# queue_free() alone keeps the old buttons in the HBox until the next
+		# frame, briefly leaving a ghost hover/selection at the strip's end.
+		_portrait_strip.remove_child(child)
 		child.queue_free()
 	for person in _local_colonists(snapshot):
 		var id := str(person.get("id", ""))
@@ -2229,6 +3199,11 @@ func _render_selected_pawn(snapshot: Dictionary) -> void:
 	var person := _selected_person(snapshot)
 	_pawn_panel.visible = not person.is_empty()
 	_pawn_detail_panel.visible = not person.is_empty() and not pawn_tab.is_empty()
+	if pawn_tab == "Health":
+		var health: Dictionary = person.get("health", {})
+		_pawn_detail_panel.offset_top = -307 - mini(6, (health.get("wounds", []) as Array).size() + (health.get("conditions", []) as Array).size()) * 22
+	else:
+		_pawn_detail_panel.offset_top = -365 if pawn_tab == "Gear" else -485 if pawn_tab in ["Needs", "Bio"] else -435
 	_command_strip.visible = not person.is_empty()
 	if person.is_empty():
 		return
@@ -2264,14 +3239,26 @@ func _render_selected_pawn(snapshot: Dictionary) -> void:
 	_pawn_summary.add_child(_label("%s    ·    %s" % ["Drafted" if bool(person.get("drafted", false)) else "Undrafted", activity], 12, MUTED))
 	var equipment: Dictionary = person.get("equipment", {})
 	_pawn_summary.add_child(_label("Weapon: %s    Apparel: %s" % [str(equipment.get("weapon", "fists")).capitalize(), str(equipment.get("apparel", "clothes")).capitalize()], 11, MUTED))
-	var draft_button := _hud_action_button("DRAFT" if not bool(person.get("drafted", false)) else "UNDRAFT", func(): _send_command({"type": "set_draft", "colonist_id": person_id, "drafted": not bool(person.get("drafted", false))}), bool(person.get("drafted", false)))
-	draft_button.tooltip_text = "Toggle combat control"
+	var draft_key := OS.get_keycode_string(int(preferences.keybinds.get("draft", KEY_R)))
+	var draft_button := _hud_action_button(("DRAFT" if not bool(person.get("drafted", false)) else "UNDRAFT") + "\n" + draft_key, func(): _send_command({"type": "set_draft", "colonist_id": person_id, "drafted": not bool(person.get("drafted", false))}), bool(person.get("drafted", false)))
+	draft_button.tooltip_text = "Toggle combat control (%s)" % draft_key
 	_command_strip.add_child(draft_button)
-	var clear_button := _hud_action_button("CANCEL\nORDER", func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "clear"}))
-	clear_button.tooltip_text = "Cancel the current direct order"
+	var clear_key := OS.get_keycode_string(int(preferences.keybinds.get("clear_order", KEY_C)))
+	var clear_button := _hud_action_button("CLEAR\n" + clear_key, func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "clear"}))
+	clear_button.tooltip_text = "Cancel the current direct order (%s)" % clear_key
 	_command_strip.add_child(clear_button)
-	_command_strip.add_child(_hud_action_button("GEAR", func(): _set_pawn_tab("Gear"), pawn_tab == "Gear"))
-	_command_strip.add_child(_hud_action_button("HEALTH", func(): _set_pawn_tab("Health"), pawn_tab == "Health"))
+	var pending_action := str(_command_strip.get_meta("pending_direct_action", ""))
+	for entry in [
+		["→", _prep_local("Move", "Git", "Idź"), "move"],
+		["⚒", _prep_local("Work", "İşle", "Pracuj"), "work"],
+		["□", _prep_local("Haul", "Taşı", "Noś"), "haul"],
+		["⚔", _prep_local("Attack", "Saldır", "Atakuj"), "attack"],
+		["◇", _prep_local("Trade", "Ticaret", "Handel"), "trade"]
+	]:
+		var action_id: String = entry[2]
+		var action_button := _hud_action_button("%s\n%s" % [entry[0], entry[1]], func(): _arm_direct_action(action_id), pending_action == action_id)
+		action_button.tooltip_text = _prep_local("Choose a target on the map.", "Haritada bir hedef seç.", "Wybierz cel na mapie.")
+		_command_strip.add_child(action_button)
 	if pawn_tab.is_empty():
 		return
 	for child in _pawn_detail_content.get_children():
@@ -2305,10 +3292,75 @@ func _hud_status_bar(label_text: String, amount: int, fill: Color) -> Control:
 
 
 func _hud_action_button(title: String, action: Callable, active: bool = false) -> Button:
-	var button := _hud_button(title, action, active, Vector2(73, 64))
+	var button := _hud_button(title, action, active, Vector2(62, 64))
 	button.add_theme_font_size_override("font_size", 11)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return button
+
+
+func _arm_direct_action(action: String) -> void:
+	if selected_ids.is_empty() or not is_instance_valid(_command_strip):
+		return
+	var pending := str(_command_strip.get_meta("pending_direct_action", ""))
+	_command_strip.set_meta("pending_direct_action", "" if pending == action else action)
+	_render_selected_pawn(_snapshot())
+	if pending != action:
+		_notice(_prep_local("Choose a target on the map for %s.", "%s için haritada bir hedef seç.", "Wybierz cel na mapie dla: %s.") % action.capitalize())
+
+
+func _send_armed_action(tile: Vector2i, enemy_id: String) -> void:
+	var action := str(_command_strip.get_meta("pending_direct_action", ""))
+	if action.is_empty() or selected_ids.is_empty():
+		return
+	var target_id := ""
+	match action:
+		"move":
+			if not _map_tile_passable(tile):
+				_notice(_prep_local("That tile is blocked.", "Bu hücreye gidilemez.", "To pole jest zablokowane."))
+				AudioDirector.play_rejection()
+				return
+		"work":
+			target_id = _order_at(tile)
+			if target_id.is_empty():
+				var resource_kind := str(_resource_at_tile(tile).get("kind", ""))
+				var designation: String = {"tree": "chop", "stone": "mine", "berry": "harvest"}.get(resource_kind, "")
+				if designation.is_empty():
+					_notice(_prep_local("Select an existing job or a harvestable resource.", "Mevcut bir iş veya toplanabilir bir kaynak seç.", "Wybierz istniejące zadanie lub zasób do zebrania."))
+					AudioDirector.play_rejection()
+					return
+				if not _send_command({"type": "designate", "site_id": _site_id(_snapshot()), "x": tile.x, "y": tile.y, "kind": designation, "priority": default_order_priority}):
+					return
+		"haul":
+			var has_drop := false
+			for drop in _local_map(_snapshot()).get("drops", []):
+				if int(drop.get("x", -1)) == tile.x and int(drop.get("y", -1)) == tile.y and _has_stockpile_for_kind(str(drop.get("kind", ""))):
+					has_drop = true
+					break
+			if not has_drop:
+				_notice(_prep_local("Select supplies with an available stockpile.", "Uygun deposu olan bir malzeme seç.", "Wybierz zapasy, dla których istnieje magazyn."))
+				AudioDirector.play_rejection()
+				return
+		"attack":
+			if enemy_id.is_empty():
+				_notice(_prep_local("Select an enemy.", "Bir düşman seç.", "Wybierz wroga."))
+				AudioDirector.play_rejection()
+				return
+			target_id = enemy_id
+		"trade":
+			target_id = _caravan_at(tile)
+			if target_id.is_empty():
+				_notice(_prep_local("Select a visiting trader.", "Gelen bir tüccar seç.", "Wybierz odwiedzającego handlarza."))
+				AudioDirector.play_rejection()
+				return
+	var command := {"type": "direct", "colonist_id": selected_ids[0], "action": action, "x": tile.x, "y": tile.y}
+	if not target_id.is_empty():
+		command["target_id"] = target_id
+	if _send_command(command):
+		if action == "trade":
+			_trade_caravan_pending_id = target_id
+		_command_strip.set_meta("pending_direct_action", "")
+		_render_selected_pawn(_snapshot())
+
 
 func _set_pawn_tab(name: String) -> void:
 	pawn_tab = "" if pawn_tab == name else name
@@ -2410,8 +3462,9 @@ func _build_pawn_log(snapshot: Dictionary, person: Dictionary) -> void:
 	var count := 0
 	for i in range((snapshot.get("events", []) as Array).size() - 1, -1, -1):
 		var event: Dictionary = snapshot["events"][i]
-		if str(event.get("message", "")).contains(str(person.get("name", ""))):
-			_pawn_detail_content.add_child(_label(str(event.get("message", "")), 12))
+		if (event.get("subject_ids", []) as Array).has(str(person.get("id", ""))) or \
+				(str(event.get("message_key", "")) == "" and str(event.get("message", "")).contains(str(person.get("name", "")))):
+			_pawn_detail_content.add_child(_label(I18n.localize_model_event(event, preferences.language), 12))
 			count += 1
 			if count >= 8:
 				break
@@ -2420,6 +3473,8 @@ func _build_pawn_log(snapshot: Dictionary, person: Dictionary) -> void:
 
 
 func _select_colonist(id: String, open_health := false) -> void:
+	if is_instance_valid(_command_strip):
+		_command_strip.set_meta("pending_direct_action", "")
 	selected_ids = [id]
 	current_tool = ""
 	if open_health:
@@ -2435,6 +3490,8 @@ func _select_colonist(id: String, open_health := false) -> void:
 
 func _on_map_pressed(tile: Vector2i, colonist_id: String, enemy_id: String, mouse_button: int) -> void:
 	if mouse_button == MOUSE_BUTTON_RIGHT:
+		if is_instance_valid(_command_strip):
+			_command_strip.set_meta("pending_direct_action", "")
 		_context_tile = tile
 		_context_unit_id = colonist_id
 		_context_enemy_id = enemy_id
@@ -2442,6 +3499,9 @@ func _on_map_pressed(tile: Vector2i, colonist_id: String, enemy_id: String, mous
 		_context_caravan_id = _caravan_at(tile)
 		_context_structure_id = str(_structure_at_tile(tile).get("id", ""))
 		_open_context_menu()
+		return
+	if is_instance_valid(_command_strip) and not str(_command_strip.get_meta("pending_direct_action", "")).is_empty():
+		_send_armed_action(tile, enemy_id)
 		return
 	if not current_tool.is_empty():
 		if current_tool == "stockpile_zone":
@@ -2593,10 +3653,12 @@ func _context_selected(id: int) -> void:
 func _send_command(command: Dictionary) -> bool:
 	var result = Net.send_command(command)
 	if result is Dictionary and not bool(result.get("ok", true)):
-		_notice(str(result.get("error", "Komut uygulanamadı.")))
+		AudioDirector.play_rejection()
+		_notice(str(result.get("error", _prep_local("Order could not be carried out.", "Komut uygulanamadı.", "Nie można wykonać rozkazu."))))
 		return false
 	elif result is bool and not result:
-		_notice("Komut uygulanamadı.")
+		AudioDirector.play_rejection()
+		_notice(_prep_local("Order could not be carried out.", "Komut uygulanamadı.", "Nie można wykonać rozkazu."))
 		return false
 	else:
 		_render_game()
@@ -2607,13 +3669,13 @@ func _send_command(command: Dictionary) -> bool:
 
 func _on_state_changed(_snapshot_data: Dictionary) -> void:
 	if screen == "game":
-		_render_game()
+		_render_game(false)
 	elif screen == "waiting" and session_kind == "join":
 		_show_game()
 
 
 func _on_event_emitted(event: Dictionary) -> void:
-	var message := str(event.get("message", ""))
+	var message := I18n.localize_model_event(event, preferences.language)
 	if not message.is_empty():
 		_notice(message)
 	if str(event.get("kind", "")) == "naming_prompt" and str(event.get("site_id", "")) == _site_id(_snapshot()):
@@ -2629,51 +3691,73 @@ func _on_event_emitted(event: Dictionary) -> void:
 		_style_colonist_pending_id = ""
 
 func _open_naming_prompt() -> void:
+	if _naming_prompt_open or screen != "game":
+		return
+	_naming_prompt_open = true
+	var resume_paused := game_paused
+	if session_kind == "solo":
+		game_paused = true
+		_update_speed_buttons()
 	var popup := PopupPanel.new()
 	popup.add_theme_stylebox_override("panel", _style(PANEL, GOLD))
 	add_child(popup)
 	var content := _vbox(9)
 	content.custom_minimum_size = Vector2(440, 0)
 	popup.add_child(content)
-	content.add_child(_label("A name for this place", 21, GOLD))
-	var story := _label("Two settlers talk by the camp. It is time to give their new home a name.", 14, CREAM)
+	content.add_child(_label(_prep_local("A name for this place", "Bu yere bir ad ver", "Nazwa tego miejsca"), 21, GOLD))
+	var story := _label(_prep_local("Your settlers have begun making this place their home. What should they call their colony and settlement?", "Yerleşimcilerin burayı yurt edinmeye başladı. Kolonilerine ve yerleşkelerine ne ad verecekler?", "Osadnicy zaczęli zadomawiać się w tym miejscu. Jak nazwą kolonię i osadę?"), 14, CREAM)
 	story.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(story)
-	content.add_child(_label("Colony name", 12, MUTED))
+	content.add_child(_label(_prep_local("Colony name", "Koloni adı", "Nazwa kolonii"), 12, MUTED))
 	var colony_edit := LineEdit.new()
-	colony_edit.text = "Foxtopia"
+	colony_edit.text = "" if faction_name.begins_with("Unnamed") else faction_name
 	content.add_child(colony_edit)
-	content.add_child(_label("Settlement name", 12, MUTED))
+	content.add_child(_label(_prep_local("Settlement name", "Yerleşke adı", "Nazwa osady"), 12, MUTED))
 	var settlement_edit := LineEdit.new()
-	settlement_edit.text = "New Haven"
+	settlement_edit.text = "" if settlement_name.begins_with("Unnamed") else settlement_name
 	content.add_child(settlement_edit)
-	content.add_child(_button("Name our home", func():
+	content.add_child(_button(_prep_local("Name our home", "Yurdumuzu adlandır", "Nazwij nasz dom"), func():
 		var colony := colony_edit.text.strip_edges()
 		var settlement := settlement_edit.text.strip_edges()
-		if colony.is_empty() or settlement.is_empty():
-			_notice("Both names are required.")
+		if colony.is_empty() or settlement.is_empty() or colony.length() > 32 or settlement.length() > 32:
+			_notice(_prep_local("Enter both names (1–32 characters each).", "İki adı da gir (her biri 1–32 karakter).", "Wpisz obie nazwy (po 1–32 znaki)."))
 			return
-		_send_command({"type": "rename", "target": "faction", "name": colony})
-		_send_command({"type": "rename", "target": "settlement", "name": settlement})
+		if not _send_command({"type": "rename", "target": "faction", "name": colony}): return
+		if not _send_command({"type": "rename", "target": "settlement", "name": settlement}): return
 		faction_name = colony
 		settlement_name = settlement
 		popup.hide()
 	, true))
-	popup.popup_hide.connect(func(): popup.queue_free())
+	content.add_child(_button(_prep_local("Decide later", "Sonra karar ver", "Zdecyduj później"), func(): popup.hide()))
+	popup.popup_hide.connect(func():
+		_naming_prompt_open = false
+		if screen == "game" and session_kind == "solo":
+			game_paused = resume_paused
+			_update_speed_buttons()
+		popup.queue_free())
 	popup.popup_centered(Vector2i(470, 330))
+	# Embedded popups can inherit a stale tall size on the first layout pass.
+	await get_tree().process_frame
+	if is_instance_valid(popup) and popup.visible:
+		popup.size = Vector2i(470, 330)
+		popup.position = Vector2i((get_viewport_rect().size - Vector2(470, 330)) / 2.0)
 
 
 func _notice(message: String) -> void:
-	_status_text = message
+	var displayed := I18n.localize_model_text(message, preferences.language)
+	_status_text = displayed
 	_status_timer = 4.0
 	if screen == "game" and is_instance_valid(_notice_label):
-		_notice_label.text = message
+		_notice_label.text = displayed
 		_notice_label.visible = true
 	else:
 		var dialog := AcceptDialog.new()
 		dialog.title = "Foxtopia"
-		dialog.dialog_text = message
+		dialog.dialog_text = displayed
 		add_child(dialog)
+		dialog.visibility_changed.connect(func():
+			if not dialog.visible:
+				dialog.queue_free())
 		dialog.popup_centered()
 
 
@@ -2721,7 +3805,10 @@ func _build_orders_tab(snapshot: Dictionary) -> void:
 		"Designate": tools = [["Chop wood", "chop"], ["Mine", "mine"], ["Harvest", "harvest"], ["Haul", "haul"]]
 		"Construction": tools = [["Wood wall", "build_wall"], ["Stone wall", "build_stone_wall"], ["Bed", "build_bed"], ["Research bench", "build_research_bench"], ["Styling table", "build_styling_table"], ["Barrier", "build_barrier"], ["Grow zone", "build_farm"]]
 		"Zones": tools = [["Stockpile zone", "stockpile_zone"]]
-	var tool_row := _hbox(5)
+	var tool_row := HFlowContainer.new()
+	tool_row.add_theme_constant_override("h_separation", 5)
+	tool_row.add_theme_constant_override("v_separation", 5)
+	tool_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_sidebar.add_child(tool_row)
 	for pair in tools:
 		var label_text: String = pair[0]
@@ -2739,11 +3826,13 @@ func _build_orders_tab(snapshot: Dictionary) -> void:
 				if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 					priority_menu.position = Vector2i(get_viewport().get_mouse_position())
 					priority_menu.popup())
-	var actions := _hbox(7)
-	_sidebar.add_child(actions)
-	actions.add_child(_button("Cancel tool", func(): _choose_tool(""), false, Vector2(105, 25)))
-	if order_category == "Zones":
-		actions.add_child(_label("Click the map to place a 3×3 stockpile.", 12, MUTED))
+	if not current_tool.is_empty() or order_category == "Zones":
+		var actions := _hbox(7)
+		_sidebar.add_child(actions)
+		if not current_tool.is_empty():
+			actions.add_child(_button("Cancel tool", func(): _choose_tool(""), false, Vector2(105, 25)))
+		if order_category == "Zones":
+			actions.add_child(_label("Click the map to place a 3×3 stockpile.", 12, MUTED))
 	var own_id := str(_my_faction(snapshot).get("id", ""))
 	var pending := 0
 	for order in _values_array(snapshot.get("orders", [])):
@@ -2761,14 +3850,25 @@ func _build_orders_tab(snapshot: Dictionary) -> void:
 			option.item_selected.connect(func(index: int): _send_command({"type": "set_order_priority", "order_id": order_id, "priority": index + 1}))
 			row.add_child(option)
 			row.add_child(_button("Cancel", func(): _send_command({"type": "cancel_order", "order_id": order_id}), false, Vector2(65, 25)))
-	_sidebar.add_child(_label("Pending orders: %d" % pending, 12, MUTED))
+	if pending > 0:
+		_sidebar.add_child(_label("Pending orders: %d" % pending, 12, MUTED))
+	var extra_height := 0
+	if not current_tool.is_empty() or order_category == "Zones":
+		extra_height += 35
+	if pending > 0:
+		extra_height += 20
+	if not selected_order_id.is_empty():
+		extra_height += 32
+	if get_viewport_rect().size.x < 1250.0 and order_category == "Construction":
+		extra_height += 45
+	_tool_panel.offset_top = -185 - extra_height
 
 
 func _choose_tool(kind: String) -> void:
 	current_tool = kind
 	_render_sidebar(_snapshot())
 	if not kind.is_empty():
-		_notice("Haritada %s için bir hücre seç." % _order_name(kind))
+		_notice(_prep_local("Choose a map tile for %s.", "%s için haritada bir hücre seç.", "Wybierz pole mapy dla: %s.") % _order_name(kind))
 
 
 func _order_name(kind: String) -> String:
@@ -2790,7 +3890,7 @@ func _build_work_tab(snapshot: Dictionary) -> void:
 		table.add_child(heading)
 	for person in _local_colonists(snapshot):
 		var person_id := str(person.get("id", ""))
-		var name := _label(str(person.get("name", "Kolonist")), 15, CREAM)
+		var name := _label(str(person.get("name", "Colonist")), 15, CREAM)
 		name.custom_minimum_size = Vector2(150, 0)
 		table.add_child(name)
 		var priorities: Dictionary = person.get("work_priorities", {})
@@ -2864,7 +3964,7 @@ func _build_research_tab(snapshot: Dictionary) -> void:
 	var active := str(research.get("project", ""))
 	var unlocked: Array = research.get("unlocked", [])
 	if not active.is_empty():
-		_sidebar.add_child(_label("AKTİF  %s  ·  %d ilerleme" % [_research_name(active), int(research.get("progress", 0))], 13, TEAL))
+		_sidebar.add_child(_label(_prep_local("ACTIVE  %s  ·  %d progress", "AKTİF  %s  ·  %d ilerleme", "AKTYWNE  %s  ·  %d postępu") % [_research_name(active), int(research.get("progress", 0))], 13, TEAL))
 	var project_row := _hbox(8)
 	_sidebar.add_child(project_row)
 	for project in RESEARCH_PROJECTS:
@@ -2874,23 +3974,23 @@ func _build_research_tab(snapshot: Dictionary) -> void:
 		project_row.add_child(card)
 		var inner := _vbox(6)
 		card.add_child(inner)
-		inner.add_child(_label(str(project.name).to_upper(), 14, GOLD if active == id else CREAM))
-		inner.add_child(_label(str(project.detail), 12, MUTED))
+		inner.add_child(_label(SetupCatalog.localized(project.name, preferences.language).to_upper(), 14, GOLD if active == id else CREAM))
+		inner.add_child(_label(SetupCatalog.localized(project.detail, preferences.language), 12, MUTED))
 		if unlocked.has(id):
-			inner.add_child(_label("Tamamlandı", 12, TEAL))
+			inner.add_child(_label(_tr("research.completed"), 12, TEAL))
 		else:
-			inner.add_child(_button("Seçili" if active == id else "Araştır", func(): _send_command({"type": "set_research", "project": id}), active == id, Vector2(90, 27)))
+			inner.add_child(_button(_prep_local("Selected", "Seçili", "Wybrane") if active == id else _tr("research.select"), func(): _send_command({"type": "set_research", "project": id}), active == id, Vector2(90, 27)))
 
 
 func _research_name(id: String) -> String:
 	for project in RESEARCH_PROJECTS:
 		if str(project.id) == id:
-			return str(project.name)
+			return SetupCatalog.localized(project.name, preferences.language)
 	return id
 
 
 func _build_health_tab(snapshot: Dictionary) -> void:
-	_tab_title("Karakter ve Sağlık", "Üst portreden veya haritadaki kolonistten seçim yap.")
+	_tab_title(_prep_local("Colonists and health", "Karakter ve Sağlık", "Koloniści i zdrowie"), _prep_local("Select a colonist from the portrait bar or the map.", "Üst portreden veya haritadaki kolonistten seçim yap.", "Wybierz kolonistę z portretu u góry lub na mapie."))
 	var person := _selected_person(snapshot)
 	if person.is_empty():
 		for colonist in _local_colonists(snapshot):
@@ -2907,12 +4007,11 @@ func _build_health_tab(snapshot: Dictionary) -> void:
 	profile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(profile)
 	var traits: Array = person.get("traits", [])
-	var trait_names := {"hardworking": "Çalışkan", "calm": "Sakin", "quick": "Çevik", "kind": "Merhametli", "timid": "Ürkek", "curious": "Meraklı"}
-	var trait_label := str(trait_names.get(str(traits[0]), str(traits[0]))) if not traits.is_empty() else "Özellik yok"
+	var trait_label := _display_trait(str(traits[0])) if not traits.is_empty() else _prep_local("No trait", "Özellik yok", "Brak cechy")
 	var profile_header := _hbox(8)
 	profile.add_child(profile_header)
-	profile_header.add_child(_label("%s  ·  %s" % [str(person.get("name", "Kolonist")), trait_label], 17, GOLD))
-	profile_header.add_child(_button("Görünüşü Düzenle", func(): _open_customize_dialog(person), false, Vector2(155, 27)))
+	profile_header.add_child(_label("%s  ·  %s" % [str(person.get("name", "Colonist")), trait_label], 17, GOLD))
+	profile_header.add_child(_button(_prep_local("Edit appearance", "Görünüşü düzenle", "Edytuj wygląd"), func(): _open_customize_dialog(person), false, Vector2(155, 27)))
 	var skills: Dictionary = person.get("skills", {})
 	var skill_grid := GridContainer.new()
 	skill_grid.columns = 4
@@ -2920,14 +4019,14 @@ func _build_health_tab(snapshot: Dictionary) -> void:
 	skill_grid.add_theme_constant_override("v_separation", 3)
 	profile.add_child(skill_grid)
 	for j in JOBS.size():
-		skill_grid.add_child(_label("%s %d" % [JOB_LABELS[j], int(skills.get(JOBS[j], 0))], 12, MUTED))
+		skill_grid.add_child(_label("%s %d" % [_display_work(JOBS[j]), int(skills.get(JOBS[j], 0))], 12, MUTED))
 	var needs_column := _vbox(3)
 	needs_column.custom_minimum_size = Vector2(225, 0)
 	needs_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(needs_column)
-	needs_column.add_child(_label("İHTİYAÇLAR", 12, GOLD))
+	needs_column.add_child(_label(_tr("tabs.needs").to_upper(), 12, GOLD))
 	var needs: Dictionary = person.get("needs", {})
-	for pair in [["Açlık", "hunger"], ["Dinlenme", "rest"], ["Ruh hâli", "mood"]]:
+	for pair in [[_tr("needs.food"), "hunger"], [_tr("needs.rest"), "rest"], [_tr("needs.mood"), "mood"]]:
 		var need_row := _hbox(5)
 		needs_column.add_child(need_row)
 		need_row.add_child(_label("%s %d" % [pair[0], int(needs.get(pair[1], 0))], 12))
@@ -2945,18 +4044,18 @@ func _build_health_tab(snapshot: Dictionary) -> void:
 	var health: Dictionary = person.get("health", {})
 	var health_row := _hbox(12)
 	action_column.add_child(health_row)
-	health_row.add_child(_label("SAĞLIK %d / %d" % [int(health.get("hp", 100)), int(health.get("max_hp", 100))], 13, GOLD))
-	health_row.add_child(_label("Kanama %d" % int(health.get("bleeding", 0)), 12, RED if float(health.get("bleeding", 0)) > 0 else MUTED))
+	health_row.add_child(_label("%s %d / %d" % [_tr("tabs.health").to_upper(), int(health.get("hp", 100)), int(health.get("max_hp", 100))], 13, GOLD))
+	health_row.add_child(_label("%s %d" % [_tr("health.bleeding"), int(health.get("bleeding", 0))], 12, RED if float(health.get("bleeding", 0)) > 0 else MUTED))
 	for wound in health.get("wounds", []):
-		action_column.add_child(_label("• %s · şiddet %d" % [str(wound.get("kind", "Yara")), int(wound.get("severity", 0))], 12))
+		action_column.add_child(_label(_prep_local("• %s · severity %d", "• %s · şiddet %d", "• %s · nasilenie %d") % [str(wound.get("kind", "Wound")).capitalize(), int(wound.get("severity", 0))], 12))
 	var equipment: Dictionary = person.get("equipment", {})
-	action_column.add_child(_label("Silah: %s   Kıyafet: %s" % [equipment.get("weapon", "Yok"), equipment.get("apparel", "Yok")], 12))
+	action_column.add_child(_label(_prep_local("Weapon: %s   Apparel: %s", "Silah: %s   Kıyafet: %s", "Broń: %s   Ubranie: %s") % [_display_item(str(equipment.get("weapon", "none"))), _display_item(str(equipment.get("apparel", "none")))], 12))
 	var buttons := _hbox(5)
 	action_column.add_child(buttons)
-	buttons.add_child(_button("Mızrak Kuşan", func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "spear"}), false, Vector2(114, 27)))
-	buttons.add_child(_button("Ceket Giy", func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"}), false, Vector2(86, 27)))
-	buttons.add_child(_button("Savaş: %s" % ("Açık" if bool(person.get("drafted", false)) else "Kapalı"), func(): _send_command({"type": "set_draft", "colonist_id": person_id, "drafted": not bool(person.get("drafted", false))}), false, Vector2(105, 27)))
-	buttons.add_child(_button("Emri İptal Et", func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "clear"}), false, Vector2(110, 27)))
+	buttons.add_child(_button(_prep_local("Equip spear", "Mızrak kuşan", "Załóż włócznię"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "spear"}), false, Vector2(114, 27)))
+	buttons.add_child(_button(_prep_local("Wear jacket", "Ceket giy", "Załóż kurtkę"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"}), false, Vector2(86, 27)))
+	buttons.add_child(_button(_prep_local("Draft: %s", "Savaş: %s", "Mobilizacja: %s") % (_tr("common.on") if bool(person.get("drafted", false)) else _tr("common.off")), func(): _send_command({"type": "set_draft", "colonist_id": person_id, "drafted": not bool(person.get("drafted", false))}), false, Vector2(105, 27)))
+	buttons.add_child(_button(_prep_local("Cancel order", "Emri iptal et", "Anuluj rozkaz"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "clear"}), false, Vector2(110, 27)))
 
 
 func _open_customize_dialog(person: Dictionary) -> void:
@@ -2965,7 +4064,7 @@ func _open_customize_dialog(person: Dictionary) -> void:
 	add_child(popup)
 	var content := _vbox(10)
 	popup.add_child(content)
-	content.add_child(_label("%s · Görünüş" % str(person.get("name", "Kolonist")), 21, GOLD))
+	content.add_child(_label(_prep_local("%s · Appearance", "%s · Görünüş", "%s · Wygląd") % str(person.get("name", "Colonist")), 21, GOLD))
 	var appearance: Dictionary = person.get("appearance", {})
 	var row := _hbox(12)
 	content.add_child(row)
@@ -2974,29 +4073,29 @@ func _open_customize_dialog(person: Dictionary) -> void:
 	var fields := _vbox(8)
 	row.add_child(fields)
 	var hair := OptionButton.new()
-	for label_text in HAIR_OPTIONS:
+	for label_text in _hair_options():
 		hair.add_item(label_text)
 	hair.select(maxi(0, ["short", "wavy", "long", "curly", "shaved"].find(str(appearance.get("hair", "short")))))
 	fields.add_child(hair)
 	var hair_color := OptionButton.new()
-	for label_text in ["Koyu Kahve", "Kestane", "Sarı", "Siyah", "Bakır"]:
+	for label_text in [_prep_local("Dark brown", "Koyu kahve", "Ciemny brąz"), _prep_local("Chestnut", "Kestane", "Kasztan"), _prep_local("Blond", "Sarı", "Blond"), _prep_local("Black", "Siyah", "Czarny"), _prep_local("Copper", "Bakır", "Miedziany")]:
 		hair_color.add_item(label_text)
 	hair_color.select(maxi(0, HAIR_COLOR_OPTIONS.find(str(appearance.get("hair_color", HAIR_COLOR_OPTIONS[0])))))
 	fields.add_child(hair_color)
 	var skin := OptionButton.new()
 	for j in SKIN_OPTIONS.size():
-		skin.add_item("Ten %d" % (j + 1))
+		skin.add_item(_prep_local("Skin tone %d", "Ten rengi %d", "Odcień skóry %d") % (j + 1))
 	skin.select(maxi(0, SKIN_OPTIONS.find(str(appearance.get("skin", SKIN_OPTIONS[0])))))
 	fields.add_child(skin)
 	var outfit := OptionButton.new()
 	for j in OUTFIT_OPTIONS.size():
-		outfit.add_item("Kıyafet %d" % (j + 1))
+		outfit.add_item(_prep_local("Outfit %d", "Kıyafet %d", "Strój %d") % (j + 1))
 	outfit.select(maxi(0, OUTFIT_OPTIONS.find(str(appearance.get("outfit", OUTFIT_OPTIONS[0])))))
 	fields.add_child(outfit)
 	for option in [hair, hair_color, skin, outfit]:
 		option.item_selected.connect(func(_index: int): _update_character_preview(preview, hair, hair_color, skin, outfit))
 	_update_character_preview(preview, hair, hair_color, skin, outfit)
-	content.add_child(_button("Değişiklikleri Kaydet", func():
+	content.add_child(_button(_prep_local("Save changes", "Değişiklikleri kaydet", "Zapisz zmiany"), func():
 		var hair_ids := ["short", "wavy", "long", "curly", "shaved"]
 		_send_command({"type": "customize_colonist", "colonist_id": str(person.get("id", "")), "appearance": {"hair": hair_ids[hair.selected], "hair_color": HAIR_COLOR_OPTIONS[hair_color.selected], "skin": SKIN_OPTIONS[skin.selected], "outfit": OUTFIT_OPTIONS[outfit.selected]}})
 		popup.hide()
@@ -3024,7 +4123,7 @@ func _open_trade_dialog(caravan_id: String) -> void:
 	var content := _vbox(8)
 	content.custom_minimum_size = Vector2(650, 0)
 	popup.add_child(content)
-	content.add_child(_label(str(caravan.get("name", "Trade caravan")), 22, GOLD))
+	content.add_child(_label(I18n.localize_caravan_name(str(caravan.get("name", "Trade caravan")), preferences.language), 22, GOLD))
 	var inventory := _local_resources(snapshot)
 	content.add_child(_label("Your silver: %d    Trader silver: %d" % [int(inventory.get("silver", 0)), int(caravan.get("stock", {}).get("silver", 0))], 14, MUTED))
 	var columns := _hbox(15)
@@ -3144,10 +4243,10 @@ func _build_trade_tab(snapshot: Dictionary) -> void:
 		if str(faction.get("id", "")) != my_id:
 			others.append(faction)
 	if not others.is_empty():
-		_sidebar.add_child(_label("Koloniler arası teklif", 18, GOLD))
+		_sidebar.add_child(_label(_prep_local("Colony trade offer", "Koloniler arası teklif", "Oferta handlu między koloniami"), 18, GOLD))
 		var target := OptionButton.new()
 		for other in others:
-			target.add_item(str(other.get("name", "Koloni")))
+			target.add_item(str(other.get("name", _prep_local("Colony", "Koloni", "Kolonia"))))
 		_sidebar.add_child(target)
 		var give_item := OptionButton.new()
 		var receive_item := OptionButton.new()
@@ -3155,21 +4254,21 @@ func _build_trade_tab(snapshot: Dictionary) -> void:
 			give_item.add_item(item)
 			receive_item.add_item(item)
 		receive_item.select(1)
-		_sidebar.add_child(_label("Vereceğin eşya / miktar", 14))
+		_sidebar.add_child(_label(_prep_local("Offer item / amount", "Vereceğin eşya / miktar", "Oferowany przedmiot / ilość"), 14))
 		_sidebar.add_child(give_item)
 		var give_count := SpinBox.new()
 		give_count.min_value = 1
 		give_count.max_value = 99
 		give_count.value = 2
 		_sidebar.add_child(give_count)
-		_sidebar.add_child(_label("İstediğin eşya / miktar", 14))
+		_sidebar.add_child(_label(_prep_local("Request item / amount", "İstediğin eşya / miktar", "Żądany przedmiot / ilość"), 14))
 		_sidebar.add_child(receive_item)
 		var receive_count := SpinBox.new()
 		receive_count.min_value = 1
 		receive_count.max_value = 99
 		receive_count.value = 1
 		_sidebar.add_child(receive_count)
-		_sidebar.add_child(_button("Teklif Gönder", func(): _send_command({"type": "trade_offer", "to_faction": str(others[target.selected].get("id", "")), "give": {give_item.get_item_text(give_item.selected): int(give_count.value)}, "receive": {receive_item.get_item_text(receive_item.selected): int(receive_count.value)}}), true))
+		_sidebar.add_child(_button(_tr("trade.offer"), func(): _send_command({"type": "trade_offer", "to_faction": str(others[target.selected].get("id", "")), "give": {give_item.get_item_text(give_item.selected): int(give_count.value)}, "receive": {receive_item.get_item_text(receive_item.selected): int(receive_count.value)}}), true))
 	for offer in _values_array(snapshot.get("trade_offers", [])):
 		if str(offer.get("status", "")) != "pending":
 			continue
@@ -3178,11 +4277,11 @@ func _build_trade_tab(snapshot: Dictionary) -> void:
 		_sidebar.add_child(card)
 		var inner := _vbox(6)
 		card.add_child(inner)
-		inner.add_child(_label("Teklif: %s → %s" % [offer.get("from_faction", ""), offer.get("to_faction", "")], 15))
-		inner.add_child(_label("Verilen: %s   İstenen: %s" % [str(offer.get("give", {})), str(offer.get("receive", {}))], 13, MUTED))
+		inner.add_child(_label(_prep_local("Offer: %s → %s", "Teklif: %s → %s", "Oferta: %s → %s") % [offer.get("from_faction", ""), offer.get("to_faction", "")], 15))
+		inner.add_child(_label(_prep_local("Give: %s   Receive: %s", "Verilen: %s   İstenen: %s", "Daj: %s   Otrzymaj: %s") % [str(offer.get("give", {})), str(offer.get("receive", {}))], 13, MUTED))
 		if str(offer.get("to_faction", "")) == my_id:
-			inner.add_child(_button("Kabul Et", func(): _send_command({"type": "trade_accept", "offer_id": offer_id}), true))
-		inner.add_child(_button("Reddet / Geri Çek", func(): _send_command({"type": "trade_decline", "offer_id": offer_id})))
+			inner.add_child(_button(_tr("trade.accept"), func(): _send_command({"type": "trade_accept", "offer_id": offer_id}), true))
+		inner.add_child(_button(_prep_local("Decline / withdraw", "Reddet / geri çek", "Odrzuć / wycofaj"), func(): _send_command({"type": "trade_decline", "offer_id": offer_id})))
 	var caravans: Array = []
 	for caravan in _values_array(snapshot.get("caravans", [])):
 		if str(caravan.get("kind", "")) == "npc" and str(caravan.get("faction_id", "")) == my_id:
@@ -3191,10 +4290,10 @@ func _build_trade_tab(snapshot: Dictionary) -> void:
 		_sidebar.add_child(_label(_prep_local("No caravan is here. Friendly settlements may visit as time passes.", "Şu anda kervan yok. Zamanla dost yerleşkeler ziyaret edebilir.", "Nie ma tu karawany. Przyjazne osady mogą odwiedzić kolonię z czasem."), 15, MUTED))
 	if not caravans.is_empty():
 		_sidebar.add_child(HSeparator.new())
-		_sidebar.add_child(_label("Gelen Tüccarlar", 18, GOLD))
+		_sidebar.add_child(_label(_prep_local("Visiting traders", "Gelen tüccarlar", "Przybyli kupcy"), 18, GOLD))
 	for caravan in caravans:
 		var caravan_id := str(caravan.get("id", ""))
-		_sidebar.add_child(_label("Kervan %s  ·  (%d, %d)" % [caravan_id, int(caravan.get("x", 0)), int(caravan.get("y", 0))], 15))
+		_sidebar.add_child(_label(_prep_local("Caravan %s  ·  (%d, %d)", "Kervan %s  ·  (%d, %d)", "Karawana %s  ·  (%d, %d)") % [caravan_id, int(caravan.get("x", 0)), int(caravan.get("y", 0))], 15))
 		var stock: Dictionary = caravan.get("stock", {})
 		var product := OptionButton.new()
 		for item in stock.keys():
@@ -3202,22 +4301,23 @@ func _build_trade_tab(snapshot: Dictionary) -> void:
 				product.add_item(str(item))
 		_sidebar.add_child(product)
 		if product.item_count > 0:
-			_sidebar.add_child(_button("1 Adet Satın Al", func(): _send_command({"type": "npc_trade", "caravan_id": caravan_id, "buy": {product.get_item_text(product.selected): 1}, "sell": {}}), true))
+			_sidebar.add_child(_button(_prep_local("Buy 1", "1 adet satın al", "Kup 1"), func(): _send_command({"type": "npc_trade", "caravan_id": caravan_id, "buy": {product.get_item_text(product.selected): 1}, "sell": {}}), true))
 		var sell_item := OptionButton.new()
 		for item in ["wood", "stone", "food", "medicine", "spear", "jacket"]:
 			if int(inventory.get(item, 0)) > 0:
 				sell_item.add_item(item)
 		_sidebar.add_child(sell_item)
 		if sell_item.item_count > 0:
-			_sidebar.add_child(_button("1 Adet Sat", func(): _send_command({"type": "npc_trade", "caravan_id": caravan_id, "buy": {}, "sell": {sell_item.get_item_text(sell_item.selected): 1}})))
+			_sidebar.add_child(_button(_prep_local("Sell 1", "1 adet sat", "Sprzedaj 1"), func(): _send_command({"type": "npc_trade", "caravan_id": caravan_id, "buy": {}, "sell": {sell_item.get_item_text(sell_item.selected): 1}})))
 
 
 func _build_world_tab(snapshot: Dictionary) -> void:
-	_tab_title(_tr("tabs.world"), "Settlements and relations")
+	_tab_title(_tr("tabs.world"), _prep_local("Settlements and relations", "Yerleşkeler ve ilişkiler", "Osady i relacje"))
 	var faction := _my_faction(snapshot)
 	_sidebar.add_child(_label("%s · %s" % [faction.get("name", faction_name), faction.get("settlement_name", settlement_name)], 18, GOLD))
-	_sidebar.add_child(_button("Open world map", func(): _open_world_overview(snapshot), true))
-	_sidebar.add_child(_label("Friendly settlements may send caravans; hostile settlements may send raids.", 14, MUTED))
+	_sidebar.add_child(_button(_prep_local("Name colony and settlement", "Koloni ve yerleşkeyi adlandır", "Nazwij kolonię i osadę"), _open_naming_prompt))
+	_sidebar.add_child(_button(_prep_local("Open world map", "Dünya haritasını aç", "Otwórz mapę świata"), func(): _open_world_overview(snapshot), true))
+	_sidebar.add_child(_label(_prep_local("Friendly settlements may send caravans; hostile settlements may send raids.", "Dost yerleşkeler kervan, düşman yerleşkeler baskın gönderebilir.", "Przyjazne osady mogą wysyłać karawany, a wrogie — najazdy."), 14, MUTED))
 	_sidebar.add_child(HSeparator.new())
 	var mine_id := str(faction.get("id", ""))
 	var has_other_player_colony := false
@@ -3226,12 +4326,12 @@ func _build_world_tab(snapshot: Dictionary) -> void:
 			has_other_player_colony = true
 			break
 	if has_other_player_colony:
-		_sidebar.add_child(_button("Trade with another colony", func(): _open_colony_trade_dialog(_snapshot())))
+		_sidebar.add_child(_button(_prep_local("Trade with another colony", "Başka koloniyle ticaret yap", "Handluj z inną kolonią"), func(): _open_colony_trade_dialog(_snapshot())))
 	for offer in _values_array(snapshot.get("trade_offers", [])):
 		if str(offer.get("status", "")) != "pending" or str(offer.get("to_faction", "")) != mine_id:
 			continue
 		var offer_id := str(offer.get("id", ""))
-		_sidebar.add_child(_label("Offer from %s · give %s · receive %s" % [str(offer.get("from_faction", "")), str(offer.get("give", {})), str(offer.get("receive", {}))], 13))
+		_sidebar.add_child(_label(_prep_local("Offer from %s · give %s · receive %s", "%s teklif etti · ver %s · al %s", "Oferta od %s · daj %s · otrzymaj %s") % [str(offer.get("from_faction", "")), str(offer.get("give", {})), str(offer.get("receive", {}))], 13))
 		var actions := _hbox(5)
 		_sidebar.add_child(actions)
 		actions.add_child(_button(_tr("trade.accept"), func(): _send_command({"type": "trade_accept", "offer_id": offer_id})))
@@ -3240,7 +4340,7 @@ func _build_world_tab(snapshot: Dictionary) -> void:
 	var world: Dictionary = snapshot.get("world", {})
 	for site in world.get("sites", []):
 		if str(site.get("kind", "")) != "vacant":
-			_sidebar.add_child(_label("• %s — %s" % [site.get("name", "Yerleşke"), site.get("kind", "")], 14, MUTED))
+			_sidebar.add_child(_label("• %s — %s" % [I18n.localize_site_name(str(site.get("name", _prep_local("Settlement", "Yerleşke", "Osada"))), preferences.language), _display_site_kind(str(site.get("kind", "")))], 14, MUTED))
 
 
 func _open_world_overview(snapshot: Dictionary) -> void:
@@ -3256,42 +4356,53 @@ func _open_world_overview(snapshot: Dictionary) -> void:
 
 func _save_game() -> void:
 	if session_kind == "join":
-		_notice("Only the host can save this game.")
+		_notice(_prep_local("Only the host can save this game.", "Bu oyunu yalnızca ev sahibi kaydedebilir.", "Tylko gospodarz może zapisać tę grę."))
 		return
 	_open_save_picker(true)
 
 
 func _load_saved_game() -> void:
 	if session_kind == "join":
-		_notice("A guest cannot load a save.")
+		_notice(_prep_local("A guest cannot load a save.", "Konuk kayıtlı oyun yükleyemez.", "Gość nie może wczytać zapisu."))
 		return
 	_open_save_picker(false)
 
 
 func _open_save_picker(save_mode: bool) -> void:
+	if _save_picker_open:
+		return
+	_save_picker_open = true
+	var resume_paused := game_paused
+	if screen == "game" and session_kind == "solo":
+		game_paused = true
+		_update_speed_buttons()
 	var popup := PopupPanel.new()
 	popup.add_theme_stylebox_override("panel", _style(PANEL, GOLD))
 	add_child(popup)
 	var content := _vbox(8)
 	content.custom_minimum_size = Vector2(470, 0)
 	popup.add_child(content)
-	content.add_child(_label("Save game" if save_mode else "Load game", 22, GOLD))
+	content.add_child(_label(_tr("game.save_game") if save_mode else _tr("game.load_game"), 22, GOLD))
 	if save_mode:
 		var name_edit := LineEdit.new()
-		name_edit.placeholder_text = "Save name"
+		name_edit.placeholder_text = _prep_local("Save name", "Kayıt adı", "Nazwa zapisu")
 		name_edit.text = "save_%d" % Time.get_unix_time_from_system()
 		content.add_child(name_edit)
-		content.add_child(_button("Create new save", func():
+		content.add_child(_button(_prep_local("Create new save", "Yeni kayıt oluştur", "Utwórz nowy zapis"), func():
 			var slot := name_edit.text.strip_edges().replace(" ", "_")
+			for existing in Game.list_saved_games():
+				if str(existing.get("id", "")) == slot:
+					_confirm_overwrite_save(slot, popup)
+					return
 			var saved := Game.save_game(slot)
-			_notice("Game saved." if saved else "Could not save. Use letters, numbers, _ or -.")
+			_notice(_prep_local("Game saved.", "Oyun kaydedildi.", "Gra zapisana.") if saved else _prep_local("Could not save. Use letters, numbers, _ or -.", "Kaydedilemedi. Harf, sayı, _ veya - kullan.", "Nie można zapisać. Użyj liter, cyfr, _ lub -."))
 			if saved: popup.hide()
 		, true))
 	var saves: Array = Game.list_saved_games()
 	if saves.is_empty():
-		content.add_child(_label("No saved games yet.", 14, MUTED))
+		content.add_child(_label(_tr("saves.empty"), 14, MUTED))
 	else:
-		content.add_child(_label("Existing saves", 14, MUTED))
+		content.add_child(_label(_prep_local("Existing saves", "Mevcut kayıtlar", "Istniejące zapisy"), 14, MUTED))
 		var scroll := ScrollContainer.new()
 		scroll.custom_minimum_size = Vector2(470, minf(320.0, float(saves.size()) * 50.0))
 		content.add_child(scroll)
@@ -3300,30 +4411,73 @@ func _open_save_picker(save_mode: bool) -> void:
 		for saved in saves:
 			var slot_id := str(saved.get("id", ""))
 			var colonies: Array = saved.get("colonies", [])
-			var label_text := "%s  ·  %s  ·  day %d" % [slot_id, ", ".join(colonies), int(saved.get("time", 0)) / 600 + 1]
-			if save_mode:
-				rows.add_child(_button("Overwrite  " + label_text, func():
-					var saved_ok := Game.save_game(slot_id)
-					_notice("Game saved." if saved_ok else "Could not save the game.")
-					if saved_ok: popup.hide()
+			var auto_label := _prep_local("AUTO  ", "OTOMATİK  ", "AUTO  ") if bool(saved.get("is_autosave", false)) else ""
+			var label_text := _prep_local("%s%s  ·  %s  ·  day %d", "%s%s  ·  %s  ·  gün %d", "%s%s  ·  %s  ·  dzień %d") % [auto_label, slot_id, ", ".join(colonies), int(saved.get("time", 0)) / 600 + 1]
+			var row := _hbox(5)
+			rows.add_child(row)
+			if save_mode and not bool(saved.get("is_autosave", false)):
+				row.add_child(_button(_prep_local("Overwrite  ", "Üzerine yaz  ", "Nadpisz  ") + label_text, func():
+					_confirm_overwrite_save(slot_id, popup)
 				))
 			else:
-				rows.add_child(_button(label_text, func(): popup.hide(); _load_slot(slot_id)))
-	content.add_child(_button("Close", func(): popup.hide()))
-	popup.popup_hide.connect(func(): popup.queue_free())
+				row.add_child(_button(label_text, func(): popup.hide(); _load_slot(slot_id)))
+			row.add_child(_button(_prep_local("Delete", "Sil", "Usuń"), func(): _confirm_delete_save(slot_id, popup, save_mode), false, Vector2(68, 32)))
+	content.add_child(_button(_tr("common.close"), func(): popup.hide()))
+	popup.popup_hide.connect(func():
+		_save_picker_open = false
+		if screen == "game" and session_kind == "solo":
+			game_paused = resume_paused
+			_update_speed_buttons()
+		popup.queue_free())
 	popup.popup_centered(Vector2i(510, 500))
+
+
+func _confirm_overwrite_save(slot_id: String, picker: PopupPanel) -> void:
+	var confirmation := ConfirmationDialog.new()
+	confirmation.title = _prep_local("Overwrite save", "Kaydın üzerine yaz", "Nadpisz zapis")
+	confirmation.dialog_text = _prep_local("Replace '%s' with the current colony?" % slot_id, "'%s' kaydını mevcut koloniyle değiştir?" % slot_id, "Zastąpić zapis '%s' bieżącą kolonią?" % slot_id)
+	add_child(confirmation)
+	confirmation.confirmed.connect(func():
+		var saved_ok := Game.save_game(slot_id)
+		_notice(_prep_local("Game saved.", "Oyun kaydedildi.", "Gra zapisana.") if saved_ok else _prep_local("Could not save the game.", "Oyun kaydedilemedi.", "Nie można zapisać gry."))
+		confirmation.hide()
+		if saved_ok:
+			picker.hide())
+	confirmation.visibility_changed.connect(func():
+		if not confirmation.visible:
+			confirmation.queue_free())
+	confirmation.popup_centered()
+
+
+func _confirm_delete_save(slot_id: String, picker: PopupPanel, save_mode: bool) -> void:
+	var confirmation := ConfirmationDialog.new()
+	confirmation.title = _prep_local("Delete save", "Kaydı sil", "Usuń zapis")
+	confirmation.dialog_text = _prep_local("Delete '%s' permanently?" % slot_id, "'%s' kaydı kalıcı silinsin mi?" % slot_id, "Usunąć '%s' na stałe?" % slot_id)
+	add_child(confirmation)
+	confirmation.confirmed.connect(func():
+		var deleted := Game.delete_saved_game(slot_id)
+		confirmation.hide()
+		if deleted:
+			picker.hide()
+			_open_save_picker(save_mode)
+		else:
+			_notice(_prep_local("Could not delete save.", "Kayıt silinemedi.", "Nie udało się usunąć zapisu.")))
+	confirmation.visibility_changed.connect(func():
+		if not confirmation.visible:
+			confirmation.queue_free())
+	confirmation.popup_centered()
 
 
 func _load_slot(slot_id: String) -> void:
 	Net.start_solo()
 	if not Game.load_game(slot_id):
-		_notice("Could not open this save.")
+		_notice(_prep_local("Could not open this save.", "Bu kayıt açılamadı.", "Nie można otworzyć tego zapisu."))
 		return
 	session_kind = "solo"
 	var data := Game.get_snapshot()
 	var mine := _my_faction(data)
-	faction_name = str(mine.get("name", "Koloni"))
-	settlement_name = str(mine.get("settlement_name", "Yerleşke"))
+	faction_name = str(mine.get("name", _prep_local("Colony", "Koloni", "Kolonia")))
+	settlement_name = str(mine.get("settlement_name", _prep_local("Settlement", "Yerleşke", "Osada")))
 	selected_site_id = str(mine.get("site_id", ""))
 	game_paused = false
 	_show_game()

@@ -33,7 +33,7 @@ func _run() -> void:
 	start_button.pressed.emit()
 	await process_frame
 	assert(main.get("session_kind") == "solo")
-	assert(main.get("screen") == "setup")
+	assert(main.get("screen") == "scenario")
 	main.call("_show_menu")
 	main.call("_show_settings")
 	assert(is_instance_valid(main.get("_settings_overlay")))
@@ -54,9 +54,11 @@ func _run() -> void:
 	assert(display_button != null)
 	display_button.pressed.emit()
 	var selectors := settings_ui.find_children("*", "OptionButton", true, false)
-	assert(selectors.size() == 2)
-	var mode_selector := selectors[0] as OptionButton
-	var resolution_selector := selectors[1] as OptionButton
+	assert(selectors.size() == 3)
+	var display_selector := selectors[0] as OptionButton
+	var mode_selector := selectors[1] as OptionButton
+	var resolution_selector := selectors[2] as OptionButton
+	assert(display_selector.item_count == maxi(1, DisplayServer.get_screen_count()))
 	assert(resolution_selector.get_popup().max_size == Vector2i(4096, 320))
 	mode_selector.select(1)
 	mode_selector.item_selected.emit(1)

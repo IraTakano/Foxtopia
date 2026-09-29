@@ -12,18 +12,18 @@ Inno Setup 6. `dist/game/Foxtopia.exe` ile oyunun diğer dışa aktarım dosyala
 hazır olmalıdır.
 
 ```powershell
-./scripts/build-windows.ps1 -Version v0.1.1
+./scripts/build-windows.ps1 -Version v0.1.8
 ```
 
 Varsayılan depo `IraTakano/Foxtopia`'dır. `-Repository` ile
 `https://github.com/owner/repo` biçiminde başka bir depo da verilebilir.
-Çıktı: `dist/Foxtopia-Setup-v0.1.1.exe`. Yerel deneme için güncelleme
+Çıktı: `dist/Foxtopia-Setup-v0.1.8.exe`. Yerel deneme için güncelleme
 kontrolünü kapatmak gerektiğinde `-Repository ''` verilebilir.
 
 ## Güncelleme paketini hazırlama
 
 ```powershell
-./scripts/create-release.ps1 -Version v0.1.1
+./scripts/create-release.ps1 -Version v0.1.8
 ```
 
 Bu komut `dist/release/Foxtopia-win-x64.zip` ve
@@ -32,12 +32,13 @@ Release'e yüklenmeli; release etiketi manifestteki sürümle aynı olmalı.
 GitHub CLI ile yayımlamak için:
 
 ```powershell
-./scripts/publish-release.ps1 -Version v0.1.1
+./scripts/publish-release.ps1 -Version v0.1.8
 ```
 
 Yayımlama komutu aynı sürümün kurulum dosyası varsa onu da Release'e ekler.
 Önceden `gh auth login` ile yetkilendirme yapılmış olmalıdır.
 Güncelleyici herkese açık deponun en son kararlı release'ini kullanır.
+Bu yerel v0.1.8 paketi yayımlanmadı; otomatik dağıtım için ayrıca Release gerekir.
 
 Başlatıcı her açılışta GitHub Releases'i kontrol eder. Yeni sürüm varsa arşivi
 indirir, manifestteki SHA-256 özetini ve GitHub'ın asset özetini (varsa)

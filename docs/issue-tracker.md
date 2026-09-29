@@ -1,0 +1,219 @@
+# Foxtopia iş ve sorun takibi
+
+Son düzenleme: 29 Eylül 2026. Kaynak: masaüstündeki `Sorunlar.txt` dosyasının **Sorunlar**, **Sorunlar 2** ve **SORUNLAR 3** bölümleri; ayrıca çözünürlük listesi, yol bulma, yerelleştirme, kullanıcı oyun testleri, Steam görselleri, saat/FPS ve çoklu monitör geri bildirimleri. `S1/11` gibi kaynaklar, notun ilgili bölüm ve maddesini gösterir. `S3` tek paragraf olduğundan konu başlığıyla izlenir.
+
+Bu dosya **iş ve sorun takip kaydı**dır. README veya önceki konuşmada bir özellikten söz edilmesi, o işin kabul edildiği anlamına gelmez. Son kullanıcı testinde onaylanan çözünürlük listesi ve siyah şerit düzeltmeleri kapatıldı. Aynı sorun farklı notlarda geçiyorsa tek ID altında kaynakları birlikte gösterilir. ID'ler sabittir; satırlar silinmez ve yeniden numaralanmaz.
+
+## Durumları nasıl okuyacağız?
+
+| Sütun | Anlamı |
+| --- | --- |
+| **Kod** | **Açık:** Talep/sorun kayıtlı, çözüm kullanıcı açısından doğrulanmadı. **İnceleme gerekli:** Kodda veya önceki sürüm notunda karşılığı olabilir; mevcut davranış kontrol edilecek. **Çalışılıyor:** Üzerinde çalışılıyor. **Yapıldı:** Somut değişiklik ve dosya/sürüm bilgisi kaydedildi. |
+| **Test** | **Bekliyor:** İlgili oyun akışı henüz yeni sürümde sınanmadı. **Geçti/Kaldı:** Sonuç ve sürüm aşağıdaki günlüğe yazıldı. |
+| **Senin incelemen** | **Bekliyor:** Sana sunulduğunda bile onay verilmiş sayılmaz. **Revizyon istendi:** Beğenilmeyen veya eksik yön açıkça kaydedilir. **Onaylandı:** Yalnızca sen açıkça beğendiğini söylediğinde yazılır. |
+
+Bir işin gerçekten kapanması için **Kod: Yapıldı**, **Test: Geçti** ve **Senin incelemen: Onaylandı** birlikte gerekir. Örneğin “**FT-015 yeniden aç: kaydırma çubuğu yok**” veya “**FT-052'yi beğenmedim, şöyle değiştir...**” demen yeterli. Revizyonlar aynı ID altında izlenir; yeni bir istekse yeni ID eklenir. Her tamamlandı iddiasına sürüm, değişen alan, nasıl sınandığı ve varsa senin geri bildirimin günlüğe eklenir.
+
+İncelemeni bekleyenler üstte, revizyonlar ve açık işler ortada, onayladıkların en altta. ID'ler değişmez.
+
+## İncelemeni bekleyenler (17)
+
+| ID | Alan | İş / kabul beklentisi | Kaynak | Kod | Test | Senin incelemen |
+| --- | --- | --- | --- | --- | --- | --- |
+| FT-032 | Yeni oyun, senaryo ve anlatıcı | Koloni ve yerleşke adını başlangıç formunda zorunlu seçtirme; oyunda kolonistler arası sosyal olayla adlandırma gelsin. | S1/8, S1/11 | Yapıldı | Geçti | Bekliyor |
+| FT-040 | Gezegen, dünya seçimi ve harita üretimi | Dünya görünümündeki gezegen döndürülebilsin; dönüş akıcı olsun. | S2/dünya, S3/dünya | Yapıldı | Geçti | Revizyon istendi |
+| FT-041 | Gezegen, dünya seçimi ve harita üretimi | Seçilen bölgenin biyom, arazi, takvim, yerel mevsimler, yıllık yetiştirme dönemi ve mevsimsel sıcaklık aralığını anlaşılır ve birbiriyle tutarlı göster. | S2/dünya; 29 Eylül mevsim geri bildirimi | Yapıldı | Geçti | Revizyon istendi |
+| FT-050 | Kolonist hazırlama ve ilişkiler | Görünüş düzenini EdB Prepare Carefully fikrine yakın, doğrudan seçilebilir listeler/paletlerle kur; her alanı ileri/geri oklarına zorunlu bağlama. | S1/9; 29 Eylül revizyonu | Yapıldı | Geçti | Revizyon istendi |
+| FT-083 | Oyun ekranı, bilgi ve gezinme | Orders menüsü alt şeridin **üstünde** açılsın ve boş yere tıklayınca kapansın. | S1/11 | Yapıldı | Geçti | Bekliyor |
+| FT-085 | Oyun ekranı, bilgi ve gezinme | Alt Trade sekmesini kaldır; ticaret karakter etkileşimiyle açılsın. | S1/11, S3/trade tab | Yapıldı | Geçti | Bekliyor |
+| FT-091 | Seçim, kontroller ve komutlar | Space duraklatma, 1/2/3 ilgili hızlar için çalışsın. | S3/temel kontroller | Yapıldı | Geçti | Bekliyor |
+| FT-092 | Seçim, kontroller ve komutlar | R ile seçili/ilgili kolonistleri topluca savaş hazırlığına alma ve C ile emir listesini temizleme kısayolları eklensin. | S3/kısayollar | Yapıldı | Geçti | Bekliyor |
+| FT-100 | Seçim, kontroller ve komutlar | Kolonist eylemleri sağ tık menüsüne yığılmasın; seçim alanının yanında / altında küçük bağlamsal düğmelerle sunulsun. | S1/11 | Yapıldı | Geçti | Bekliyor |
+| FT-110 | Kolonist bilgisi, sağlık ve sosyal yaşam | Health yalnızca seçili kolonistin bilgi penceresindeki ayrı sekme olsun. | S1/11 | Yapıldı | Geçti | Bekliyor |
+| FT-143 | 29 Eylül geri bildirimi | Yapılamayan emir ve üst sağ uyarıları için duyulabilir, ölçülü bir hata sesi ekle. | FT-018 ek ses geri bildirimi | Yapıldı | Geçti | Bekliyor |
+| FT-144 | 29 Eylül geri bildirimi | Oyun saatinin, gün döngüsünün ve hız kontrollerinin işleyişini RimWorld resmî kaynaklarıyla karşılaştırıp Foxtopia için tutarlı hale getir. | Son saat geri bildirimi | Yapıldı | Geçti | Bekliyor |
+| FT-145 | 29 Eylül geri bildirimi | Oyun içindeki ağır FPS düşüşünün nedenini ölç ve oynanışta iyileştir. | Son FPS geri bildirimi | Yapıldı | Geçti | Bekliyor |
+| FT-146 | 29 Eylül geri bildirimi | Tek oyunculuda Esc menüsü açılırken oyun dursun; kapanınca önceki hız durumuna dönsün. | FT-133 ek geri bildirim | Yapıldı | Geçti | Bekliyor |
+| FT-147 | 29 Eylül geri bildirimi | Birden fazla monitörde Görüntü ayarından ekran seç; pencere/tam ekran modunda uygula ve yeniden açılışta koru. | Son ekran seçimi isteği | Yapıldı | Geçti | Bekliyor |
+| FT-149 | 29 Eylül geri bildirimi | Space yalnızca oyunu duraklatsın veya sürdürsün; Architect menüsünü aynı anda açmasın. | 29 Eylül tuş çakışması | Yapıldı | Geçti | Revizyon istendi |
+| FT-150 | 29 Eylül geri bildirimi | Üst portrelerden ilk kolonist seçilince son portrede sahte mavi seçim vurgusu kalmasın. | 29 Eylül portre vurgusu | Yapıldı | Geçti | Revizyon istendi |
+
+## Revizyon istediklerin (1)
+
+| ID | Alan | İş / kabul beklentisi | Kaynak | Kod | Test | Senin incelemen |
+| --- | --- | --- | --- | --- | --- | --- |
+| FT-008 | Ana menü, görsel kimlik ve ayarlar | Yeni oyun ekranından itibaren bütün hazırlık menülerini ana menünün kalite ve görsel diliyle yeniden düzenle. | S3/menüler | Çalışılıyor | Kaldı | Revizyon istendi |
+
+## Açık ve çalışılan işler (95)
+
+| ID | Alan | İş / kabul beklentisi | Kaynak | Kod | Test | Senin incelemen |
+| --- | --- | --- | --- | --- | --- | --- |
+| FT-026 | Yeni oyun, senaryo ve anlatıcı | Kullanıcının kendi başlangıç senaryosunu düzenleyebileceği senaryo editörü ekle. | S3/senaryo | Açık | Bekliyor | Bekliyor |
+| FT-027 | Yeni oyun, senaryo ve anlatıcı | Anlatıcı portrelerini, baktıkları yöne uyacak şekilde sol tarafa al. | S3/storyteller | Açık | Bekliyor | Bekliyor |
+| FT-028 | Yeni oyun, senaryo ve anlatıcı | Anlatıcı seçimi ekranının görsel düzenini yenile. | S3/storyteller | Açık | Bekliyor | Bekliyor |
+| FT-029 | Yeni oyun, senaryo ve anlatıcı | Başlangıçta normal kayıt ile kalıcı ölüm (permadeath) seçimi sun. | S3/kayıt modu | Açık | Bekliyor | Bekliyor |
+| FT-030 | Yeni oyun, senaryo ve anlatıcı | Kalıcı ölüm modunda son kolonist ölünce oyun kaybedilmiş sayılsın. | S3/kayıt modu | Açık | Bekliyor | Bekliyor |
+| FT-031 | Yeni oyun, senaryo ve anlatıcı | “Hazır mısın?” adımını kaldır veya akışa uygun, gereksiz durak yaratmayan biçimde yeniden tasarla. | S1/10 | Açık | Bekliyor | Bekliyor |
+| FT-033 | Gezegen, dünya seçimi ve harita üretimi | Gezegen önizlemesi döndürülürken takılma / düşük FPS hissini gider; hem oluşturma hem iniş bölgesi ekranında dene. | S3/dünya döndürme | Açık | Bekliyor | Bekliyor |
+| FT-034 | Gezegen, dünya seçimi ve harita üretimi | Seed girişinde Enter'a basılması gerekiyorsa bunu göster; tercihen değişiklik doğrudan ve anlaşılır biçimde uygulansın. | S3/seed | Açık | Bekliyor | Bekliyor |
+| FT-035 | Gezegen, dünya seçimi ve harita üretimi | Dünya oluşturma ekranındaki küçük “Your Planet” önizlemesinde gereksiz karo tıklamasını kaldır. | S3/önizleme | Açık | Bekliyor | Bekliyor |
+| FT-036 | Gezegen, dünya seçimi ve harita üretimi | “Gelişmiş” dünya ayarlarında yerel harita boyutunu küçük/orta/büyük seçtir; yalnızca 50×50 ile sınırlama. | S3/harita boyutu | Açık | Bekliyor | Bekliyor |
+| FT-037 | Gezegen, dünya seçimi ve harita üretimi | İniş bölgesi dünya görünümünü tam ekran harita yap; üst yazı ve kalıcı yan/alt panelleri kaldır. | S1/7 | Açık | Bekliyor | Bekliyor |
+| FT-038 | Gezegen, dünya seçimi ve harita üretimi | Dünya üretiminde birbirine bağlı kıtalar, topraklar, deniz ve okyanuslar oluştur; dağınık tek pikselli görünümü gider. | S1/7 | Açık | Bekliyor | Bekliyor |
+| FT-042 | Gezegen, dünya seçimi ve harita üretimi | Seçilen karonun yerel haritasını küçük önizlemede göster; önizleme oyunda açılan haritayla eşleşsin. | S2/dünya ve mini harita | Açık | Bekliyor | Bekliyor |
+| FT-043 | Gezegen, dünya seçimi ve harita üretimi | Farklı faksiyon türlerini (tüccar, imparatorluk kalıntısı, korsan vb.) dünya hazırlığında göster; küçük gezegen önizlemesinin yerleşimini buna göre düzelt. | S3/faksiyonlar | Açık | Bekliyor | Bekliyor |
+| FT-044 | Gezegen, dünya seçimi ve harita üretimi | Başka faksiyonlara yaklaşık 5–10 karo yakın yerleşmenin zamanla ilişkiyi bozması ve düşmanlığa yol açması için açık, dengeli kural kur. | S3/faksiyon yakınlığı | Açık | Bekliyor | Bekliyor |
+| FT-045 | Gezegen, dünya seçimi ve harita üretimi | Dünya ekranındaki ikonları yeni görsel dille değiştir. | S3/dünya ikonları | Açık | Bekliyor | Bekliyor |
+| FT-046 | Gezegen, dünya seçimi ve harita üretimi | Dünya karolarının sınırlarını ve özellikle seçili karoyu daha belirgin göster. | S3/dünya karoları | Açık | Bekliyor | Bekliyor |
+| FT-047 | Gezegen, dünya seçimi ve harita üretimi | Yerel oyunda nehir/göl gibi bütünlüklü arazi üret; rastgele, sert geçişli karo desenlerini gider. | S1/11, S2/mini harita | Açık | Bekliyor | Bekliyor |
+| FT-048 | Gezegen, dünya seçimi ve harita üretimi | Yerel haritadaki çimlerin ölçeğini ağaç ve diğer nesnelerle tutarlı yap. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-049 | Kolonist hazırlama ve ilişkiler | Kolonist hazırlama ekranının genel akışını ve görünümünü EdB Prepare Carefully fikrinden yararlanarak Foxtopia'ya özgü biçimde yeniden kur. | S1/9, S2/karakter, S3/kolonist | Açık | Bekliyor | Bekliyor |
+| FT-051 | Kolonist hazırlama ve ilişkiler | Başlangıç karakterinde cinsiyet seçimi açık ve tek anlamlı olsun; aynı ekranda çakışan sex/gender alanları bulunmasın. | S1/9, S3/sex-gender | Açık | Bekliyor | Bekliyor |
+| FT-052 | Kolonist hazırlama ve ilişkiler | Başlangıç sağlık durumları seçilebilsin ve seçimin oyun verisine etkisi olsun. | S1/9 | İnceleme gerekli | Bekliyor | Bekliyor |
+| FT-053 | Kolonist hazırlama ve ilişkiler | Birden fazla kişilik özelliği seçilebilsin; özellikler anlaşılır açılır seçimde görünsün. | S1/9, S3/traitler | Açık | Bekliyor | Bekliyor |
+| FT-054 | Kolonist hazırlama ve ilişkiler | Olumlu/olumsuz özelliklerle değişen anlamlı puan bütçesi uygula; sınır isteğe bağlı kapatılabilsin. | S1/9, S3/puanlar | Açık | Bekliyor | Bekliyor |
+| FT-055 | Kolonist hazırlama ve ilişkiler | Değiştirilen kişilik özelliği başlangıç ekibi özetinde hemen güncellensin. | S1/9 | Açık | Bekliyor | Bekliyor |
+| FT-056 | Kolonist hazırlama ve ilişkiler | Becerilerde passion / ilgi düzeylerini seçtir ve oynanışa etkisini göster. | S3/skill passion | Açık | Bekliyor | Bekliyor |
+| FT-057 | Kolonist hazırlama ve ilişkiler | Özelliklerin becerilere etkisi görünür ve tutarlı olsun. | S3/trait-beceri | Açık | Bekliyor | Bekliyor |
+| FT-058 | Kolonist hazırlama ve ilişkiler | Çocukluk ve yetişkinlik geçmişlerinin becerilere ve karaktere etkisini uygula. | S3/childhood-adulthood | Açık | Bekliyor | Bekliyor |
+| FT-059 | Kolonist hazırlama ve ilişkiler | Bozuk karakter görünüş varyantlarını düzelt; önizleme ve oyundaki görünüş eşleşsin. | S3/görünüş | Açık | Bekliyor | Bekliyor |
+| FT-060 | Kolonist hazırlama ve ilişkiler | Kolonist hazırlama alanlarını hizalı ve okunabilir yerleştir. | S3/hizalama | Açık | Bekliyor | Bekliyor |
+| FT-061 | Kolonist hazırlama ve ilişkiler | Başlangıç ekranında kolonist ekleme ve silme işlevleri olsun. | S3/kolonist sayısı | Açık | Bekliyor | Bekliyor |
+| FT-062 | Kolonist hazırlama ve ilişkiler | Karşılaşılabilecek dünya karakterleri de başlangıçta düzenlenebilsin. | S3/world pawn | Açık | Bekliyor | Bekliyor |
+| FT-063 | Kolonist hazırlama ve ilişkiler | İlişkiler yalnızca kolonistler arasında sınırlı kalmasın; dünya karakterleri arasında ve kolonistlerle ilişkiler kurulabilsin. | S3/relationships | Açık | Bekliyor | Bekliyor |
+| FT-064 | Kolonist hazırlama ve ilişkiler | Karakter/ekip hazır ayarları ayrı liste ekranında birden fazla adla kaydedilip yüklenebilsin. | S3/preset | Açık | Bekliyor | Bekliyor |
+| FT-065 | Kolonist hazırlama ve ilişkiler | Başlangıç ekipmanına istenen kadar ücretsiz eşya eklenemesin; miktar ve değer puan bütçesine işlensin. | S3/equipment point | Açık | Bekliyor | Bekliyor |
+| FT-066 | Oyun ekranı, bilgi ve gezinme | Oyun içindeki üst “Foxtopia” yazısını kaldır. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-068 | Oyun ekranı, bilgi ve gezinme | Malzemeleri ekran kenarında, üstten alta dikey ve harita üstü katman olarak göster; kullanıcı sağ taraf istemiştir. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-069 | Oyun ekranı, bilgi ve gezinme | Malzeme listesi boyutu ayardan değişsin ve biraz daha büyük okunabilsin. | S3/material list | Açık | Bekliyor | Bekliyor |
+| FT-070 | Oyun ekranı, bilgi ve gezinme | Malzemeler kategoriye göre daraltılıp açılabilsin. | S3/material list | Açık | Bekliyor | Bekliyor |
+| FT-073 | Oyun ekranı, bilgi ve gezinme | “Merkeze git” düğmesini kaldır. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-074 | Oyun ekranı, bilgi ve gezinme | Yakınlaştırma üst sınırını artır; Zoom In daha yakına gelebilsin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-075 | Oyun ekranı, bilgi ve gezinme | Hız düğmelerini sol alta ve biraz yukarı taşı; tarih hız düğmelerinin üstünde görünsün. | S1/11, S3/saat-hız | Açık | Bekliyor | Bekliyor |
+| FT-076 | Oyun ekranı, bilgi ve gezinme | 1x hızın akışını belirgin biçimde yavaşlat ve hız kademelerini tutarlı yap. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-077 | Oyun ekranı, bilgi ve gezinme | Saat/hız çevresinde sıcaklık ve çatı görünümü gibi temel bilgi/görünüm düğmeleri olsun. | S3/temperature-roofs | Açık | Bekliyor | Bekliyor |
+| FT-078 | Oyun ekranı, bilgi ve gezinme | “Oyun duraklatıldı/kaydedildi” bildirimleri ekranda sürekli durmasın; kısa ve anlaşılır görünsün. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-079 | Oyun ekranı, bilgi ve gezinme | “Research bench needed” uyarısını tarihin üstündeki uyarı alanına taşı; diğer olaylara yer bırak. | S1/11, S3/uyarı | Açık | Bekliyor | Bekliyor |
+| FT-080 | Oyun ekranı, bilgi ve gezinme | Fare altındaki kare karo seçimi işaretini kaldır veya yalnızca gerçekten gerekli bağlamda göster. | S3/karo işareti | Açık | Bekliyor | Bekliyor |
+| FT-081 | Oyun ekranı, bilgi ve gezinme | Kalıcı alt panel yerine kısa kategori sekmeleri ve açılır komut alanları kullan; bütün alt menülerin görsel düzenini iyileştir. | S1/11, S3/alt tabler | Açık | Bekliyor | Bekliyor |
+| FT-082 | Oyun ekranı, bilgi ve gezinme | Designate/Chop Wood dahil ilgili komutlara anlaşılır ikonlar ekle. | S3/designate | Açık | Bekliyor | Bekliyor |
+| FT-084 | Oyun ekranı, bilgi ve gezinme | Taş duvar gibi inşa seçenekleri doğrudan Orders listesinde değil, Construction ve ilgili alt menülerde olsun. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-086 | Oyun ekranı, bilgi ve gezinme | World sekmesi tam ekran, döndürülebilir dünya haritasını ve kendi yerleşkemizi açsın. | S1/11, S3/world tab | Açık | Bekliyor | Bekliyor |
+| FT-087 | Oyun ekranı, bilgi ve gezinme | Oyun içi genel görsel dili, kolonist menüleri dahil tutarlı ve okunabilir biçimde yenile. | S2/oyun içi, S3/karakter menüleri | Açık | Bekliyor | Bekliyor |
+| FT-088 | Seçim, kontroller ve komutlar | Boş haritaya tıklayınca kolonist seçimi ve ilgili menüler kapansın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-089 | Seçim, kontroller ve komutlar | Fareyle sürükleyerek birden fazla kolonist seçilebilsin. | S3/çoklu seçim | Açık | Bekliyor | Bekliyor |
+| FT-090 | Seçim, kontroller ve komutlar | Duvar gibi uzun yapı ve alan emirleri fare sürüklemesiyle yerleştirilebilsin. | S3/duvar sürükleme | Açık | Bekliyor | Bekliyor |
+| FT-093 | Seçim, kontroller ve komutlar | Sık komutlara kısayol ekle; küçültülmüş komut düğmelerinde ikon ve kısayol harfi görünsün. | S3/keybind görünümü | Açık | Bekliyor | Bekliyor |
+| FT-094 | Seçim, kontroller ve komutlar | Seçili kolonistin gideceği yolu ince gri çizgiyle göster. | S3/yol çizgisi | Açık | Bekliyor | Bekliyor |
+| FT-095 | Seçim, kontroller ve komutlar | Kolonistler hücreler arasında ışınlanır gibi sıçramasın; hareket ve yürüyüş animasyonu akıcı olsun. | S1/11, S3/yürüyüş | Açık | Bekliyor | Bekliyor |
+| FT-096 | Seçim, kontroller ve komutlar | Boştaki kolonistler güvenli, doğal kısa dolaşma davranışı göstersin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-097 | Seçim, kontroller ve komutlar | Taşa bağlamsal sağ tıklamada “kaz” gibi yapılabilir iş görünsün. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-098 | Seçim, kontroller ve komutlar | Olmayan mızrağı kuşan gibi imkânsız komutlar görünmesin / çalışmasın. | S1/11, S3/gear | Açık | Bekliyor | Bekliyor |
+| FT-099 | Seçim, kontroller ve komutlar | Savaş hazırlığı aç/kapat tek durumlu düğme olsun; etkin duruma göre eylem yazısı değişsin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-101 | Seçim, kontroller ve komutlar | “Yeni emir önceliği” alanını kaldır; öncelik, ilgili emrin sağ tık küçük menüsünden seçilsin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-102 | Seçim, kontroller ve komutlar | Seçilen emir önceliği sonraki harita işaretlemelerine doğrudan uygulansın ve haritada okunur biçimde görünsün. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-103 | Seçim, kontroller ve komutlar | İş yapan kolonistin yanında küçük ilerleme çubuğu göster. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-104 | Kaynaklar, bölgeler, araştırma ve ticaret | Odun, taş, yiyecek ve gümüş için yerde duran, taşınabilir özgün eşya görselleri oluştur. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-105 | Kaynaklar, bölgeler, araştırma ve ticaret | Taşıyıcılar yerdeki eşyayı doğrudan soyut envantere katmasın; uygun stockpile bölgesine fiziksel olarak bıraksın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-106 | Kaynaklar, bölgeler, araştırma ve ticaret | Stockpile / bölge ayarları Orders altında erişilebilir olsun. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-107 | Kaynaklar, bölgeler, araştırma ve ticaret | Her depolama bölgesine hangi eşya türlerinin bırakılabileceği seçilebilsin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-108 | Kaynaklar, bölgeler, araştırma ve ticaret | Araştırma masası kurulmadan Research sekmesi açılmasın; nedeni uyarıda görünsün ve masa kurulduğunda araştırma açılsın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-109 | Kaynaklar, bölgeler, araştırma ve ticaret | Ticaret, gelen kervanın bir üyesiyle seçili kolonistin konuşup temas etmesiyle açılsın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-111 | Kolonist bilgisi, sağlık ve sosyal yaşam | Needs ayrı sekmede; Bio sekmesinde beceri ve karakter bilgisi bulunsun. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-112 | Kolonist bilgisi, sağlık ve sosyal yaşam | Gear sekmesi silah ve kıyafeti göstersin; “mızrak kuşan/ceket giy” gibi hazır, eşyadan bağımsız düğmeler ve savaş emri burada bulunmasın. | S1/11, S3/gear | Açık | Bekliyor | Bekliyor |
+| FT-113 | Kolonist bilgisi, sağlık ve sosyal yaşam | Needs ekranında ruh hâlini etkileyen olumlu ve olumsuz düşünceler gösterilsin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-114 | Kolonist bilgisi, sağlık ve sosyal yaşam | Aynı tip yaraları tek tek tekrar etmek yerine “Kesik ×3” gibi özetle. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-115 | Kolonist bilgisi, sağlık ve sosyal yaşam | Sağlıkta çıplak sayılar yerine az/orta/ağır/ölümcül gibi anlaşılır şiddet düzeyleri kullan. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-116 | Kolonist bilgisi, sağlık ve sosyal yaşam | Oyun içi görünüş değiştirme, bir mobilyaya yürüyüp etkileşimden sonra açılsın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-117 | Kolonist bilgisi, sağlık ve sosyal yaşam | Karakterler arası diyalog ve sosyal etkileşimler oyunda gerçekleşsin. | S1/Ekstralar | Açık | Bekliyor | Bekliyor |
+| FT-118 | Kolonist bilgisi, sağlık ve sosyal yaşam | Gündüz/gece döngüsü ve ilerleyen saat olsun; oyun sürekli sabah görünmesin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-119 | Baskın ve düşman karakterler | Baskın başlamadan olay uyarısı ver. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-120 | Baskın ve düşman karakterler | Baskıncı haritanın kenarından girsin; ortada aniden belirmesin. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-121 | Baskın ve düşman karakterler | Baskıncılar için hazırlık süresi ve ardından kolonistlere yürüyerek saldırı akışı olsun. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-122 | Baskın ve düşman karakterler | Oyuncu hazırlıkta baskıncıya saldırırsa çatışma erkenden başlasın. | S1/11 | Açık | Bekliyor | Bekliyor |
+| FT-123 | Baskın ve düşman karakterler | Baskıncılar hasar alıp ölebilsin; dövüş sonucu açıkça anlaşılabilsin. | S3/raider | Açık | Bekliyor | Bekliyor |
+| FT-124 | Baskın ve düşman karakterler | Baskıncı adı ve sağlık çubuğu görünür olsun. | S3/raider | Açık | Bekliyor | Bekliyor |
+| FT-125 | Baskın ve düşman karakterler | Düşman karaktere tıklanınca kolonistteki gibi uygun bilgi sekmeleri / küçük inceleme alanı açılsın. | S3/raider | Açık | Bekliyor | Bekliyor |
+| FT-126 | Kayıt, çıkış ve çok oyunculu | “Kayıtlı oyunu aç” doğrudan oyuna atlamasın; kayıtları listeleyen seçim ekranı açsın. | S1/15 | Açık | Bekliyor | Bekliyor |
+| FT-127 | Kayıt, çıkış ve çok oyunculu | Birden fazla ayrı oyun kaydı oluşturma, adlandırma ve yükleme çalışsın. | S1/15 | Açık | Bekliyor | Bekliyor |
+| FT-134 | Kayıt, çıkış ve çok oyunculu | Oyun kurarken port açma / sunucu kurma zorunluluğu yerine oda kodu sistemi kullan. | S1/12 | Açık | Bekliyor | Bekliyor |
+| FT-135 | Kayıt, çıkış ve çok oyunculu | Odaya katılma IP ve port girmeden oda koduyla yapılabilsin. | S1/14 | Açık | Bekliyor | Bekliyor |
+| FT-136 | Kayıt, çıkış ve çok oyunculu | Oyun başladıktan sonra uygun oyuncu var olan oturuma katılabilsin. | S1/13 | Açık | Bekliyor | Bekliyor |
+| FT-137 | Dağıtım ve proje kuralları | GitHub'da yayımlanan açıklamalar İngilizce yazılsın. | S1/Ekstralar | Açık | Bekliyor | Bekliyor |
+| FT-138 | Dağıtım ve proje kuralları | Kaynak kodunun yayımlanma durumunu ve projeye ait lisansı kullanıcının isteğine göre düzelt; yayın paketi ve depo içeriği ayrıca gözden geçirilsin. | S1/Ekstralar | Açık | Bekliyor | Bekliyor |
+| FT-139 | Dağıtım ve proje kuralları | RimWorld ve EdB Prepare Carefully'nin ilgili resmî ekranlarını/mekaniklerini, her büyük yeniden tasarım öncesinde araştır ve Foxtopia'ya özgü uygulama kararını kaydet. | S1/Not, S1/9, S3/kolonist | Açık | Bekliyor | Bekliyor |
+| FT-148 | 29 Eylül geri bildirimi | Oyun içindeki eksik bağlamsal mini menüleri tamamla ve görsel/etkileşim düzenlerini tutarlı hale getir. | 29 Eylül oyun içi menü geri bildirimi | Açık | Bekliyor | Bekliyor |
+
+## Değişiklik ve inceleme günlüğü
+
+| Tarih / sürüm | ID | Ne değişti? | Test kanıtı | Kullanıcı görüşü / sonraki düzeltme |
+| --- | --- | --- | --- | --- |
+| 28.09.2026 / başlangıç | FT-001–FT-139 | Üç sorun bölümü ve son çözünürlük geri bildirimi ayrı işlere aktarıldı. | Oyun içi yeni doğrulama henüz yok. | Hiçbir iş kullanıcı adına onaylanmadı. |
+| 28.09.2026 / yerel çalışma | FT-019, FT-091, FT-092 | Options → Controls içinde yeniden atanabilen kısayollar, kamera/kolonist gezinmesi, zaman ve emir kısayolları eklendi. `game/scripts/ui/settings.gd`, `main.gd`, `map_view.gd`; araştırma kararı `docs/controls-reference.md`. | `keyboard_controls_smoke.gd` geçti; paketli sürümde kullanıcı testi bekleniyor. | Kullanıcı incelemesi bekleniyor. |
+| 28.09.2026 / yerel çalışma | FT-025 | Başlangıç kolonist sayısı senaryoya bağlandı; hazırlık ve ağ kuralları aynı sayıyı kullanıyor. | `setup_rules_regression.gd` ve `preparation_ui_smoke.gd` geçti. | Kullanıcı incelemesi bekleniyor. |
+| 28.09.2026 / yerel çalışma | FT-128–FT-131 | Kayıt silme onayı, otomatik kayıt seçenekleri ve kaydedilmemiş oturumdan çıkış uyarıları eklendi. | `save_management_regression.gd` ve `save_ui_smoke.gd` geçti. | Kullanıcı incelemesi bekleniyor. |
+| 28.09.2026 / yeni bildirim | FT-020, FT-140, FT-141 | Oyun ve kurulumda seçili dil dışına çıkan metinler ile duvara takılan kolonistler ayrı izleniyor. | Düzeltme ve yeni paket testi sürüyor. | Kullanıcı bu davranışları sorun olarak bildirdi. |
+| 28.09.2026 / yerel çalışma | FT-140 | Kolonist, iş ve taşıma hareketi geçilebilir karelerde rota buluyor; duvar değişince rota yenileniyor; kapalı hedefler reddediliyor. `game/scripts/model/game_model.gd`. | `pathfinding_regression.gd`, `model_regression.gd` geçti; yeni kurulumda kullanıcı testi bekleniyor. | Kullanıcı incelemesi bekleniyor. |
+| 28.09.2026 / v0.1.5 yerel kurulum | FT-020, FT-021, FT-141 | İngilizce ekranda Türkçe kalan menü ve oyun metinleri çevrildi; olaylara istemcide çevrilen anahtarlar ve yer adlarına dil karşılıkları eklendi. Setup özel metinleri kurulum dilini izliyor; başlatıcı da seçili dili okuyor. | `localization_regression.gd`, `english_ui_smoke.gd`, Inno Setup derlemesi ve paketli oyunun başlatılması geçti. Kurulum sihirbazının ve tüm oyun akışlarının görsel incelemesi bekliyor. | Kullanıcı incelemesi bekleniyor; geniş yerelleştirme işi açık. |
+| 28.09.2026 / v0.1.5 kullanıcı testi | FT-001–FT-007, FT-009–FT-017 | Ana menü, logo/simge, imleç ve Options ekranının görünüm, çözünürlük ve pencere modu değişiklikleri kullanıcı tarafından denendi. İlgili alanlar `game/scripts/ui/main.gd`, `settings.gd`, `game/project.godot` ve kurulum simgesi. | Kullanıcı her ID için açıkça “GEÇTİ” dedi. | Bu maddeler onaylandı ve kapatıldı. |
+| 28.09.2026 / v0.1.5 kullanıcı testi | FT-019–FT-021, FT-023–FT-025 | Tuş atamaları, oyun/yer adı yerelleştirmesi, zorluk/dünya ayarları ve senaryoya bağlı kolonist sayısı kullanıcı tarafından denendi. İlgili alanlar `game/scripts/ui/main.gd`, `settings.gd`, `i18n.gd`, `game/scripts/model/setup_catalog.gd`. | Kullanıcı her ID için açıkça “GEÇTİ” dedi. | Bu maddeler onaylandı ve kapatıldı. |
+| 28.09.2026 / v0.1.5 kullanıcı testi | FT-008, FT-018, FT-022 | Hazırlık ekranlarının tasarımı tamamlanmamış; oyunda ses duyulmuyor; senaryo açıklamaları kısa. | Kullanıcı FT-008 için “YAPILMAMIŞ”, FT-018 için “SES YOK OYUNDA KALDI”, FT-022 için “AÇIKLAMALAR KISA” dedi. | Üç madde revizyona alındı; yeniden oyuncu testine sunulacak. |
+| 28.09.2026 / durum ayrımı | FT-026 ve sonrası | Henüz toplu onay verilmedi. Kaynak incelemesinde bazı işler kısmen bulunuyor, bazıları hiç yapılmamış; her ID ayrı doğrulanacak. | Kullanıcı “sanırım buradan sonrakilerin hiçbiri yapılmamış” değerlendirmesini iletti; toplu test yapılmadı. | Açık veya inceleme bekleyen durumlar korunuyor. |
+| 28.09.2026 / v0.1.6 yerel kurulum | FT-008, FT-022 | Hazırlık akışının altı adımında ortak Foxtopia logosu, koyu zemin ve altın tonlu kontroller kullanılıyor; senaryolara İngilizce, Türkçe ve Lehçe daha uzun hikâye, ilk günler, koşullar ve malzeme bölümleri eklendi. `game/scripts/ui/main.gd`, `game/scripts/model/setup_catalog.gd`. | 1920×1080 ve 960×540 ekran görüntülerinde taşma görülmedi; UI, hazırlık ve senaryo testleri geçti; v0.1.6 paketli oyun açıldı. | Eski sürümdeki ret kaydı korunuyor; yeni tasarım ve açıklamalar kullanıcı incelemesini bekliyor. |
+| 28.09.2026 / v0.1.6 yerel kurulum | FT-018 | Özgün menü/oyun müzikleri ve arayüz/olay efektleri eklendi; ses ayarları anlık önizlenip İptal'de geri alınıyor. `game/scripts/audio/audio_director.gd`, `game/assets/audio`, `game/scripts/ui/main.gd`. | `audio_smoke.gd` geçti; yerel WASAPI çıkışında çalma konumu ilerledi ve Music sinyali yaklaşık −15 dB ölçüldü. v0.1.6 paketli oyun açıldı. | Kullanıcının gerçek dinleme testi bekleniyor; eski “ses yok” ret kaydı henüz kapatılmadı. |
+| 28.09.2026 / Steam görselleri | FT-142 | Üç özgün Foxtopia sahnesi ve mevcut tilki simgesiyle dört son görsel `marketing/steam` altında hazırlandı. Promptlar ve düzenlenebilir logo kaynakları aynı klasörde. | PNG ölçüleri sırasıyla 600×900, 3840×1240, 1280×720 ve 920×430 doğrulandı; kapaklar gözle incelendi. | Kullanıcı görsel incelemesi bekleniyor. |
+| 29.09.2026 / v0.1.6 kullanıcı testi | FT-018, FT-022, FT-128–FT-133, FT-140–FT-142 | Ses, genişletilmiş senaryo anlatımları, kayıt/çıkış akışları, yol bulma, kurulum dili ve Steam görselleri kullanıcı tarafından incelendi. | Kullanıcı her ID için açıkça “Geçti” dedi. | Maddeler onaylandı; FT-143 hata sesi ve FT-146 Esc ile duraklatma ek talepleri ayrı izlendi. |
+| 29.09.2026 / v0.1.6 kullanıcı testi | FT-008 | Tek oyunculuda gereksiz mod ekranı, karışık Narrator/Storyteller etiketi, dünya bölgesi panelinde kaydırma ve hizalama, yetersiz kolonist hazırlama görünümü ve adlandırma/kaydetme akışları bildirildi. | Kullanıcı “Ağır Kaldı” dedi. | Madde yeniden açıldı; alt sorunlar düzeltilip yeni sürümde tekrar gösterilecek. |
+| 29.09.2026 / yeni bildirim | FT-144–FT-147 | Oyun saati/hız akışı, ağır FPS sorunu, Esc ile tek oyunculu duraklatma ve çoklu monitör seçimi ayrı takip ediliyor. | Resmî RimWorld/Ludeon kaynak araştırması ve Foxtopia ölçümleri başladı. | Kullanıcı incelemesi bekliyor. |
+| 29.09.2026 / v0.1.7 yerel kurulum | FT-008, FT-032 | Solo mod seçimi atlanıyor; hazırlık paneli dar ekran için yeniden yerleştirildi. Zorunlu adlandırma adımı kaldırıldı; tek kişiyle bile oyun içi olay adlandırma penceresini açıyor, Dünya panelinden sonra da değiştirilebiliyor. Dünya bölgesi alanları hizalandı ve çevrildi. | `preparation_ui_smoke.gd`, `naming_flow_smoke.gd`, `naming_social_regression.gd`, `english_ui_smoke.gd`, 960×540 ve 1920×1080 görüntü incelemesi geçti. | FT-032 kullanıcı incelemesini bekliyor. FT-008 önceki kullanıcı ret durumunda; karakter çizimi ve kapsamı dahil görsel kabul henüz yok. |
+| 29.09.2026 / v0.1.7 yerel kurulum | FT-143, FT-144, FT-146 | Geçersiz emir için özgün ret sesi, yeni üst sağ uyarı için olay sesi; 0×/1×/3×/6× hızlar ve 1000 gerçek saniyelik gün; Esc, adlandırma ve kayıt seçicisinde tek oyunculu duraklatma eklendi. Kayıt üzerine yazmadan önce onay isteniyor. | `audio_smoke.gd`, `time_pause_smoke.gd`, `save_ui_smoke.gd` geçti. Saat kaynağı ve karar [zaman notunda](time-and-performance-reference.md). | Ses ve tempo için gerçek oyun denemesi bekleniyor. |
+| 29.09.2026 / v0.1.7 yerel kurulum | FT-145, FT-147 | Yerel kopyalama/HUD maliyeti azaltıldı ve zemin çizimi hareketli varlıklardan ayrıldı. Görüntü ayarına monitör seçimi, seçili ekranın doğal çözünürlüğü, geçersiz ekran için geri dönüş ve dar pencerede okunur ölçek eklendi. Çözünürlük listesi seçili monitöre sığan değerleri gösteriyor. | RTX 2080 üzerinde 1920×1080 komutlu görsel ölçüm 19,53→8,40 ms/kare; `display_modes_smoke.gd` iki gerçek monitörde pencereli, çerçevesiz ve tam ekran geçişini geçti. Paketli `Foxtopia.exe` başlatıldı; `Foxtopia-Setup-v0.1.7.exe` ve güncelleme arşivi aynı derlemeden üretildi, arşiv SHA-256 değeri manifestle eşleşti. | FPS ölçümü bir örnek sahnede; kullanıcının kendi oyunu ve 4K monitör incelemesi bekleniyor. GitHub Release henüz yayımlanmadı. |
+| 29.09.2026 / v0.1.7 son görsel geçiş | FT-008, FT-049, FT-051, FT-059, FT-060 | Kolonist çizimlerine yüz, saç ve kıyafet ayrıntıları eklendi; hazırlık ekranında renk paletleri, geçmiş ve sağlık açıklamaları, beceri göstergeleri ve Biyoloji/Kimlik ayrımı var. Dokunulmamış beceriler Otomatik kalıyor ve geçmiş bonuslarını ezmiyor. | `preparation_ui_smoke.gd`, `preparation_background_smoke.gd`, `english_ui_smoke.gd`, `model_regression.gd` geçti; 1920×1080 ve 960×540 hazırlık görüntüleri ile portre/harita ölçeğindeki beş saç çeşidi incelendi. | FT-008'in önceki ret durumu korunuyor; yeni görünüm kullanıcı incelemesini bekliyor. Karakter hazırlama kapsamındaki açık maddeler toptan kapanmadı. |
+| 29.09.2026 / 4K boyutlu pencere denemesi | FT-015, FT-147 | 3840×2160 boyutlu pencereye ana menü ve oyun içi sahne çizdirildi. | Her iki PNG 3840×2160 kaydedildi; görsel incelemede sol veya sağ siyah bant görülmedi. Bilgisayara bağlı ekranlar 1920×1080 ve 1280×720. | Gerçek 4K monitörde ve kurulu oyunda inceleme yine gerekli. |
+| 29.09.2026 / kullanıcı testi | FT-008, FT-039–FT-041, FT-050, FT-067, FT-071–FT-072, FT-148–FT-150 | Yeni hazırlık/oyun içi menüler, gezegen ve bölge bilgileri ile klavye/portre seçimi yeniden değerlendirildi. | Kullanıcı FT-039, FT-067, FT-071 ve FT-072 için “Geçti”; FT-008 ve FT-040 için “Kaldı”; FT-041 için takvim/mevsim/sıcaklık revizyonu; FT-050 için “Ağır kaldı” dedi. Space çakışması ve son portrede mavi iz ayrıca bildirildi. | Geçen dört iş onaylandı. Diğerleri revizyona açıldı. İnceleme bekleyenler listenin başına, onaylılar sonuna taşındı. |
+
+**Önemli karar notu:** Projedeki `docs/ui-reference.md` malzeme listesini solda tarif ediyor; kullanıcı S1/11'de sağ tarafta istiyor. Uygulama sırasında bu fark kullanıcı isteğine göre çözülmeli. Benzer biçimde eski mekanik notundaki elle seçilen 1/2/3 başlangıç sayısı, S3'teki senaryoya bağlı sayı isteğiyle güncellenecek.
+| 29.09.2026 / v0.1.8 kod doğrulaması | FT-040, FT-041, FT-050, FT-149, FT-150 | Küre çizimi bir ağ üzerinden yapılıyor; bölge iklimi 60 günlük takvim ve dönemlere göre sıcaklık/ekim aralıklarıyla gösteriliyor; görünüş ve geçmiş doğrudan listeden seçiliyor; Space/portre vurgusu çakışmaları giderildi. | Küre dönüşü aynı 120 karelik RTX 2080 ölçümünde 77,3→6,5 ms/kare; yalıtılmış 4K testinde 6,5 ms/kare. `climate_calendar_smoke.gd`, `world_preview_regression.gd`, `preparation_picker_smoke.gd`, `portrait_input_regression.gd`, `keyboard_controls_smoke.gd`, `time_pause_smoke.gd` geçti; 1920×1080 ve 960×540 iklim/hazırlık görüntüleri incelendi. | Önceki ret kayıtları saklanıyor; yeni sürümde kullanıcının 4K oyun denemesi ve görsel incelemesi bekleniyor. |
+| 29.09.2026 / v0.1.8 oyun içi menü geçişi | FT-083, FT-085, FT-100, FT-110 | Architect emir alanı alt sekmelerin üstünde açılıyor ve boş harita tıklamasında kapanıyor. Genel Health/Trade sekmeleri kaldırıldı; Sağlık seçili kolonistin sekmesinde, kervan ticareti kolonist etkileşiminde. Koloniste Move/Work/Haul/Attack/Trade hedef düğmeleri eklendi. | `mini_menus_smoke.gd`, `ui_smoke.gd`, `english_ui_smoke.gd` geçti; 1600×900 ve 960×540 ekran görüntüleri incelendi. | FT-008, FT-081 ve FT-148 açık; tüm mini menüler henüz yenilenmedi. Yeni dört iş kullanıcı incelemesini bekliyor. |
+
+## Onayladıkların (37)
+
+| ID | Alan | İş / kabul beklentisi | Kaynak | Kod | Test | Senin incelemen |
+| --- | --- | --- | --- | --- | --- | --- |
+| FT-001 | Ana menü, görsel kimlik ve ayarlar | Ana menü arka planını oyunun çizgi film / 2D görsel diline uygun yeniden tasarla. | S1/3 | Yapıldı | Geçti | Onaylandı |
+| FT-002 | Ana menü, görsel kimlik ve ayarlar | Ana menüdeki üst sloganı ve altındaki çizgiyi kaldır. | S1/4 | Yapıldı | Geçti | Onaylandı |
+| FT-003 | Ana menü, görsel kimlik ve ayarlar | Ana menü düğmelerinin üzerindeki gereksiz yazıları kaldır veya sadeleştir. | S1/5 | Yapıldı | Geçti | Onaylandı |
+| FT-004 | Ana menü, görsel kimlik ve ayarlar | Foxtopia logosunu ana menü düğmelerinin üzerinde görünür kıl. | S2/ana menü | Yapıldı | Geçti | Onaylandı |
+| FT-005 | Ana menü, görsel kimlik ve ayarlar | Ana menü düğmelerini daha küçük, uygun renkli ve gölgeli bir görsel düzene getir. | S2/ana menü | Yapıldı | Geçti | Onaylandı |
+| FT-006 | Ana menü, görsel kimlik ve ayarlar | Tek oyunculuya basılınca açılan ekranı ana menünün yaklaşık yarısını kaplayan bir görünüme çevir. | S1/6 | Yapıldı | Geçti | Onaylandı |
+| FT-007 | Ana menü, görsel kimlik ve ayarlar | Ana menüdeki Single / Multi ayrımını bir **New Game** girişinde birleştir; mod seçimini sonraki adımda göster. | S2/ana menü | Yapıldı | Geçti | Onaylandı |
+| FT-009 | Ana menü, görsel kimlik ve ayarlar | Ana menüdeki yuvarlak tilki simgesini Windows görev çubuğu ve kısayolda da doğru göster. | S2/simge | Yapıldı | Geçti | Onaylandı |
+| FT-010 | Ana menü, görsel kimlik ve ayarlar | Oyuna özgü fare imleci ekle. | S3/imleç | Yapıldı | Geçti | Onaylandı |
+| FT-011 | Ana menü, görsel kimlik ve ayarlar | Ana menüden erişilen kapsamlı Options ekranı bulunmalı. | S1/1 | Yapıldı | Geçti | Onaylandı |
+| FT-012 | Ana menü, görsel kimlik ve ayarlar | Options ekranı herhangi bir tuşa basınca kendiliğinden kapanmamalı. | S2/options | Yapıldı | Geçti | Onaylandı |
+| FT-013 | Ana menü, görsel kimlik ve ayarlar | Options ekranının yerleşimini ve okunabilirliğini baştan ele al. | S2/options | Yapıldı | Geçti | Onaylandı |
+| FT-014 | Ana menü, görsel kimlik ve ayarlar | Küçük monitörden 4K/8K'ya ve etkin monitörün doğal boyutuna uygun çözünürlükleri sun. | S1/1, S2/çözünürlük | Yapıldı | Geçti | Onaylandı |
+| FT-015 | Ana menü, görsel kimlik ve ayarlar | Çözünürlük listesini kısa tut; kaydırma çubuğu görünür ve son seçeneğe erişilebilir olsun. | Son geri bildirim | Yapıldı | Geçti | Onaylandı |
+| FT-016 | Ana menü, görsel kimlik ve ayarlar | Tam ekran, çerçevesiz ve pencereli modlar ile seçilen çözünürlük gerçekten çalışsın; çerçevesizde de boyut seçilebilsin. | S1/1, S2/options ve çözünürlük | Yapıldı | Geçti | Onaylandı |
+| FT-017 | Ana menü, görsel kimlik ve ayarlar | Ana menüde ekranın iki yanındaki siyah şeritler giderilsin; farklı ekran oranlarında kontrol edilsin. | S1/2, önceki v0.1.4 bildirimi | Yapıldı | Geçti | Onaylandı |
+| FT-018 | Ana menü, görsel kimlik ve ayarlar | Options'a ses düzeyi ve ilgili ses seçeneklerini ekle; ayarlar etkili olsun. | S1/1 | Yapıldı | Geçti | Onaylandı |
+| FT-019 | Ana menü, görsel kimlik ve ayarlar | Options içinde tuş atamalarını görüntüleme ve değiştirme ekranı olsun. | S3/keybinds | Yapıldı | Geçti | Onaylandı |
+| FT-020 | Ana menü, görsel kimlik ve ayarlar | Varsayılan oyun dili İngilizce olsun; ayarlardan Türkçe ve Lehçe seçilebilsin, çeviriler doğal ve tutarlı olsun. | S1/Ekstralar, son geri bildirim/oyun dili | Yapıldı | Geçti | Onaylandı |
+| FT-021 | Ana menü, görsel kimlik ve ayarlar | Dünya/yer adı dahil tüm metinler seçili dilden geçsin; İngilizce oyunda “Kızıltepe” gibi çevrilmemiş ad kalmasın. | S3/yer adları | Yapıldı | Geçti | Onaylandı |
+| FT-022 | Yeni oyun, senaryo ve anlatıcı | Yeni oyunda senaryo seçimi ekle ve senaryoları anlamlı biçimde tanıt. | S2/yeni koloni | Yapıldı | Geçti | Onaylandı |
+| FT-023 | Yeni oyun, senaryo ve anlatıcı | Yeni oyunda zorluk seçimi ekle. | S2/yeni koloni | Yapıldı | Geçti | Onaylandı |
+| FT-024 | Yeni oyun, senaryo ve anlatıcı | Dünya üretiminden önce oynanışı etkileyen dünya ayarları seçilebilsin. | S2/yeni koloni | Yapıldı | Geçti | Onaylandı |
+| FT-025 | Yeni oyun, senaryo ve anlatıcı | “Choose how many people will share each colony” seçimini kaldır; başlangıç kolonist sayısı senaryoya bağlı olsun (Landfall 3, Homesteaders 2, Hard Landing 1). | S3/başlangıç | Yapıldı | Geçti | Onaylandı |
+| FT-039 | Gezegen, dünya seçimi ve harita üretimi | Kurulabilir her uygun dünya karosuna tıklayıp yerleşim yeri seçilebilsin. | S1/7 | Yapıldı | Geçti | Onaylandı |
+| FT-067 | Oyun ekranı, bilgi ve gezinme | Yerel harita tüm oyun alanını doldursun; kalıcı büyük paneller haritayı daraltmasın. | S1/11, S2/oyun içi | Yapıldı | Geçti | Onaylandı |
+| FT-071 | Oyun ekranı, bilgi ve gezinme | Kolonist portreleri üst orta bölgede olsun; yüzde yazılı büyük panel yerine portrelerle seçim yapılsın. | S1/11 | Yapıldı | Geçti | Onaylandı |
+| FT-072 | Oyun ekranı, bilgi ve gezinme | Seçilen kolonistin bilgi penceresi alt sekmelerin üstünde bağlamsal açılsın. | S1/11 | Yapıldı | Geçti | Onaylandı |
+| FT-128 | Kayıt, çıkış ve çok oyunculu | Kayıt listesinde var olan kayıt silinebilsin. | S3/load game | Yapıldı | Geçti | Onaylandı |
+| FT-129 | Kayıt, çıkış ve çok oyunculu | Otomatik kayıt olsun; sıklığı ve tutulacak kayıt sayısı Options'tan ayarlansın. | S3/auto save | Yapıldı | Geçti | Onaylandı |
+| FT-130 | Kayıt, çıkış ve çok oyunculu | Kaydedilmemiş değişikliklerle ana menüye dönülürken uyarı çıksın. | S3/çıkış | Yapıldı | Geçti | Onaylandı |
+| FT-131 | Kayıt, çıkış ve çok oyunculu | “Kaydet ve çık” ile “Kaydet ve ana menüye dön” eylemleri sunulsun. | S3/çıkış | Yapıldı | Geçti | Onaylandı |
+| FT-132 | Kayıt, çıkış ve çok oyunculu | Ana menüye dönme düğmesi gerçekten çalışsın. | S1/11 | Yapıldı | Geçti | Onaylandı |
+| FT-133 | Kayıt, çıkış ve çok oyunculu | Esc oyun menüsünü açsın; kayıt/yükleme/ayarlar/çıkış burada erişilebilir olsun. | S1/11 | Yapıldı | Geçti | Onaylandı |
+| FT-140 | Son oyun testinde bildirilen yeni sorunlar | Kolonistler duvara takılmadan geçilebilir karelerden hedefe yol bulsun; erişilemeyen hedeflerde aynı duvara yürümeyi tekrar etmesin. | Son geri bildirim/yol bulma | Yapıldı | Geçti | Onaylandı |
+| FT-141 | Son oyun testinde bildirilen yeni sorunlar | İngilizce seçildiğinde Windows kurulumunun açıklama, görev ve çalıştırma metinleri de İngilizce görünsün; seçilen diğer diller kendi metinlerini göstersin. | Son geri bildirim/setup dili | Yapıldı | Geçti | Onaylandı |
+| FT-142 | Steam görselleri | 600×900 dikey kapak, 3840×1240 arka plan, 1280×720 şeffaf logo ve 920×430 geniş kapak görsellerini Foxtopia kimliğiyle üret. | Son Steam görsel isteği | Yapıldı | Geçti | Onaylandı |

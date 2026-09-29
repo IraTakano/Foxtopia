@@ -2,6 +2,9 @@ extends Node
 class_name GameModel
 
 const SetupCatalog = preload("res://scripts/model/setup_catalog.gd")
+const ClimateCalendar = preload("res://scripts/model/climate_calendar.gd")
+const AUTOSAVE_PREFIX := "autosave_"
+const AUTOSAVE_LIMIT := 20
 
 ## Authoritative, transport-independent game simulation. All values in state are
 ## JSON-compatible so the server can send snapshots and save the same data.
@@ -44,6 +47,12 @@ const SITE_NAMES := ["Çınar", "Kavak", "Akkaya", "Yeşilova", "Güneydere", "K
 var state: Dictionary = {}
 var active_colony_id: String = ""
 var _tick_remainder: float = 0.0
+var _autosave_elapsed: float = 0.0
+var _next_autosave_slot: int = 0
+var _has_unsaved_changes: bool = false
+var _last_saved_slot: String = ""
+var _save_directory_name: String = "saves"
+var _route_cache: Dictionary = {}
 
 var world: Dictionary:
 	get:
@@ -138,7 +147,8 @@ func preview_world(seed_text: String, options: Dictionary = {}) -> Dictionary:
 		})
 	return {"seed": seed_value, "width": WORLD_WIDTH, "height": WORLD_HEIGHT,
 		"tiles": tiles, "elevation": elevations, "rainfall_map": rainfalls,
-		"temperature_map": temperatures, "options": world_options, "sites": sites}
+		"temperature_map": temperatures, "options": world_options, "sites": sites,
+		"calendar": ClimateCalendar.world_calendar()}
 
 
 func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
@@ -165,6 +175,8 @@ func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
 	var elevation := int(elevation_data[index]) if index < elevation_data.size() else 200
 	var rainfall := int(rainfall_data[index]) if index < rainfall_data.size() else 700
 	var temperature := float(temperature_data[index]) if index < temperature_data.size() else 18.0
+	var site_latitude := snappedf((0.5 - (float(y) + 0.5) / float(height)) * 180.0, 0.1)
+	var climate_profile: Dictionary = ClimateCalendar.describe(temperature, site_latitude)
 	var terrain := "Mountainous" if biome == "rocky" and elevation > 700 else "Hilly" if elevation > 450 or biome == "rocky" else "Flat"
 	var coast_direction := ""
 	var nearest_water := 99
@@ -185,10 +197,15 @@ func describe_site(world_data: Dictionary, site_id: String) -> Dictionary:
 		"id": site_id, "name": str(site.get("name", "Unsettled land")), "x": x, "y": y,
 		"kind": str(site.get("kind", "vacant")), "biome": biome,
 		"terrain": terrain, "elevation": elevation, "rainfall": rainfall,
-		"temperature": temperature, "growing_days": clampi(roundi((temperature + 3.0) * 8.0), 0, 60),
+		"temperature": temperature, "temperature_min": climate_profile["temperature_min"],
+		"temperature_max": climate_profile["temperature_max"],
+		"monthly_temperatures": climate_profile["monthly_temperatures"],
+		"season_pattern": climate_profile["season_pattern"],
+		"growing_days": climate_profile["growing_days"],
+		"growing_periods": climate_profile["growing_periods"],
 		"coastal": nearest_water <= 3, "coast_direction": coast_direction if nearest_water <= 3 else "",
 		"stone_types": ["granite", "slate"] if hash_value % 2 == 0 else ["limestone", "sandstone"],
-		"latitude": snappedf((0.5 - (float(y) + 0.5) / float(height)) * 180.0, 0.1),
+		"latitude": site_latitude,
 		"longitude": snappedf(((float(x) + 0.5) / float(width) - 0.5) * 360.0, 0.1),
 	}
 
@@ -217,8 +234,8 @@ func start_new_game(config: Dictionary) -> Dictionary:
 	var mode: String = str(config.get("mode", "solo"))
 	if not mode in ["solo", "coop", "competitive"]:
 		mode = "solo"
-	var count: int = clampi(int(config.get("colonists_per_faction", config.get("colonist_count", 3))), 1, 3)
 	var selected_scenario := str(config.get("scenario_id", "landfall"))
+	var count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, selected_scenario).get("colonist_count", 3))
 	var selected_storyteller := str(config.get("storyteller_id", "steady"))
 	var selected_difficulty := str(config.get("difficulty_id", "frontier"))
 	var generated_world := preview_world(seed_text, config.get("world_options", {}))
@@ -280,7 +297,11 @@ func start_new_game(config: Dictionary) -> Dictionary:
 		"point_limit_enabled": bool(config.get("point_limit_enabled", true)),
 		"research_projects": RESEARCH_PROJECTS.duplicate(true),
 	}
+	_route_cache.clear()
 	_tick_remainder = 0.0
+	_autosave_elapsed = 0.0
+	_next_autosave_slot = 0
+	_last_saved_slot = ""
 	_emit_change()
 	return get_snapshot(1)
 
@@ -334,7 +355,8 @@ func add_late_player(peer_id: int, spec: Dictionary = {}) -> Dictionary:
 		state["colonists"].append(_make_colonist(str(state["seed"]), faction_id, site_id, index, j, person))
 	_apply_starting_relationships(state["colonists"], prepared, first_colonist_index,
 		int(state.get("colonists_per_faction", 3)))
-	_event("player_joined", "%s established a new colony." % faction_name, site_id)
+	_event("player_joined", "%s established a new colony." % faction_name, site_id,
+		"event.player_joined", {"faction_name": faction_name})
 	_emit_change()
 	return _ok({"faction_id": faction_id, "site_id": site_id})
 
@@ -358,7 +380,10 @@ func validate_setup(config: Dictionary) -> Dictionary:
 			return _error("Invalid game setup choice.")
 	var preview := preview_world(str(config.get("seed", "")), config.get("world_options", {}))
 	var selected: Dictionary = {}
-	var count: int = clampi(int(config.get("colonists_per_faction", config.get("colonist_count", 3))), 1, 3)
+	var scenario_count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(config.get("scenario_id", "landfall"))).get("colonist_count", 3))
+	if int(config.get("colonists_per_faction", config.get("colonist_count", scenario_count))) != scenario_count:
+		return _error("Starting crew size must match the selected scenario.")
+	var count: int = scenario_count
 	for raw_spec in config.get("faction_specs", []):
 		if not raw_spec is Dictionary: return _error("Invalid faction setup.")
 		var spec: Dictionary = raw_spec
@@ -541,37 +566,135 @@ func serialize_game() -> Dictionary:
 
 
 func save_game(slot_id: String = "") -> bool:
-	if state.is_empty(): return false
-	if slot_id.is_empty(): slot_id = "save_%d" % Time.get_unix_time_from_system()
-	if not _valid_save_slot(slot_id): return false
-	var save_dir := "user://saves"
-	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(save_dir)) != OK: return false
-	var path := "%s/%s.json" % [save_dir, slot_id]
-	if FileAccess.file_exists(path) and slot_id.begins_with("save_"):
+	if state.is_empty() or not _valid_save_slot(_save_directory_name): return false
+	var generated := slot_id.is_empty()
+	if generated: slot_id = "save_%d" % Time.get_unix_time_from_system()
+	if not _valid_save_slot(slot_id) or slot_id.begins_with(AUTOSAVE_PREFIX): return false
+	if generated:
+		var base_slot := slot_id
 		var suffix := 2
-		while FileAccess.file_exists(path):
-			path = "%s/%s_%d.json" % [save_dir, slot_id, suffix]
+		while FileAccess.file_exists(_save_path(slot_id)):
+			slot_id = "%s_%d" % [base_slot, suffix]
 			suffix += 1
+	if not _write_save_file(slot_id): return false
+	_last_saved_slot = slot_id
+	_has_unsaved_changes = false
+	_autosave_elapsed = 0.0
+	return true
+
+
+func save_autosave(max_count: int = 3) -> bool:
+	if state.is_empty() or max_count <= 0 or not _valid_save_slot(_save_directory_name): return false
+	var count := clampi(max_count, 1, AUTOSAVE_LIMIT)
+	if _next_autosave_slot < 1 or _next_autosave_slot > count:
+		_next_autosave_slot = _select_autosave_slot(count)
+	var slot_id := "%s%02d" % [AUTOSAVE_PREFIX, _next_autosave_slot]
+	if not _write_save_file(slot_id): return false
+	_next_autosave_slot = _next_autosave_slot % count + 1
+	_prune_autosaves(count)
+	_last_saved_slot = slot_id
+	_has_unsaved_changes = false
+	_autosave_elapsed = 0.0
+	return true
+
+
+func advance_autosave(real_delta_seconds: float, interval_minutes: float, max_count: int) -> bool:
+	if state.is_empty() or interval_minutes <= 0.0 or max_count <= 0:
+		_autosave_elapsed = 0.0
+		return false
+	_autosave_elapsed += maxf(real_delta_seconds, 0.0)
+	if _autosave_elapsed < interval_minutes * 60.0: return false
+	_autosave_elapsed = 0.0
+	if not _has_unsaved_changes: return false
+	return save_autosave(max_count)
+
+
+func has_unsaved_changes() -> bool:
+	return _has_unsaved_changes and not state.is_empty()
+
+
+func delete_saved_game(slot_id: String) -> bool:
+	if not _valid_save_slot(slot_id) or not _valid_save_slot(_save_directory_name): return false
+	var path := _save_path(slot_id)
+	if not FileAccess.file_exists(path): return false
+	var removed := DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) == OK
+	if removed and slot_id == _last_saved_slot:
+		_has_unsaved_changes = not state.is_empty()
+		_last_saved_slot = ""
+	return removed
+
+
+func _save_path(slot_id: String) -> String:
+	return "%s/%s.json" % [_save_dir(), slot_id]
+
+
+func _save_dir() -> String:
+	return "user://%s" % _save_directory_name
+
+
+func _write_save_file(slot_id: String) -> bool:
+	if not _valid_save_slot(_save_directory_name): return false
+	var save_dir := _save_dir()
+	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(save_dir)) != OK: return false
+	var path := _save_path(slot_id)
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null: return false
 	file.store_string(JSON.stringify(state))
-	return true
+	file.flush()
+	var wrote := file.get_error() == OK
+	file.close()
+	return wrote
+
+
+func _prune_autosaves(max_count: int) -> void:
+	var dir := DirAccess.open(_save_dir())
+	if dir == null: return
+	for filename in dir.get_files():
+		if not filename.ends_with(".json"): continue
+		var slot_id := filename.trim_suffix(".json")
+		if _autosave_slot_number(slot_id) > max_count:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(_save_path(slot_id)))
+
+
+func _select_autosave_slot(max_count: int) -> int:
+	var oldest_slot := 1
+	var oldest_time := 9223372036854775807
+	for number in range(1, max_count + 1):
+		var path := _save_path("%s%02d" % [AUTOSAVE_PREFIX, number])
+		if not FileAccess.file_exists(path): return number
+		var modified := FileAccess.get_modified_time(path)
+		if modified < oldest_time:
+			oldest_time = modified
+			oldest_slot = number
+	return oldest_slot
+
+
+func _autosave_slot_number(slot_id: String) -> int:
+	if not slot_id.begins_with(AUTOSAVE_PREFIX): return -1
+	var number := slot_id.trim_prefix(AUTOSAVE_PREFIX)
+	if number.length() != 2 or not number.is_valid_int(): return -1
+	return int(number)
 
 
 func list_saved_games() -> Array:
 	var saves: Array = []
-	var dir := DirAccess.open("user://saves")
+	if not _valid_save_slot(_save_directory_name): return saves
+	var dir := DirAccess.open(_save_dir())
 	if dir == null: return saves
 	for filename in dir.get_files():
 		if not filename.ends_with(".json"): continue
-		var path := "user://saves/%s" % filename
+		var slot_id := filename.trim_suffix(".json")
+		if not _valid_save_slot(slot_id): continue
+		var path := _save_path(slot_id)
 		var file := FileAccess.open(path, FileAccess.READ)
 		if file == null: continue
 		var data: Variant = JSON.parse_string(file.get_as_text())
 		if not data is Dictionary or int(data.get("schema", -1)) != 1: continue
+		if not data.get("factions", []) is Array: continue
 		var names: Array = []
 		for faction in data.get("factions", []): names.append(str(faction.get("name", "Colony")))
-		saves.append({"id": filename.trim_suffix(".json"), "saved_at": FileAccess.get_modified_time(path),
+		saves.append({"id": slot_id, "is_autosave": _autosave_slot_number(slot_id) > 0,
+			"saved_at": FileAccess.get_modified_time(path),
 			"seed": str(data.get("seed", "")), "time": int(data.get("time", 0)),
 			"mode": str(data.get("mode", "solo")), "colonies": names})
 	saves.sort_custom(func(a, b): return int(a["saved_at"]) > int(b["saved_at"]))
@@ -588,7 +711,9 @@ func _valid_save_slot(slot_id: String) -> bool:
 
 func load_game(data: Variant = {}) -> bool:
 	var loaded: Variant = data
+	var loaded_slot_id := ""
 	if not (loaded is Dictionary) or loaded.is_empty():
+		if not _valid_save_slot(_save_directory_name): return false
 		var slot_id := str(loaded) if loaded is String else ""
 		if slot_id.is_empty():
 			var saves := list_saved_games()
@@ -596,7 +721,8 @@ func load_game(data: Variant = {}) -> bool:
 		var path := "user://foxtopia_save.json"
 		if not slot_id.is_empty():
 			if not _valid_save_slot(slot_id): return false
-			path = "user://saves/%s.json" % slot_id
+			path = _save_path(slot_id)
+		loaded_slot_id = slot_id
 		var file := FileAccess.open(path, FileAccess.READ)
 		if file == null: return false
 		loaded = JSON.parse_string(file.get_as_text())
@@ -604,15 +730,22 @@ func load_game(data: Variant = {}) -> bool:
 	if int(loaded.get("schema", -1)) != 1: return false
 	if not loaded.has("world") or not loaded.has("factions") or not loaded.has("maps"): return false
 	state = loaded.duplicate(true)
+	_route_cache.clear()
 	_migrate_loaded_state()
 	active_colony_id = str(state["factions"][0]["id"]) if not state["factions"].is_empty() else ""
 	_tick_remainder = 0.0
-	_emit_change()
+	_autosave_elapsed = 0.0
+	_next_autosave_slot = 0
+	_last_saved_slot = loaded_slot_id
+	_emit_change(false)
 	return true
 
 
 func _migrate_loaded_state() -> void:
 	if not state.has("day_length"): state["day_length"] = 600
+	var saved_world: Dictionary = state.get("world", {})
+	if not saved_world.has("calendar"):
+		saved_world["calendar"] = ClimateCalendar.world_calendar()
 	if not state.has("colonists_per_faction"): state["colonists_per_faction"] = 3
 	if not state.has("point_limit_enabled"): state["point_limit_enabled"] = true
 	if not state.has("scenario_id"): state["scenario_id"] = "landfall"
@@ -625,6 +758,12 @@ func _migrate_loaded_state() -> void:
 			faction["name_prompted"] = not str(faction.get("name", "")).begins_with("Unnamed")
 	for site_id in state.get("maps", {}).keys():
 		var map_data: Dictionary = state["maps"][site_id]
+		var previous_info: Dictionary = map_data.get("site_info", {})
+		if not previous_info.has("monthly_temperatures"):
+			var refreshed_info := describe_site(saved_world, str(site_id))
+			if not refreshed_info.is_empty():
+				previous_info.merge(refreshed_info, true)
+				map_data["site_info"] = previous_info
 		if not map_data.has("zones"):
 			map_data["zones"] = [{"id": "zone_1", "kind": "stockpile", "x": 24, "y": 26,
 				"width": 3, "height": 2, "accepts": ITEM_PRICES.keys()}]
@@ -655,8 +794,9 @@ func load_snapshot(snapshot: Dictionary) -> bool:
 	if snapshot.is_empty() or not snapshot.has("world") or not snapshot.has("factions"):
 		return false
 	state = snapshot.duplicate(true)
+	_route_cache.clear()
 	active_colony_id = str(state["factions"][0]["id"]) if not state["factions"].is_empty() else ""
-	_emit_change()
+	_emit_change(false)
 	return true
 
 
@@ -926,13 +1066,18 @@ func _new_id(prefix: String) -> String:
 	return id
 
 
-func _emit_change() -> void:
-	state_changed.emit(state.duplicate(true))
+func _emit_change(mark_unsaved: bool = true) -> void:
+	_has_unsaved_changes = mark_unsaved
+	# Local listeners use this as a read-only view. Network transport and saves
+	# still take their own copies at the boundary where ownership changes.
+	state_changed.emit(state)
 
 
-func _event(kind: String, message: String, site_id: String = "") -> void:
+func _event(kind: String, message: String, site_id: String = "", message_key: String = "",
+		message_args: Dictionary = {}, subject_ids: Array = []) -> void:
 	var item := {"time": int(state["time"]), "kind": kind, "message": message,
-		"site_id": site_id}
+		"site_id": site_id, "message_key": message_key,
+		"message_args": message_args.duplicate(true), "subject_ids": subject_ids.duplicate()}
 	state["events"].append(item)
 	if state["events"].size() > 40: state["events"].pop_front()
 	event_emitted.emit(item.duplicate(true))
@@ -1085,24 +1230,52 @@ func _zone_at(map_data: Dictionary, x: int, y: int) -> Dictionary:
 	return {}
 
 
-func _stockpile_for(map_data: Dictionary, x: int, y: int, item: String) -> Dictionary:
+func _stockpile_for(map_data: Dictionary, x: int, y: int, item: String, reachable_only: bool = false) -> Dictionary:
 	var nearest: Dictionary = {}
 	var best := 99999
+	var walking_distances := _walking_distances(map_data, Vector2i(x, y)) if reachable_only else PackedInt32Array()
 	for zone in map_data.get("zones", []):
 		if not (zone.get("accepts", []) as Array).has(item): continue
 		for zy in range(int(zone["y"]), int(zone["y"]) + int(zone["height"])):
 			for zx in range(int(zone["x"]), int(zone["x"]) + int(zone["width"])):
 				if not _passable(map_data, zx, zy): continue
-				var distance: int = abs(zx - x) + abs(zy - y)
+				var distance: int = int(walking_distances[zy * LOCAL_SIZE + zx]) if reachable_only else abs(zx - x) + abs(zy - y)
+				if distance < 0: continue
 				if distance < best:
 					best = distance
 					nearest = {"zone_id": zone["id"], "x": zx, "y": zy}
 	return nearest
 
 
+func _walking_distances(map_data: Dictionary, origin: Vector2i) -> PackedInt32Array:
+	var distances := PackedInt32Array()
+	distances.resize(LOCAL_SIZE * LOCAL_SIZE)
+	distances.fill(-1)
+	if map_data.is_empty() or origin.x < 0 or origin.x >= LOCAL_SIZE or origin.y < 0 or origin.y >= LOCAL_SIZE:
+		return distances
+	var start_index := origin.y * LOCAL_SIZE + origin.x
+	distances[start_index] = 0
+	var queue := PackedInt32Array([start_index])
+	var head := 0
+	var directions: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+	while head < queue.size():
+		var index: int = queue[head]
+		head += 1
+		var cell := Vector2i(index % LOCAL_SIZE, index / LOCAL_SIZE)
+		for direction in directions:
+			var next: Vector2i = cell + direction
+			if not _passable(map_data, next.x, next.y): continue
+			var next_index := next.y * LOCAL_SIZE + next.x
+			if distances[next_index] >= 0: continue
+			distances[next_index] = distances[index] + 1
+			queue.append(next_index)
+	return distances
+
+
 func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 	var colonist := _owned_colonist(faction_id, str(command.get("colonist_id", "")))
 	if colonist.is_empty() or not colonist["alive"]: return _error("Kolonist bulunamadı.")
+	var colonist_map: Dictionary = state["maps"].get(colonist["site_id"], {})
 	var action: String = str(command.get("action", ""))
 	if not action in ["move", "work", "haul", "equip", "attack", "trade", "style", "clear"]:
 		return _error("Geçersiz doğrudan emir.")
@@ -1123,6 +1296,7 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 				return _error("İş emri bulunamadı.")
 			x = int(order["x"])
 			y = int(order["y"])
+			if not _can_reach(colonist_map, colonist, x, y): return _error("No walkable route to this job.")
 			colonist["manual"] = {"action": "work", "order_id": order["id"]}
 			return _ok()
 		if action == "haul":
@@ -1134,6 +1308,9 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 				return _error("Bu malzemeyi kabul eden bir depolama alanı yok.")
 			x = int(drop["x"])
 			y = int(drop["y"])
+			if not _can_reach(colonist_map, colonist, x, y): return _error("No walkable route to these supplies.")
+			if _stockpile_for(map_data, x, y, str(drop["kind"]), true).is_empty():
+				return _error("No walkable route from these supplies to a stockpile.")
 			colonist["manual"] = {"action": "haul", "drop_id": drop["id"]}
 			return _ok()
 		if action == "trade":
@@ -1147,6 +1324,7 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 				return _error("Tüccar kervanı bulunamadı.")
 			x = int(caravan.get("x", 25))
 			y = int(caravan.get("y", 25))
+			if not _can_reach(colonist_map, colonist, x, y, 1): return _error("No walkable route to the trader.")
 			colonist["manual"] = {"action": "trade", "caravan_id": caravan["id"], "x": x, "y": y}
 			return _ok()
 		if action == "style":
@@ -1157,10 +1335,13 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 					style_table = structure
 					break
 			if style_table.is_empty(): return _error("Styling table not found.")
+			if not _can_reach(colonist_map, colonist, int(style_table["x"]), int(style_table["y"]), 1):
+				return _error("No walkable route to the styling table.")
 			colonist["manual"] = {"action": "style", "x": int(style_table["x"]), "y": int(style_table["y"])}
 			return _ok()
 		if x < 0 or y < 0 or x >= LOCAL_SIZE or y >= LOCAL_SIZE: return _error("Harita dışında.")
 		if not _passable(state["maps"][colonist["site_id"]], x, y): return _error("Bu hücreye gidilemez.")
+		if not _can_reach(colonist_map, colonist, x, y): return _error("No walkable route to this tile.")
 		colonist["manual"] = {"action": "move", "x": x, "y": y}
 		return _ok()
 	if action == "equip":
@@ -1168,7 +1349,7 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 		if not item in ["spear", "jacket"]: return _error("Bu eşya kuşanılamaz.")
 		var inventory: Dictionary = _faction_by_id(faction_id)["inventory"]
 		if int(inventory.get(item, 0)) < 1: return _error("Depoda eşya yok.")
-		var stockpile := _stockpile_for(state["maps"][colonist["site_id"]], int(colonist["x"]), int(colonist["y"]), item)
+		var stockpile := _stockpile_for(colonist_map, int(colonist["x"]), int(colonist["y"]), item, true)
 		if stockpile.is_empty(): return _error("This item has no accessible stockpile.")
 		colonist["manual"] = {"action": "equip", "item": item, "x": stockpile["x"], "y": stockpile["y"]}
 		return _ok()
@@ -1182,6 +1363,8 @@ func _command_direct(faction_id: String, command: Dictionary) -> Dictionary:
 					raider = candidate
 					break
 		if raider.is_empty() or raider["site_id"] != colonist["site_id"]: return _error("Düşman bulunamadı.")
+		if not _can_reach(colonist_map, colonist, int(raider["x"]), int(raider["y"]), 1):
+			return _error("No walkable route to this enemy.")
 		colonist["drafted"] = true
 		colonist["manual"] = {"action": "attack", "target_id": raider["id"]}
 		return _ok()
@@ -1247,7 +1430,9 @@ func _command_trade_offer(faction_id: String, command: Dictionary) -> Dictionary
 	state["trade_offers"].append({"id": offer_id, "from_faction": faction_id,
 		"to_faction": to_faction, "give": give.duplicate(true), "receive": receive.duplicate(true),
 		"status": "pending", "created_at": int(state["time"])})
-	_event("trade_offer", "%s ticaret teklifi gönderdi." % _faction_by_id(faction_id)["name"])
+	var offer_faction_name := str(_faction_by_id(faction_id)["name"])
+	_event("trade_offer", "%s ticaret teklifi gönderdi." % offer_faction_name, "",
+		"event.trade_offer", {"faction_name": offer_faction_name})
 	return _ok({"offer_id": offer_id})
 
 
@@ -1271,7 +1456,7 @@ func _command_trade_accept(faction_id: String, command: Dictionary) -> Dictionar
 		"eta": eta, "cargo_to_target": offer["give"].duplicate(true),
 		"cargo_to_source": offer["receive"].duplicate(true), "offer_id": offer["id"]})
 	offer["status"] = "in_transit"
-	_event("trade_accept", "Ticaret kabul edildi; kervan yola çıktı.")
+	_event("trade_accept", "Ticaret kabul edildi; kervan yola çıktı.", "", "event.trade_accept")
 	return _ok({"eta": eta})
 
 
@@ -1307,7 +1492,7 @@ func _command_npc_trade(faction_id: String, command: Dictionary) -> Dictionary:
 	_change_cargo(stock, sell, 1)
 	faction_inventory["silver"] = int(faction_inventory.get("silver", 0)) + balance
 	stock["silver"] = int(stock.get("silver", 0)) - balance
-	_event("npc_trade", "Tüccarla alışveriş tamamlandı.", str(caravan["site_id"]))
+	_event("npc_trade", "Tüccarla alışveriş tamamlandı.", str(caravan["site_id"]), "event.npc_trade")
 	return _ok({"silver_change": balance})
 
 
@@ -1402,7 +1587,8 @@ func _tick_one_second() -> void:
 		var raid_period := _event_period("raid")
 		if int(state["raid_clock"]) == raid_period - 20:
 			for faction in state["factions"]:
-				_event("raid_warning", "%s yakınlarında düşman izleri görüldü." % faction["settlement_name"], str(faction["site_id"]))
+				_event("raid_warning", "%s yakınlarında düşman izleri görüldü." % faction["settlement_name"],
+					str(faction["site_id"]), "event.raid_warning", {"settlement_name": str(faction["settlement_name"])})
 		if int(state["raid_clock"]) >= raid_period:
 			state["raid_clock"] = -40
 			state["raid_cycle"] = int(state.get("raid_cycle", 0)) + 1
@@ -1442,7 +1628,8 @@ func _tick_colonist(colonist: Dictionary) -> void:
 		colonist["alive"] = false
 		colonist["current_order"] = ""
 		colonist["manual"] = {}
-		_event("death", "%s hayatını kaybetti." % colonist["name"], str(colonist["site_id"]))
+		_event("death", "%s hayatını kaybetti." % colonist["name"], str(colonist["site_id"]),
+			"event.death", {"colonist_name": str(colonist["name"])}, [str(colonist["id"])])
 		return
 	if float(health["bleeding"]) <= 0.0 and float(health["hp"]) < 100.0:
 		health["hp"] = minf(100.0, float(health["hp"]) + 0.025)
@@ -1568,14 +1755,15 @@ func _tick_social() -> void:
 		var people: Array = []
 		for person in state["colonists"]:
 			if person["faction_id"] == faction["id"] and bool(person["alive"]): people.append(person)
-		if people.size() < 2: continue
+		if people.size() < 2:
+			# A lone survivor can name the place after settling in; crews decide
+			# together when they first have a nearby social interaction.
+			if not people.is_empty() and int(state["time"]) >= 60:
+				_prompt_colony_naming(faction)
+			continue
 		var first: Dictionary = people[0]
 		var second: Dictionary = people[1]
 		if abs(int(first["x"]) - int(second["x"])) + abs(int(first["y"]) - int(second["y"])) > 5: continue
-		if not bool(faction.get("name_prompted", false)) and int(state["time"]) >= 60:
-			faction["name_prompted"] = true
-			if str(faction.get("name", "")).begins_with("Unnamed") or str(faction.get("settlement_name", "")).begins_with("Unnamed"):
-				_event("naming_prompt", "Your settlers are ready to name their colony and settlement.", str(faction["site_id"]))
 		var relation_type := str(first.get("relationship_types", {}).get(str(second["id"]), ""))
 		var conflict: bool = relation_type == "rival" or first["traits"].has("abrasive") or second["traits"].has("abrasive")
 		var value := -5 if relation_type == "rival" else -3 if conflict else 5 if relation_type == "partner" else 4 if relation_type == "friend" else 3
@@ -1589,7 +1777,20 @@ func _tick_social() -> void:
 			if thoughts.size() > 10: thoughts.pop_front()
 			var old: int = int(speaker["relationships"].get(str(other["id"]), 0))
 			speaker["relationships"][str(other["id"])] = clampi(old + value, -100, 100)
-		_event("social", "%s and %s %s." % [first["name"], second["name"], "argued" if conflict else "talked"], str(faction["site_id"]))
+		_event("social", "%s and %s %s." % [first["name"], second["name"], "argued" if conflict else "talked"],
+			str(faction["site_id"]), "event.social_argument" if conflict else "event.social_talk",
+			{"first_name": str(first["name"]), "second_name": str(second["name"])},
+			[str(first["id"]), str(second["id"])])
+		if int(state["time"]) >= 60:
+			_prompt_colony_naming(faction)
+
+
+func _prompt_colony_naming(faction: Dictionary) -> void:
+	if bool(faction.get("name_prompted", false)):
+		return
+	faction["name_prompted"] = true
+	if str(faction.get("name", "")).begins_with("Unnamed") or str(faction.get("settlement_name", "")).begins_with("Unnamed"):
+		_event("naming_prompt", "Name your colony and settlement.", str(faction["site_id"]), "event.naming_prompt")
 
 
 func _tick_manual(colonist: Dictionary) -> bool:
@@ -1598,6 +1799,8 @@ func _tick_manual(colonist: Dictionary) -> bool:
 	if action == "move":
 		if _move_towards(colonist, int(manual["x"]), int(manual["y"])):
 			colonist["manual"] = {}
+		elif _route_failed(colonist):
+			_cancel_unreachable_manual(colonist)
 		return true
 	if action == "work":
 		var order := _order_by_id(str(manual.get("order_id", "")))
@@ -1621,11 +1824,15 @@ func _tick_manual(colonist: Dictionary) -> bool:
 				return false
 			if _move_towards(colonist, int(drop["x"]), int(drop["y"])):
 				_pickup_drop(colonist, drop)
+			elif _route_failed(colonist):
+				_cancel_unreachable_manual(colonist)
 		else:
 			if _tick_carry_to_stockpile(colonist): colonist["manual"] = {}
 		return true
 	if action == "equip":
-		if not _move_towards(colonist, int(manual["x"]), int(manual["y"])): return true
+		if not _move_towards(colonist, int(manual["x"]), int(manual["y"])):
+			if _route_failed(colonist): _cancel_unreachable_manual(colonist)
+			return true
 		var item := str(manual["item"])
 		var inventory: Dictionary = _faction_by_id(str(colonist["faction_id"]))["inventory"]
 		if int(inventory.get(item, 0)) > 0:
@@ -1644,14 +1851,20 @@ func _tick_manual(colonist: Dictionary) -> bool:
 		if _move_towards(colonist, int(manual["x"]), int(manual["y"]), 1):
 			caravan["trade_ready_until"] = int(state["time"]) + 30
 			caravan["trade_ready_colonist_id"] = colonist["id"]
-			_event("trade_ready", "%s tüccarla görüşmeye hazır." % colonist["name"], str(colonist["site_id"]))
+			_event("trade_ready", "%s tüccarla görüşmeye hazır." % colonist["name"],
+				str(colonist["site_id"]), "event.trade_ready", {"colonist_name": str(colonist["name"])}, [str(colonist["id"])])
 			colonist["manual"] = {}
+		elif _route_failed(colonist):
+			_cancel_unreachable_manual(colonist)
 		return true
 	if action == "style":
 		if _move_towards(colonist, int(manual["x"]), int(manual["y"]), 1):
 			colonist["styling_ready_until"] = int(state["time"]) + 30
-			_event("styling_ready", "%s is ready to change appearance." % colonist["name"], str(colonist["site_id"]))
+			_event("styling_ready", "%s is ready to change appearance." % colonist["name"],
+				str(colonist["site_id"]), "event.styling_ready", {"colonist_name": str(colonist["name"])}, [str(colonist["id"])])
 			colonist["manual"] = {}
+		elif _route_failed(colonist):
+			_cancel_unreachable_manual(colonist)
 		return true
 	if action == "attack":
 		var raider := _raider_by_id(str(manual.get("target_id", "")))
@@ -1662,6 +1875,12 @@ func _tick_manual(colonist: Dictionary) -> bool:
 		return true
 	colonist["manual"] = {}
 	return false
+
+
+func _cancel_unreachable_manual(colonist: Dictionary) -> void:
+	colonist["manual"] = {}
+	_event("unreachable_manual", "%s cannot reach the ordered destination." % colonist["name"],
+		str(colonist["site_id"]), "event.unreachable_manual", {"colonist_name": str(colonist["name"])}, [str(colonist["id"])])
 
 
 func _tick_drafted(colonist: Dictionary) -> void:
@@ -1684,7 +1903,7 @@ func _tick_treat(colonist: Dictionary) -> bool:
 			target = other
 			break
 	if target.is_empty(): return false
-	if not _move_towards(colonist, int(target["x"]), int(target["y"]), 1): return true
+	if not _move_towards(colonist, int(target["x"]), int(target["y"]), 1): return not _route_failed(colonist)
 	var inventory: Dictionary = _faction_by_id(str(colonist["faction_id"]))["inventory"]
 	var advanced_aid: bool = _faction_by_id(str(colonist["faction_id"]))["research"]["unlocked"].has("first_aid")
 	var caring_bonus := 5.0 if colonist["traits"].has("kind") else 0.0
@@ -1762,6 +1981,11 @@ func _tick_order(colonist: Dictionary, order: Dictionary) -> void:
 				order["status"] = "done"
 				order["claimed_by"] = ""
 				colonist["current_order"] = ""
+			elif (colonist.get("carrying", {}) as Dictionary).is_empty():
+				order["retry_at"] = int(state["time"]) + 30
+				order["status"] = "queued"
+				order["claimed_by"] = ""
+				colonist["current_order"] = ""
 			return
 		var map_data: Dictionary = state["maps"][order["site_id"]]
 		var drop := _drop_at(map_data, int(order["x"]), int(order["y"]))
@@ -1812,7 +2036,8 @@ func _check_order_stuck(colonist: Dictionary, order: Dictionary, before: Vector2
 	colonist["current_order"] = ""
 	if str((colonist.get("manual", {}) as Dictionary).get("order_id", "")) == str(order["id"]):
 		colonist["manual"] = {}
-	_event("unreachable_order", "A colonist cannot reach a designated job.", str(order["site_id"]))
+	_event("unreachable_order", "A colonist cannot reach a designated job.",
+		str(order["site_id"]), "event.unreachable_order", {}, [str(colonist["id"])])
 
 
 func _complete_order(colonist: Dictionary, order: Dictionary) -> void:
@@ -1835,7 +2060,8 @@ func _complete_order(colonist: Dictionary, order: Dictionary) -> void:
 			_change_cargo(_faction_by_id(str(order["faction_id"]))["inventory"], BUILD_COSTS[kind], -1)
 		map_data["structures"].append({"id": _new_id("structure"), "kind": kind.trim_prefix("build_"),
 			"x": int(order["x"]), "y": int(order["y"]), "built_at": int(state["time"])})
-		_event("build", "%s tamamlandı." % _building_name(kind), str(order["site_id"]))
+		_event("build", "%s tamamlandı." % _building_name(kind), str(order["site_id"]),
+			"event.build", {"building_kind": kind}, [str(colonist["id"])])
 	order["status"] = "done"
 	order["claimed_by"] = ""
 	colonist["current_order"] = ""
@@ -1864,12 +2090,12 @@ func _tick_carry_to_stockpile(colonist: Dictionary) -> bool:
 	var carried: Dictionary = colonist.get("carrying", {})
 	if carried.is_empty(): return true
 	var map_data: Dictionary = state["maps"][colonist["site_id"]]
-	var stockpile := _stockpile_for(map_data, int(colonist["x"]), int(colonist["y"]), str(carried["kind"]))
+	var stockpile := _stockpile_for(map_data, int(colonist["x"]), int(colonist["y"]), str(carried["kind"]), true)
 	if stockpile.is_empty():
 		map_data["drops"].append({"id": _new_id("drop"), "x": colonist["x"], "y": colonist["y"],
 			"kind": carried["kind"], "amount": carried["amount"]})
 		colonist["carrying"] = {}
-		return true
+		return false
 	if not _move_towards(colonist, int(stockpile["x"]), int(stockpile["y"])): return false
 	var inventory: Dictionary = _faction_by_id(str(colonist["faction_id"]))["inventory"]
 	var item: String = str(carried["kind"])
@@ -1897,7 +2123,7 @@ func _tick_research(colonist: Dictionary) -> bool:
 	for structure in map_data["structures"]:
 		if structure["kind"] == "research_bench": bench = structure; break
 	if bench.is_empty(): return false
-	if not _move_towards(colonist, int(bench["x"]), int(bench["y"]), 1): return true
+	if not _move_towards(colonist, int(bench["x"]), int(bench["y"]), 1): return not _route_failed(colonist)
 	var rate := 0.75 + float(colonist["skills"]["research"]) * 0.13
 	if colonist["traits"].has("curious"): rate *= 1.3
 	research["progress"] = float(research["progress"]) + rate
@@ -1905,76 +2131,107 @@ func _tick_research(colonist: Dictionary) -> bool:
 		research["unlocked"].append(project)
 		research["project"] = ""
 		research["progress"] = 0.0
-		_event("research", "%s araştırması tamamlandı." % RESEARCH_PROJECTS[project]["name"], str(colonist["site_id"]))
+		_event("research", "%s araştırması tamamlandı." % RESEARCH_PROJECTS[project]["name"],
+			str(colonist["site_id"]), "event.research", {"project_id": project}, [str(colonist["id"])])
 	return true
 
 
 func _move_towards(actor: Dictionary, target_x: int, target_y: int, acceptable_distance: int = 0, allow_quick_step: bool = true) -> bool:
-	var x: int = int(actor["x"])
-	var y: int = int(actor["y"])
-	if abs(x - target_x) + abs(y - target_y) <= acceptable_distance: return true
-	var steps: Array = []
-	if target_x != x: steps.append(Vector2i(signi(target_x - x), 0))
-	if target_y != y: steps.append(Vector2i(0, signi(target_y - y)))
-	if abs(target_y - y) > abs(target_x - x): steps.reverse()
-	steps.append_array([Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)])
-	var map_data: Dictionary = state["maps"].get(actor["site_id"], {})
-	var previous_distance: int = abs(x - target_x) + abs(y - target_y)
-	var moved := false
-	for step in steps:
-		var nx: int = x + step.x
-		var ny: int = y + step.y
-		if nx < 0 or nx >= LOCAL_SIZE or ny < 0 or ny >= LOCAL_SIZE: continue
-		if int(abs(nx - target_x) + abs(ny - target_y)) > previous_distance: continue
-		if not _passable(map_data, nx, ny): continue
-		actor["x"] = nx
-		actor["y"] = ny
-		actor["facing"] = "right" if step.x > 0 else "left" if step.x < 0 else "down" if step.y > 0 else "up"
-		moved = true
-		break
-	if not moved:
-		_move_with_bfs(actor, target_x, target_y, acceptable_distance, map_data)
-	if allow_quick_step and actor.get("traits", []).has("quick") and int(state["time"]) % 2 == 0:
-		if abs(int(actor["x"]) - target_x) + abs(int(actor["y"]) - target_y) > acceptable_distance:
-			_move_towards(actor, target_x, target_y, acceptable_distance, false)
-	return abs(int(actor["x"]) - target_x) + abs(int(actor["y"]) - target_y) <= acceptable_distance
-
-
-func _move_with_bfs(actor: Dictionary, target_x: int, target_y: int, acceptable_distance: int, map_data: Dictionary) -> void:
 	var origin := Vector2i(int(actor["x"]), int(actor["y"]))
-	var start_index: int = origin.y * LOCAL_SIZE + origin.x
-	var queue: Array[Vector2i] = [origin]
-	var parent: Dictionary = {start_index: -1}
+	var destination := Vector2i(target_x, target_y)
+	var actor_id := str(actor["id"])
+	if abs(origin.x - target_x) + abs(origin.y - target_y) <= acceptable_distance:
+		_route_cache.erase(actor_id)
+		return true
+	var map_data: Dictionary = state["maps"].get(actor["site_id"], {})
+	if map_data.is_empty(): return false
+	var structure_count: int = map_data["structures"].size()
+	var route: Dictionary = _route_cache.get(actor_id, {})
+	var route_valid: bool = not route.is_empty() and route.get("destination", Vector2i(-1, -1)) == destination \
+		and int(route.get("acceptable_distance", -1)) == acceptable_distance \
+		and route.get("origin", Vector2i(-1, -1)) == origin \
+		and int(route.get("structure_count", -1)) == structure_count \
+		and str(route.get("site_id", "")) == str(actor["site_id"])
+	if route_valid and bool(route.get("failed", false)):
+		if int(route.get("retry_at", 0)) > int(state["time"]): return false
+		route_valid = false
+	if route_valid and not bool(route.get("failed", false)):
+		var cached_steps: Array[Vector2i] = route["steps"]
+		if cached_steps.is_empty() or not _passable(map_data, cached_steps[0].x, cached_steps[0].y):
+			route_valid = false
+	if not route_valid:
+		var found_steps := _find_route(map_data, origin, destination, acceptable_distance)
+		route = {"destination": destination, "acceptable_distance": acceptable_distance,
+			"origin": origin, "structure_count": structure_count, "site_id": str(actor["site_id"]),
+			"steps": found_steps, "failed": found_steps.is_empty(),
+			"retry_at": int(state["time"]) + 3}
+		_route_cache[actor_id] = route
+		if found_steps.is_empty(): return false
+	var steps: Array[Vector2i] = route["steps"]
+	var next: Vector2i = steps.pop_front()
+	actor["x"] = next.x
+	actor["y"] = next.y
+	actor["facing"] = "right" if next.x > origin.x else "left" if next.x < origin.x else "down" if next.y > origin.y else "up"
+	var arrived: bool = abs(next.x - target_x) + abs(next.y - target_y) <= acceptable_distance
+	if arrived:
+		_route_cache.erase(actor_id)
+	else:
+		route["origin"] = next
+		route["steps"] = steps
+		_route_cache[actor_id] = route
+	if not arrived and allow_quick_step and actor.get("traits", []).has("quick") and int(state["time"]) % 2 == 0:
+		return _move_towards(actor, target_x, target_y, acceptable_distance, false)
+	return arrived
+
+
+func _find_route(map_data: Dictionary, origin: Vector2i, destination: Vector2i, acceptable_distance: int = 0) -> Array[Vector2i]:
+	var route: Array[Vector2i] = []
+	if map_data.is_empty() or origin.x < 0 or origin.x >= LOCAL_SIZE or origin.y < 0 or origin.y >= LOCAL_SIZE:
+		return route
+	var start_index := origin.y * LOCAL_SIZE + origin.x
+	var parents := PackedInt32Array()
+	parents.resize(LOCAL_SIZE * LOCAL_SIZE)
+	parents.fill(-1)
+	parents[start_index] = start_index
+	var queue := PackedInt32Array([start_index])
 	var head := 0
-	var destination_index := -1
-	var directions: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var goal_index := -1
+	var directions: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 	while head < queue.size():
-		var cell: Vector2i = queue[head]
+		var index: int = queue[head]
 		head += 1
-		var cell_index: int = cell.y * LOCAL_SIZE + cell.x
-		if abs(cell.x - target_x) + abs(cell.y - target_y) <= acceptable_distance:
-			destination_index = cell_index
+		var cell := Vector2i(index % LOCAL_SIZE, index / LOCAL_SIZE)
+		if abs(cell.x - destination.x) + abs(cell.y - destination.y) <= acceptable_distance:
+			goal_index = index
 			break
 		for direction in directions:
 			var next: Vector2i = cell + direction
-			if next.x < 0 or next.x >= LOCAL_SIZE or next.y < 0 or next.y >= LOCAL_SIZE: continue
-			var next_index: int = next.y * LOCAL_SIZE + next.x
-			if parent.has(next_index) or not _passable(map_data, next.x, next.y): continue
-			parent[next_index] = cell_index
-			queue.append(next)
-	if destination_index < 0 or destination_index == start_index: return
-	var step_index := destination_index
-	while int(parent[step_index]) != start_index:
-		step_index = int(parent[step_index])
-	var nx: int = step_index % LOCAL_SIZE
-	var ny: int = floori(float(step_index) / float(LOCAL_SIZE))
-	actor["x"] = nx
-	actor["y"] = ny
-	actor["facing"] = "right" if nx > origin.x else "left" if nx < origin.x else "down" if ny > origin.y else "up"
+			if not _passable(map_data, next.x, next.y): continue
+			var next_index := next.y * LOCAL_SIZE + next.x
+			if parents[next_index] != -1: continue
+			parents[next_index] = index
+			queue.append(next_index)
+	if goal_index < 0: return route
+	var cursor := goal_index
+	while cursor != start_index:
+		route.append(Vector2i(cursor % LOCAL_SIZE, cursor / LOCAL_SIZE))
+		cursor = parents[cursor]
+	route.reverse()
+	return route
+
+
+func _can_reach(map_data: Dictionary, actor: Dictionary, target_x: int, target_y: int, acceptable_distance: int = 0) -> bool:
+	var origin := Vector2i(int(actor["x"]), int(actor["y"]))
+	if abs(origin.x - target_x) + abs(origin.y - target_y) <= acceptable_distance: return true
+	return not _find_route(map_data, origin, Vector2i(target_x, target_y), acceptable_distance).is_empty()
+
+
+func _route_failed(actor: Dictionary) -> bool:
+	return bool((_route_cache.get(str(actor["id"]), {}) as Dictionary).get("failed", false))
 
 
 func _passable(map_data: Dictionary, x: int, y: int) -> bool:
-	if map_data.is_empty(): return false
+	if map_data.is_empty() or x < 0 or x >= LOCAL_SIZE or y < 0 or y >= LOCAL_SIZE: return false
 	if map_data["terrain"][y * LOCAL_SIZE + x] == "water": return false
 	var structure := _structure_at(map_data, x, y)
 	if not structure.is_empty() and structure["kind"] in ["wall", "stone_wall", "barrier"]: return false
@@ -1985,10 +2242,12 @@ func _attack_raider(colonist: Dictionary, raider: Dictionary) -> void:
 	if int(colonist.get("attack_cooldown", 0)) > 0: return
 	if str(raider.get("phase", "attacking")) == "preparing":
 		raider["phase"] = "attacking"
-		_event("raid_attack", "The raiders have been provoked.", str(raider["site_id"]))
+		_event("raid_attack", "The raiders have been provoked.", str(raider["site_id"]), "event.raid_provoked")
 	var distance: int = abs(int(colonist["x"]) - int(raider["x"])) + abs(int(colonist["y"]) - int(raider["y"]))
 	if distance > 1:
 		_move_towards(colonist, int(raider["x"]), int(raider["y"]), 1)
+		if _route_failed(colonist) and str((colonist.get("manual", {}) as Dictionary).get("action", "")) == "attack":
+			_cancel_unreachable_manual(colonist)
 		return
 	var damage := 10.0 + float(colonist["skills"]["combat"]) * 1.2
 	if colonist["equipment"]["weapon"] == "spear": damage += 10.0
@@ -1996,7 +2255,8 @@ func _attack_raider(colonist: Dictionary, raider: Dictionary) -> void:
 	raider["hp"] = maxf(0.0, float(raider["hp"]) - damage)
 	colonist["attack_cooldown"] = 2
 	if float(raider["hp"]) <= 0.0:
-		_event("raid_defeated", "Bir akıncı etkisiz hale getirildi.", str(raider["site_id"]))
+		_event("raid_defeated", "Bir akıncı etkisiz hale getirildi.", str(raider["site_id"]),
+			"event.raid_defeated")
 
 
 func _tick_raiders() -> void:
@@ -2008,7 +2268,7 @@ func _tick_raiders() -> void:
 		if str(raider.get("phase", "attacking")) == "preparing":
 			if int(state["time"]) < int(raider.get("attack_at", 0)): continue
 			raider["phase"] = "attacking"
-			_event("raid_attack", "The raiders begin their attack.", str(raider["site_id"]))
+			_event("raid_attack", "The raiders begin their attack.", str(raider["site_id"]), "event.raid_attack")
 		var target: Dictionary = {}
 		var best_distance := 9999
 		for colonist in state["colonists"]:
@@ -2052,7 +2312,8 @@ func _spawn_raids() -> void:
 				"x": edge.x, "y": edge.y, "previous_x": edge.x, "previous_y": edge.y,
 				"hp": 55.0, "attack_cooldown": 0,
 				"phase": "preparing", "attack_at": int(state["time"]) + 20})
-		_event("raid", "%s yerleşkesine akıncılar girdi; saldırı hazırlığındalar." % faction["settlement_name"], site_id)
+		_event("raid", "%s yerleşkesine akıncılar girdi; saldırı hazırlığındalar." % faction["settlement_name"],
+			site_id, "event.raid", {"settlement_name": str(faction["settlement_name"])})
 
 
 func _find_edge_spawn(map_data: Dictionary, offset: int) -> Vector2i:
@@ -2081,11 +2342,12 @@ func _spawn_npc_caravans() -> void:
 		var source: Dictionary = friendly_sites[source_index]
 		var caravan := {"id": _new_id("caravan"), "kind": "npc", "faction_id": faction["id"],
 			"site_id": faction["site_id"], "source_site_id": source["id"],
-			"name": "%s Ticaret Kervanı" % source["name"], "x": 27, "y": 26,
+			"source_name": source["name"], "name": "%s Ticaret Kervanı" % source["name"], "x": 27, "y": 26,
 			"ttl": 70, "stock": {"wood": 15, "stone": 12, "food": 18,
 				"medicine": 5, "spear": 3, "jacket": 4, "silver": 80}}
 		state["caravans"].append(caravan)
-		_event("caravan", "%s geldi." % caravan["name"], str(faction["site_id"]))
+		_event("caravan", "%s geldi." % caravan["name"], str(faction["site_id"]),
+			"event.caravan_arrived", {"source_name": str(source["name"])})
 
 
 func _tick_caravans() -> void:
@@ -2095,7 +2357,11 @@ func _tick_caravans() -> void:
 			caravan["ttl"] = int(caravan["ttl"]) - 1
 			if int(caravan["ttl"]) <= 0:
 				removed.append(caravan)
-				_event("caravan_left", "%s ayrıldı." % caravan["name"], str(caravan["site_id"]))
+				var source_name := str(caravan.get("source_name", ""))
+				if source_name.is_empty():
+					source_name = str(_site_by_id(state["world"], str(caravan.get("source_site_id", ""))).get("name", caravan["name"]))
+				_event("caravan_left", "%s ayrıldı." % caravan["name"], str(caravan["site_id"]),
+					"event.caravan_left", {"source_name": source_name})
 		elif caravan["kind"] == "player_trade":
 			caravan["eta"] = int(caravan["eta"]) - 1
 			if int(caravan["eta"]) <= 0:
@@ -2106,14 +2372,20 @@ func _tick_caravans() -> void:
 				var offer := _trade_offer_by_id(str(caravan["offer_id"]))
 				if not offer.is_empty(): offer["status"] = "completed"
 				removed.append(caravan)
-				_event("trade_complete", "Koloniler arası ticaret kervanı ulaştı.")
+				_event("trade_complete", "Koloniler arası ticaret kervanı ulaştı.", "", "event.trade_complete")
 	for caravan in removed: state["caravans"].erase(caravan)
 
 
 func _tick_farms() -> void:
 	if int(state["time"]) % 80 != 0: return
+	var day_length := maxi(1, int(state.get("day_length", ClimateCalendar.DEFAULT_DAY_LENGTH)))
+	var year_day := (int(state["time"]) / day_length) % ClimateCalendar.DAYS_PER_YEAR
 	for faction in state["factions"]:
 		var map_data: Dictionary = state["maps"][faction["site_id"]]
+		var site_info: Dictionary = map_data.get("site_info", {})
+		var outside_temperature: float = ClimateCalendar.temperature_for_day(
+			float(site_info.get("temperature", 18.0)), float(site_info.get("latitude", 0.0)), year_day)
+		if not ClimateCalendar.can_grow(outside_temperature): continue
 		for structure in map_data["structures"]:
 			if structure["kind"] != "farm": continue
 			if not _drop_at(map_data, int(structure["x"]), int(structure["y"])).is_empty(): continue

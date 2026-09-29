@@ -19,6 +19,11 @@ var _hover_tile := Vector2i(-1, -1)
 var _rotating := false
 var _drag_distance := 0.0
 var _surface_texture: ImageTexture
+var _surface_mesh: ArrayMesh
+var _mesh_rotation := INF
+var _mesh_tilt := INF
+var _mesh_zoom := INF
+var _mesh_size := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -34,6 +39,7 @@ func set_preview(data: Dictionary, selected_id: String = "") -> void:
 	selected_site_id = selected_id
 	if new_world or _surface_texture == null:
 		_build_surface_texture()
+		_surface_mesh = null
 	_site_at_tile.clear()
 	for raw_site in preview.get("sites", []):
 		var site: Dictionary = raw_site
@@ -68,23 +74,9 @@ func _draw() -> void:
 	draw_circle(center, radius, Color("#2b6273"))
 	var columns := int(preview.get("width", 64))
 	var rows := int(preview.get("height", 40))
-	var tiles: Array = preview.get("tiles", [])
 	if columns <= 0 or rows <= 0:
 		return
-	# The exact poles collapse to a single point. Leave the thin polar cap to
-	# the ocean disc so every terrain polygon has valid, visible geometry.
-	for y in range(1, rows - 1):
-		for x in columns:
-			if not _front(float(x) + 0.5, float(y) + 0.5):
-				continue
-			var polygon := PackedVector2Array([_project(float(x), float(y)), _project(float(x + 1), float(y)), _project(float(x + 1), float(y + 1)), _project(float(x), float(y + 1))])
-			if polygon[0].distance_to(polygon[1]) < 0.12 or polygon[2].distance_to(polygon[3]) < 0.12:
-				continue
-			var uvs := PackedVector2Array([Vector2(float(x) / float(columns), float(y) / float(rows)), Vector2(float(x + 1) / float(columns), float(y) / float(rows)), Vector2(float(x + 1) / float(columns), float(y + 1) / float(rows)), Vector2(float(x) / float(columns), float(y + 1) / float(rows))])
-			var colors := PackedColorArray()
-			for corner in [Vector2(float(x), float(y)), Vector2(float(x + 1), float(y)), Vector2(float(x + 1), float(y + 1)), Vector2(float(x), float(y + 1))]:
-				colors.append(Color.WHITE.darkened((1.0 - maxf(0.0, _view_z(corner.x, corner.y))) * 0.35))
-			draw_polygon(polygon, colors, uvs, _surface_texture)
+	_draw_surface_mesh(columns, rows)
 	_draw_grid(columns, rows)
 	_draw_sites()
 	var selected_tile := _selected_tile()
@@ -93,6 +85,82 @@ func _draw() -> void:
 	if _hover_tile.x >= 0 and _hover_tile != selected_tile and _is_selectable(_hover_tile):
 		_draw_tile_marker(_hover_tile, Color("#e8e1bb", 0.8), 6.0)
 	draw_arc(center, radius, 0.0, TAU, 128, Color("#a0bec1", 0.43), 2.0)
+
+
+func _draw_surface_mesh(columns: int, rows: int) -> void:
+	if _surface_texture == null:
+		return
+	if _surface_mesh != null and is_equal_approx(_mesh_rotation, globe_rotation) and is_equal_approx(_mesh_tilt, globe_tilt) and is_equal_approx(_mesh_zoom, zoom) and _mesh_size == size:
+		draw_mesh(_surface_mesh, _surface_texture)
+		return
+	# Draw all visible terrain cells in one textured mesh. The old path sent
+	# thousands of separate polygons and recomputed sin/cos for every corner.
+	# Pole rows still use the ocean disc because their quads collapse to points.
+	var sin_longitude := PackedFloat32Array()
+	var cos_longitude := PackedFloat32Array()
+	for x in range(columns + 1):
+		var longitude := (float(x) / float(columns) - 0.5) * TAU - globe_rotation
+		sin_longitude.append(sin(longitude))
+		cos_longitude.append(cos(longitude))
+	var tilt_sin := sin(globe_tilt)
+	var tilt_cos := cos(globe_tilt)
+	var center := size * 0.5
+	var radius := _radius()
+	var vertex_columns := columns + 1
+	var vertices := PackedVector3Array()
+	var points := PackedVector2Array()
+	var depths := PackedFloat32Array()
+	var colors := PackedColorArray()
+	var uvs := PackedVector2Array()
+	for y in range(1, rows):
+		var latitude := (float(y) / float(rows) - 0.5) * PI
+		var latitude_sin := sin(latitude)
+		var latitude_cos := cos(latitude)
+		for x in range(vertex_columns):
+			var px := latitude_cos * sin_longitude[x]
+			var py := latitude_sin * tilt_cos - latitude_cos * cos_longitude[x] * tilt_sin
+			var depth := latitude_sin * tilt_sin + latitude_cos * tilt_cos * cos_longitude[x]
+			var point := center + Vector2(px, py) * radius
+			points.append(point)
+			vertices.append(Vector3(point.x, point.y, 0.0))
+			depths.append(depth)
+			var shade := (1.0 - maxf(0.0, depth)) * 0.35
+			colors.append(Color(1.0 - shade, 1.0 - shade, 1.0 - shade))
+			uvs.append(Vector2(float(x) / float(columns), float(y) / float(rows)))
+	var indices := PackedInt32Array()
+	for row in range(rows - 2):
+		for x in columns:
+			var a := row * vertex_columns + x
+			var b := a + 1
+			var d := a + vertex_columns
+			var c := d + 1
+			if depths[a] + depths[b] + depths[c] + depths[d] <= 0.0:
+				continue
+			# At the limb, back-facing or collapsed cells can fold over. Skip
+			# these instead of sending invalid polygons to the renderer.
+			if (points[b] - points[a]).cross(points[c] - points[a]) <= 0.02 or (points[c] - points[a]).cross(points[d] - points[a]) <= 0.02:
+				continue
+			indices.append(a)
+			indices.append(b)
+			indices.append(c)
+			indices.append(a)
+			indices.append(c)
+			indices.append(d)
+	if indices.is_empty():
+		return
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	_surface_mesh = ArrayMesh.new()
+	_surface_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_mesh_rotation = globe_rotation
+	_mesh_tilt = globe_tilt
+	_mesh_zoom = zoom
+	_mesh_size = size
+	draw_mesh(_surface_mesh, _surface_texture)
 
 
 func _build_surface_texture() -> void:
