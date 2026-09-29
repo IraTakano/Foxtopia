@@ -20,13 +20,19 @@ func _run() -> void:
 	main.call("_set_starting_relation", 0, 1, "friend")
 	main.call("_switch_preparation_tab", "relationships")
 	main.call("_switch_preparation_tab", "equipment")
+	var cargo: Dictionary = main.get("starting_cargo")
+	cargo["wood"] = 37
+	main.set("starting_cargo", cargo)
 	main.call("_save_preparation_preset")
 	var specs: Array = main.get("character_specs")
 	(specs[0] as Dictionary)["name"] = "Changed"
 	main.set("character_specs", specs)
+	cargo["wood"] = 1
+	main.set("starting_cargo", cargo)
 	main.call("_load_preparation_preset")
 	specs = main.get("character_specs")
 	assert(str(specs[0]["name"]) == "Mara")
+	assert(int((main.get("starting_cargo") as Dictionary).get("wood", 0)) == 37)
 	main.call("_advance_to_lobby")
 	await process_frame
 	assert(main.get("screen") == "game")
@@ -38,5 +44,6 @@ func _run() -> void:
 	assert(int(pawn.get("age", 0)) == 34)
 	assert(str(pawn.get("equipment", {}).get("weapon", "")) == "spear")
 	assert(str(pawn.get("relationship_types", {}).get(str(people[1].get("id", "")), "")) == "friend")
+	assert(int((main.call("_local_resources", data) as Dictionary).get("wood", 0)) == 37)
 	print("PREPARATION_UI_SMOKE_OK")
 	quit()

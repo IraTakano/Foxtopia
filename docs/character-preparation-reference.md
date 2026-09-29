@@ -14,7 +14,7 @@
 
 - Hazırlama ekranında üst sekmeler ve dört ana sütun vardır: Colony/World listesi, yaş ve görünüş, geçmiş/özellik/sağlık, klasik beceriler. Keskin köşeli koyu panellerde dokulu zemin kullanılır; alt düğmelerin altında boşluk bırakılır. Puan anahtarı kırmızı X veya yeşil onay işaretidir; sağ üstte tüm ekip ve ortak yükün toplam harcaması görünür.
 - Kolonistler bir ile üç kişi arasında eklenip çıkarılabilir. Çıkarılan kolonist World havuzuna taşınır ve geri alınabilir; kayıtlı hazırlık şablonu bu havuzu da saklar. Ad satırında ilk ad, takma ad ve soyad ayrı saklanır; takma ad haritadaki kısa etikettir. Rastgele seçim ikonları metin karakteri yerine çizilmiş zar kullanır. Biyolojik/kronolojik yaşlar, görünüş, geçmiş ve özellikler oklarla düzenlenir; saç ve ten renkleri doğrudan görünür.
-- Characters sekmesindeki ana sütunda ayrı bir Apparel/Possessions/Titles/Abilities sütunu yoktur. Kişinin T-shirt, pantolon, ceket, silah ve giyim renkleri portredeki giysi ikonundan açılan pencerede düzenlenir. Şapka açılır listesindeki kep ve siperli şapka, başlangıç ekipmanına ve harita üzerindeki çizime aktarılır. Equipment sekmesi koloninin ortak yüküdür: kategori ve malzeme filtreleri, Cost sütunu, Add Equipment düğmesi ve miktar okları vardır.
+- Characters sekmesindeki ana sütunda ayrı bir Apparel/Possessions/Titles/Abilities sütunu yoktur. Kişinin T-shirt, pantolon, ceket, silah ve giyim renkleri Appearance başlığındaki Apparel düğmesinden açılan pencerede düzenlenir. Şapka açılır listesindeki kep ve siperli şapka, başlangıç ekipmanına ve harita üzerindeki çizime aktarılır. Equipment sekmesi koloninin ortak yüküdür: kategori ve malzeme filtreleri, Cost sütunu, Add Equipment düğmesi ve miktar okları vardır.
 - On iki klasik beceri başlığı ve alev biçimli tutku işaretleri görünür. İnşaat, madencilik, bitki, tıp, araştırma ve dövüş becerileri mevcut iş/savaş sistemlerine eşlenir.
 - Aile görünümünde ebeveyn/çocuk yönlü kalın oklarla bağlanır; boş kutuların köşesindeki küçük artıdan bağ eklenir. Diğer ilişkiler yalnızca kurulmuş bağlar için portreler ve karşılıklı dolgulu rol oklarıyla görünür; yeni ilişki ayrı bir boş kutudan eklenir.
 - İki beden ve kafa seçeneği biyolojik görünüme göre çizilir. Saç seçimi aynı görünümü harita, üst portre ve hazırlama ekranında kullanır.
@@ -33,5 +33,21 @@ Bu değişiklik kullanıcının önceki FT-050 reddini kapatmaz. Görsel ve işl
 | Appearance | İki şapka tipi çalışır; malzeme tabanlı giysi çeşidi ve ek şapka modelleri henüz yok. Görünüş/giysi siluetinin son sanat yönü kullanıcı incelemesini bekler. |
 | Point limits | Harcanan toplam puan görünür; sınır açıldığında mevcut model kişi başına 12 puan uygular. EdB'nin tam puan ekonomisi henüz uyarlanmadı. |
 | Pawn grafiği | Yeni özgün yüksek çözünürlüklü çizim yumuşaktır; beden, yüz ve kıyafet siluetinin son sanat yönü kullanıcı incelemesini bekler. |
+
+## 30 Eylül ekran görüntüsü geri bildirimi
+
+Kullanıcının son değerlendirmesi kurulu oyuna değil, Codex'in gösterdiği hazırlama ekranı görüntülerine ilişkindir. Mevcut karşılaştırma için `.tools/prep-1440-characters.png`, `.tools/characters-960-v2.png` ve `.tools/prep-1440-partner.png` kullanıldı. Bu maddeler görsel kabul anlamına gelmez:
+
+| Alan | İstenen düzeltme ve kontrol |
+| --- | --- |
+| Ad satırı | İlk ad, takma ad ve soyad üç ayrı kutuda, birbirinden farklı örnek değerlerle okunabilsin. EdB'deki gibi satır içi kutular korunur. |
+| Rastgele simgeleri | Dolu kare zar yerine çizgi biçimli zar kullanılsın. Portre içindeki biyolojik görünüş ve rastgele görünüş kontrolleri küçülüp saydamlaşsın. Sağ üstteki kare kaldırılırken onun açtığı kişisel giysi/silah düzenleme erişimi korunmalı. |
+| Yaş ve geçmiş | Her satırda başlık, sol ok, değer ve sağ ok birbirine bitişik ve aynı hizada olsun. |
+| Özellikler | Her özellik satırında yalnızca özellik adı ve kaldırma X'i bulunsun; ekle ve rastgele düğmeleri başlıkta ayrı kalsın. |
+| Beceriler | Sıra ad, tutku alevi, değer, sol ve sağ ok olsun. Üç başlangıç kolonistinin becerileri tekdüze 5 yerine farklı değerlerle açılsın; değer değişikliği kayıt ve oyun modeline aktarımda korunmalı. |
+| İlişkiler | Ebeveyn/çocuk bağlantıları belirgin blok oklara benzesin. Diğer ilişkilerde düz uçlu/çerçeveli bar ve ayrı açılır ok görünmesin; ilişkiyi değiştirme veya kaldırma erişimi kaybolmamalı. |
+| Dar ekran | 960×540 görünümde adların anlamı, portre kontrolleri ve yatay/dikey kaydırma ile ulaşılabilen alanlar ayrıca incelensin. |
+
+Kod incelemesinde hazırlık şablonunun ortak başlangıç yükünü kaydetmediği görüldü. `Save preset` / `Load preset` bu yükü artık saklıyor; eski şablonlar mevcut senaryonun varsayılan yüküyle açılıyor. `preparation_ui_smoke.gd` karakter adı ve ilişkisiyle birlikte yükün geri yüklenmesini ve oyuna aktarılmasını doğruladı.
 
 Kullanıcının nihai görsel onayı ve bu işlevlerin kapsam kararı `issue-tracker.md` içinde açık kalır.

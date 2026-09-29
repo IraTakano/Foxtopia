@@ -69,6 +69,13 @@ func _run() -> void:
 		if bool(edge["active"]):
 			has_confirmed_link = true
 	assert(has_confirmed_link)
+	var relationship_pickers := main.find_children("PreparationRelationshipPicker*", "MenuButton", true, false)
+	assert(relationship_pickers.size() >= 2 and relationship_pickers.size() % 2 == 0)
+	for picker in relationship_pickers:
+		assert((picker as MenuButton).custom_minimum_size.x >= 164.0)
+		assert((picker as MenuButton).get_popup().item_count == 7)
+	(relationship_pickers[0] as MenuButton).get_popup().id_pressed.emit(1)
+	assert(str((main.get("character_specs") as Array)[0]["starting_relationships"].get("1", "")) == "friend")
 	main.call("_set_starting_gear", "apparel", "jacket")
 	main.call("_set_starting_gear", "hat", "brim_hat")
 	var specs: Array = main.get("character_specs")

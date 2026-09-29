@@ -82,25 +82,23 @@ class FamilyGraph extends Control:
 			var finish: Vector2 = edge["finish"]
 			var active: bool = edge["active"]
 			var color := Color("#a7a8a6") if active else Color("#5d6062")
-			var middle_y := (start.y + finish.y) * 0.5
-			if str(edge.get("kind", "parent")) == "sibling" or absf(finish.y - start.y) < 12.0:
-				_segment(start, finish, color, false)
+			if str(edge.get("kind", "parent")) == "sibling":
+				draw_line(start, finish, color, 7.0)
 			else:
-				_segment(start, Vector2(start.x, middle_y), color, false)
-				_segment(Vector2(start.x, middle_y), Vector2(finish.x, middle_y), color, false)
-				_segment(Vector2(finish.x, middle_y), finish - Vector2(0, 7), color, false)
-				draw_colored_polygon(PackedVector2Array([finish, finish + Vector2(-10, -13), finish + Vector2(10, -13)]), color)
+				var arrow_direction := 1.0 if finish.y >= start.y else -1.0
+				var arrow_base_y := finish.y - arrow_direction * 14.0
+				var middle_y := (start.y + arrow_base_y) * 0.5
+				_block_segment(start, Vector2(start.x, middle_y), color)
+				_block_segment(Vector2(start.x, middle_y), Vector2(finish.x, middle_y), color)
+				_block_segment(Vector2(finish.x, middle_y), Vector2(finish.x, arrow_base_y), color)
+				draw_colored_polygon(PackedVector2Array([Vector2(finish.x - 12.0, arrow_base_y), finish, Vector2(finish.x + 12.0, arrow_base_y)]), color)
 
-	func _segment(start: Vector2, finish: Vector2, color: Color, dashed: bool) -> void:
-		if not dashed:
-			draw_line(start, finish, color, 7.0)
-			return
-		var length := start.distance_to(finish)
-		if length < 1.0:
-			return
-		var direction := (finish - start) / length
-		for offset in range(0, int(length), 10):
-			draw_line(start + direction * float(offset), start + direction * minf(float(offset + 5), length), color, 1.0)
+	func _block_segment(start: Vector2, finish: Vector2, color: Color) -> void:
+		var width := 11.0
+		if is_equal_approx(start.x, finish.x):
+			draw_rect(Rect2(Vector2(start.x - width * 0.5, minf(start.y, finish.y)), Vector2(width, absf(finish.y - start.y))), color)
+		else:
+			draw_rect(Rect2(Vector2(minf(start.x, finish.x), start.y - width * 0.5), Vector2(absf(finish.x - start.x), width)), color)
 
 
 class RelationshipArrow extends Control:
@@ -108,24 +106,47 @@ class RelationshipArrow extends Control:
 
 	func _draw() -> void:
 		var head := 14.0
-		var inset := 3.0
 		var points := PackedVector2Array()
 		if forward:
-			points = PackedVector2Array([Vector2(0, inset), Vector2(size.x - head, inset), Vector2(size.x, size.y * 0.5), Vector2(size.x - head, size.y - inset), Vector2(0, size.y - inset)])
+			points = PackedVector2Array([Vector2.ZERO, Vector2(size.x - head, 0), Vector2(size.x, size.y * 0.5), Vector2(size.x - head, size.y), Vector2(0, size.y)])
 		else:
-			points = PackedVector2Array([Vector2(head, inset), Vector2(size.x, inset), Vector2(size.x, size.y - inset), Vector2(head, size.y - inset), Vector2(0, size.y * 0.5)])
-		draw_colored_polygon(points, Color("#55595b"))
-		draw_polyline(points + PackedVector2Array([points[0]]), Color("#777b7d"), 1.0)
+			points = PackedVector2Array([Vector2(head, 0), Vector2(size.x, 0), Vector2(size.x, size.y), Vector2(head, size.y), Vector2(0, size.y * 0.5)])
+		draw_colored_polygon(points, Color("#696b6c"))
 
 
 class PrepDiceButton extends Button:
 	func _draw() -> void:
-		var side := 16.0
+		var side := 14.0
 		var origin := (size - Vector2.ONE * side) * 0.5
 		draw_rect(Rect2(origin, Vector2.ONE * side), Color("#c2c2be"))
 		draw_rect(Rect2(origin, Vector2.ONE * side), Color("#26292b"), false, 1.0)
-		for offset in [Vector2(4, 4), Vector2(12, 4), Vector2(8, 8), Vector2(4, 12), Vector2(12, 12)]:
-			draw_circle(origin + offset, 1.45, Color("#252829"))
+		var ink := Color("#252829")
+		for mark in [Vector2(3, 3), Vector2(9, 3), Vector2(5, 6), Vector2(10, 8), Vector2(3, 10)]:
+			draw_line(origin + mark, origin + mark + Vector2(2, 2), ink, 1.5)
+		draw_line(origin + Vector2(8, 11), origin + Vector2(11, 11), ink, 1.3)
+
+
+class PrepGenderButton extends Button:
+	var is_male := false
+	var selected := false
+
+	func _ready() -> void:
+		flat = true
+		custom_minimum_size = Vector2(20, 21)
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var ink := Color("#e2dbce") if selected else Color("#a8a8a4")
+		var center := Vector2(8.5, 9.0)
+		draw_arc(center, 4.4, 0.0, TAU, 24, ink, 1.8, true)
+		if is_male:
+			draw_line(center + Vector2(3.1, -3.1), center + Vector2(7.5, -7.5), ink, 1.8, true)
+			draw_line(center + Vector2(4.1, -7.5), center + Vector2(7.5, -7.5), ink, 1.8, true)
+			draw_line(center + Vector2(7.5, -7.5), center + Vector2(7.5, -4.1), ink, 1.8, true)
+		else:
+			draw_line(center + Vector2(0, 4.4), center + Vector2(0, 9.2), ink, 1.8, true)
+			draw_line(center + Vector2(-2.6, 7.0), center + Vector2(2.6, 7.0), ink, 1.8, true)
 
 
 class PassionFlame extends Button:
@@ -170,32 +191,47 @@ class PrepStepper extends HBoxContainer:
 	var value := 0
 	var minimum := 0
 	var maximum := 100
+	var display_mode := "standard"
 	var field: LineEdit
 
-	func _init(initial_value: int = 0, lower: int = 0, upper: int = 100) -> void:
+	func _init(initial_value: int = 0, lower: int = 0, upper: int = 100, mode: String = "standard") -> void:
 		minimum = lower
 		maximum = upper
 		value = clampi(initial_value, minimum, maximum)
+		display_mode = mode
 
 	func _ready() -> void:
-		add_theme_constant_override("separation", 2)
+		add_theme_constant_override("separation", 0 if display_mode != "standard" else 2)
 		var previous := Button.new()
 		previous.text = "◀"
-		previous.custom_minimum_size = Vector2(23, 25)
+		previous.custom_minimum_size = Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)
 		previous.pressed.connect(func(): set_value(value - 1))
-		add_child(previous)
 		field = LineEdit.new()
 		field.text = str(value)
 		field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		field.custom_minimum_size = Vector2(42, 25)
+		field.custom_minimum_size = Vector2(36, 25) if display_mode != "standard" else Vector2(42, 25)
 		field.text_submitted.connect(func(_text: String): _commit())
 		field.focus_exited.connect(_commit)
-		add_child(field)
 		var next := Button.new()
 		next.text = "▶"
-		next.custom_minimum_size = Vector2(23, 25)
+		next.custom_minimum_size = Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)
 		next.pressed.connect(func(): set_value(value + 1))
-		add_child(next)
+		if display_mode != "standard":
+			previous.flat = true
+			next.flat = true
+			previous.add_theme_font_size_override("font_size", 12)
+			next.add_theme_font_size_override("font_size", 12)
+		if display_mode == "inline":
+			field.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+			field.add_theme_stylebox_override("read_only", StyleBoxEmpty.new())
+		if display_mode == "skill":
+			add_child(field)
+			add_child(previous)
+			add_child(next)
+		else:
+			add_child(previous)
+			add_child(field)
+			add_child(next)
 
 	func set_value(next_value: int) -> void:
 		value = clampi(next_value, minimum, maximum)
@@ -756,13 +792,18 @@ func _preparation_panel(minimum := Vector2.ZERO, outer := false) -> PanelContain
 	return card
 
 
-func _preparation_dice_button(action: Callable, hint: String, minimum := Vector2(27, 27)) -> PrepDiceButton:
+func _preparation_dice_button(action: Callable, hint: String, minimum := Vector2(27, 27), transparent := false) -> PrepDiceButton:
 	var button := PrepDiceButton.new()
 	button.custom_minimum_size = minimum
 	button.tooltip_text = hint
 	button.pressed.connect(action)
-	for state in ["normal", "hover", "pressed"]:
-		button.add_theme_stylebox_override(state, _style(Color("#36383a") if state == "normal" else Color("#4b4d4f"), Color("#6a6c6d"), 0))
+	if transparent:
+		button.flat = true
+		for state in ["normal", "hover", "pressed", "focus"]:
+			button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	else:
+		for state in ["normal", "hover", "pressed"]:
+			button.add_theme_stylebox_override(state, _style(Color("#36383a") if state == "normal" else Color("#4b4d4f"), Color("#6a6c6d"), 0))
 	return button
 
 
@@ -1789,7 +1830,33 @@ func _preparation_roster(body: HBoxContainer) -> void:
 
 func _default_prepared_spec(index: int) -> Dictionary:
 	var i := clampi(index, 0, 2)
-	return {"name": ["Ada", "Baran", "Deniz"][i], "first_name": ["Ada", "Baran", "Deniz"][i], "nickname": ["Ada", "Baran", "Deniz"][i], "last_name": "", "hair_index": i % 4, "hair_color": HAIR_COLOR_OPTIONS[i + 1], "skin_color": SKIN_OPTIONS[i * 3], "body_type": i % 2, "head_type": i % 2, "trait_ids": ["hardworking"] if i == 0 else ["calm"] if i == 1 else ["quick"], "condition_ids": [], "sex": "female" if i != 1 else "male", "age": 25 + i * 4, "childhood": "rural_child", "adulthood": ["farmer", "builder", "medic"][i], "starting_gear": {"weapon": "fists", "shirt": "tshirt", "pants": "pants", "shirt_color": OUTFIT_OPTIONS[i % OUTFIT_OPTIONS.size()], "pants_color": "#5f6768"}, "starting_relationships": {}, "skills": {}}
+	var nickname := str(["Ada", "Baran", "Deniz"][i])
+	var default_passions := [
+		{"plants": 2, "animals": 1},
+		{"construction": 2, "mining": 1},
+		{"medical": 2, "intellectual": 1}
+	]
+	return {
+		"name": nickname, "first_name": ["Adeline", "Baran", "Deniz"][i],
+		"nickname": nickname, "last_name": ["Fox", "Vale", "Arden"][i],
+		"hair_index": i % 4, "hair_color": HAIR_COLOR_OPTIONS[i + 1],
+		"skin_color": SKIN_OPTIONS[i * 3], "body_type": i % 2, "head_type": i % 2,
+		"trait_ids": ["hardworking"] if i == 0 else ["calm"] if i == 1 else ["quick"],
+		"condition_ids": [], "sex": "female" if i != 1 else "male", "age": 25 + i * 4,
+		"childhood": "rural_child", "adulthood": ["farmer", "builder", "medic"][i],
+		"starting_gear": {"weapon": "fists", "shirt": "tshirt", "pants": "pants", "shirt_color": OUTFIT_OPTIONS[i % OUTFIT_OPTIONS.size()], "pants_color": "#5f6768"},
+		"starting_relationships": {}, "skills": _derive_work_skills(_default_classic_skill_profile(i)),
+		"passions": default_passions[i]
+	}
+
+
+func _default_classic_skill_profile(index: int) -> Dictionary:
+	var profiles := [
+		{"shooting": 4, "melee": 3, "construction": 5, "mining": 2, "cooking": 6, "plants": 9, "animals": 7, "crafting": 4, "artistic": 2, "medical": 3, "social": 6, "intellectual": 3},
+		{"shooting": 7, "melee": 5, "construction": 10, "mining": 8, "cooking": 2, "plants": 3, "animals": 2, "crafting": 8, "artistic": 4, "medical": 2, "social": 3, "intellectual": 5},
+		{"shooting": 3, "melee": 2, "construction": 3, "mining": 1, "cooking": 5, "plants": 4, "animals": 4, "crafting": 3, "artistic": 5, "medical": 10, "social": 7, "intellectual": 8}
+	]
+	return (profiles[clampi(index, 0, profiles.size() - 1)] as Dictionary).duplicate(true)
 
 
 func _add_prepared_colonist() -> void:
@@ -1910,20 +1977,29 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 	var age_row := _hbox(5)
 	appearance_fields.add_child(age_row)
 	age_row.add_child(_label(_prep_local("Biological", "Biyolojik", "Biologiczny"), 12, MUTED))
-	var age := PrepStepper.new(int(old.get("age", 25)), 18, 80)
+	var age := PrepStepper.new(int(old.get("age", 25)), 18, 80, "inline")
 	age.changed.connect(func(_value: int): _refresh_character_editor())
 	age_row.add_child(age)
 	var chronological_row := _hbox(5)
 	appearance_fields.add_child(chronological_row)
 	chronological_row.add_child(_label(_prep_local("Chronological", "Kronolojik", "Chronologiczny"), 12, MUTED))
-	var chronological_age := PrepStepper.new(int(old.get("chronological_age", old.get("age", 25))), 18, 1200)
+	var chronological_age := PrepStepper.new(int(old.get("chronological_age", old.get("age", 25))), 18, 1200, "inline")
 	chronological_age.changed.connect(func(_value: int): _refresh_character_editor())
 	chronological_row.add_child(chronological_age)
 	appearance_fields.add_child(HSeparator.new())
-	appearance_fields.add_child(_label(_prep_local("Appearance", "Görünüş", "Wygląd"), 18, CREAM))
 	var apparel_popup := PopupPanel.new()
 	apparel_popup.name = "PreparationApparelPopup"
 	editor.add_child(apparel_popup)
+	var appearance_header := _hbox(5)
+	appearance_fields.add_child(appearance_header)
+	appearance_header.add_child(_label(_prep_local("Appearance", "Görünüş", "Wygląd"), 18, CREAM))
+	var appearance_header_spacer := Control.new()
+	appearance_header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	appearance_header.add_child(appearance_header_spacer)
+	var apparel_edit_button := _setup_button(_prep_local("Apparel...", "Giysiler...", "Odzież..."), func(): apparel_popup.popup_centered(Vector2i(390, 410)), false, Vector2(88, 24))
+	apparel_edit_button.tooltip_text = _prep_local("Edit this colonist's apparel and weapon", "Bu kolonistin giysi ve silahını düzenle", "Edytuj odzież i broń postaci")
+	apparel_edit_button.add_theme_font_size_override("font_size", 11)
+	appearance_header.add_child(apparel_edit_button)
 	var equipped_gear: Dictionary = old.get("starting_gear", {})
 	var hat_choice := MenuButton.new()
 	var hat_id := str(equipped_gear.get("hat", "none"))
@@ -1942,22 +2018,23 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 	var preview := PawnPreviewScript.new()
 	portrait_box.add_child(preview)
 	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var portrait_controls := _hbox(3)
-	portrait_controls.position = Vector2(5, 4)
+	var portrait_controls := _hbox(1)
+	portrait_controls.position = Vector2(5, 3)
 	portrait_box.add_child(portrait_controls)
 	var sex := {"index": 0 if str(old.get("sex", "female")) == "female" else 1, "row": portrait_box}
-	var female_button := _setup_button("♀", func(): sex["index"] = 0; _on_preparation_sex_changed(), int(sex["index"]) == 0, Vector2(33, 30))
+	var female_button := PrepGenderButton.new()
+	female_button.selected = int(sex["index"]) == 0
+	female_button.pressed.connect(func(): sex["index"] = 0; _on_preparation_sex_changed())
 	female_button.tooltip_text = _prep_local("Female", "Kadın", "Kobieta")
 	portrait_controls.add_child(female_button)
-	var male_button := _setup_button("♂", func(): sex["index"] = 1; _on_preparation_sex_changed(), int(sex["index"]) == 1, Vector2(33, 30))
+	var male_button := PrepGenderButton.new()
+	male_button.is_male = true
+	male_button.selected = int(sex["index"]) == 1
+	male_button.pressed.connect(func(): sex["index"] = 1; _on_preparation_sex_changed())
 	male_button.tooltip_text = _prep_local("Male", "Erkek", "Mężczyzna")
 	portrait_controls.add_child(male_button)
-	var appearance_die := _preparation_dice_button(_randomize_prepared_appearance, _prep_local("Randomize appearance", "Görünüşü rastgele seç", "Wylosuj wygląd"), Vector2(33, 30))
+	var appearance_die := _preparation_dice_button(_randomize_prepared_appearance, _prep_local("Randomize appearance", "Görünüşü rastgele seç", "Wylosuj wygląd"), Vector2(21, 21), true)
 	portrait_controls.add_child(appearance_die)
-	var apparel_icon_button := _setup_button("▣", func(): apparel_popup.popup_centered(Vector2i(390, 410)), false, Vector2(32, 30))
-	apparel_icon_button.position = Vector2(239, 4)
-	apparel_icon_button.tooltip_text = _prep_local("Apparel and weapon", "Giysi ve silah", "Odzież i broń")
-	portrait_box.add_child(apparel_icon_button)
 	var hair := _arrow_choice_field(appearance_fields, _tr("characters.hair"), _hair_options_for_sex(str(old.get("sex", "female"))), clampi(int(old.get("hair_index", 0)), 0, 3), _refresh_character_editor, 75, 118)
 	var body_type := _arrow_choice_field(appearance_fields, _prep_local("Body", "Gövde", "Sylwetka"), [_prep_local("Type 1", "Tip 1", "Typ 1"), _prep_local("Type 2", "Tip 2", "Typ 2")], clampi(int(old.get("body_type", 0)), 0, 1), _refresh_character_editor, 75, 118)
 	var head_type := _arrow_choice_field(appearance_fields, _prep_local("Head", "Kafa", "Głowa"), [_prep_local("Type 1", "Tip 1", "Typ 1"), _prep_local("Type 2", "Tip 2", "Typ 2")], clampi(int(old.get("head_type", 0)), 0, 1), _refresh_character_editor, 75, 118)
@@ -2036,7 +2113,7 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 	biography_stack.add_child(traits_panel)
 	var traits_column := _vbox(6)
 	traits_panel.add_child(traits_column)
-	var trait_header := _hbox(3)
+	var trait_header := _hbox(9)
 	traits_column.add_child(trait_header)
 	trait_header.add_child(_label(_prep_local("Traits", "Özellikler", "Cechy"), 18, CREAM))
 	var trait_header_fill := Control.new()
@@ -2045,10 +2122,10 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 	var old_traits: Array = old.get("trait_ids", [TRAIT_IDS[clampi(int(old.get("trait_index", 0)) + 1, 1, TRAIT_IDS.size() - 1)]])
 	var trait_fields := _preparation_choice_chips(traits_column, TRAIT_IDS, _preparation_trait_names(), old_traits,
 		_prep_local("Add trait", "Özellik ekle", "Dodaj cechę"), trait_header)
-	var trait_die := _preparation_dice_button(func(): _randomize_preparation_choices("traits"), _prep_local("Randomize traits", "Özellikleri rastgele seç", "Wylosuj cechy"))
+	var trait_die := _preparation_dice_button(func(): _randomize_preparation_choices("traits"), _prep_local("Randomize traits", "Özellikleri rastgele seç", "Wylosuj cechy"), Vector2(23, 23), true)
 	trait_header.add_child(trait_die)
 	traits_column.add_child(HSeparator.new())
-	var health_header := _hbox(3)
+	var health_header := _hbox(9)
 	traits_column.add_child(health_header)
 	health_header.add_child(_label(_tr("characters.health"), 18, CREAM))
 	var health_header_fill := Control.new()
@@ -2059,7 +2136,7 @@ func _build_preparation_character(body: HBoxContainer) -> void:
 		traits_column.add_child(_label(_prep_local("No injuries, conditions or implants", "Yaralanma, rahatsızlık veya implant yok", "Brak obrażeń, schorzeń i implantów"), 12, MUTED))
 	var condition_fields := _preparation_choice_chips(traits_column, CONDITION_IDS, _preparation_condition_names(), old_conditions,
 		_prep_local("Add condition", "Sağlık durumu ekle", "Dodaj schorzenie"), health_header)
-	var health_die := _preparation_dice_button(func(): _randomize_preparation_choices("health"), _prep_local("Randomize health conditions", "Sağlık durumlarını rastgele seç", "Wylosuj stan zdrowia"))
+	var health_die := _preparation_dice_button(func(): _randomize_preparation_choices("health"), _prep_local("Randomize health conditions", "Sağlık durumlarını rastgele seç", "Wylosuj stan zdrowia"), Vector2(23, 23), true)
 	health_header.add_child(health_die)
 	var skill_panel := _preparation_panel(Vector2(328, 0))
 	skill_panel.name = "PreparationSkills"
@@ -2225,21 +2302,8 @@ func _build_preparation_relationships(body: HBoxContainer) -> void:
 			if relation_id == "partner":
 				forward = _prep_local("Wife", "Eş", "Żona") if str(first.get("sex", "female")) == "female" else _prep_local("Husband", "Eş", "Mąż")
 				backward = _prep_local("Wife", "Eş", "Żona") if str(second.get("sex", "female")) == "female" else _prep_local("Husband", "Eş", "Mąż")
-			_preparation_relationship_arrow(link_column, forward, true)
-			_preparation_relationship_arrow(link_column, backward, false)
-			var first_index := i
-			var second_index := j
-			var relation_picker := MenuButton.new()
-			relation_picker.text = "▾"
-			relation_picker.tooltip_text = _prep_local("Change relationship", "İlişkiyi değiştir", "Zmień relację")
-			relation_picker.custom_minimum_size = Vector2(27, 25)
-			relation_picker.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			for option_index in relation_ids.size():
-				relation_picker.get_popup().add_item(_preparation_relation_label(relation_ids[option_index], true), option_index)
-			relation_picker.get_popup().id_pressed.connect(func(choice_index: int):
-				_set_starting_relation(first_index, second_index, relation_ids[choice_index])
-				_show_characters())
-			link_column.add_child(relation_picker)
+			_preparation_relationship_arrow(link_column, forward, true, relation_ids, i, j)
+			_preparation_relationship_arrow(link_column, backward, false, relation_ids, i, j)
 			var second_card := _vbox(2)
 			second_card.custom_minimum_size.x = 90
 			row.add_child(second_card)
@@ -2255,10 +2319,7 @@ func _build_preparation_relationships(body: HBoxContainer) -> void:
 	add_relationship.custom_minimum_size = Vector2(92, 94)
 	for add_state in ["normal", "hover", "pressed"]:
 		add_relationship.add_theme_stylebox_override(add_state, _style(Color("#303133") if add_state == "normal" else Color("#3a3c3e"), Color("#555759"), 0))
-	var relationship_plus := _label("+", 18, CREAM)
-	relationship_plus.position = Vector2(74, 2)
-	relationship_plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_relationship.add_child(relationship_plus)
+	_preparation_plus_placeholder(add_relationship, _prep_local("Add relation", "İlişki ekle", "Dodaj relację"))
 	var pair_options: Array = []
 	for first_index in range(colonist_count):
 		for second_index in range(first_index + 1, colonist_count):
@@ -2269,6 +2330,8 @@ func _build_preparation_relationships(body: HBoxContainer) -> void:
 			add_relationship.get_popup().add_item("%s  ↔  %s" % [first_name, second_name], pair_options.size())
 			pair_options.append([first_index, second_index])
 	add_relationship.disabled = pair_options.is_empty()
+	if add_relationship.disabled:
+		add_relationship.modulate.a = 0.5
 	add_relationship.get_popup().id_pressed.connect(func(choice_index: int):
 		var pair: Array = pair_options[choice_index]
 		_set_starting_relation(int(pair[0]), int(pair[1]), "friend")
@@ -2276,17 +2339,42 @@ func _build_preparation_relationships(body: HBoxContainer) -> void:
 	pair_grid.add_child(add_relationship)
 
 
-func _preparation_relationship_arrow(parent: VBoxContainer, title: String, forward: bool) -> void:
+func _preparation_relationship_arrow(parent: VBoxContainer, title: String, forward: bool, relation_ids: Array, first_index: int, second_index: int) -> void:
+	var picker := MenuButton.new()
+	picker.name = "PreparationRelationshipPickerForward" if forward else "PreparationRelationshipPickerReverse"
+	picker.text = ""
+	picker.flat = true
+	picker.tooltip_text = _prep_local("Change relationship", "İlişkiyi değiştir", "Zmień relację")
+	picker.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	picker.custom_minimum_size = Vector2(164, 27)
+	parent.add_child(picker)
 	var arrow := RelationshipArrow.new()
 	arrow.forward = forward
-	arrow.custom_minimum_size = Vector2(164, 27)
-	parent.add_child(arrow)
+	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picker.add_child(arrow)
+	arrow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var caption := _label(title, 11, CREAM)
 	arrow.add_child(caption)
 	caption.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for option_index in relation_ids.size():
+		picker.get_popup().add_item(_preparation_relation_label(str(relation_ids[option_index]), forward), option_index)
+	picker.get_popup().id_pressed.connect(func(choice_index: int):
+		_set_starting_relation(first_index, second_index, str(relation_ids[choice_index]))
+		_show_characters())
+
+
+func _preparation_plus_placeholder(button: MenuButton, caption: String) -> void:
+	if button.tooltip_text.is_empty():
+		button.tooltip_text = caption
+	var plus := _label("+", 19, CREAM)
+	plus.position = Vector2(button.custom_minimum_size.x - 23.0, 2.0)
+	plus.size = Vector2(20, 20)
+	plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(plus)
 
 
 func _preparation_relation_label(relation_id: String, forward: bool) -> String:
@@ -2388,10 +2476,7 @@ func _preparation_family_add_slot(graph: FamilyGraph, position: Vector2, anchor_
 		style.set_content_margin_all(3)
 		add.add_theme_stylebox_override(state, style)
 	graph.add_child(add)
-	var plus := _label("+", 18, CREAM)
-	plus.position = Vector2(88, 1)
-	plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add.add_child(plus)
+	_preparation_plus_placeholder(add, _prep_local("Add parent", "Ebeveyn ekle", "Dodaj rodzica") if slot_role == "parent" else _prep_local("Add bond", "Bağ ekle", "Dodaj więź"))
 	var actions: Array = []
 	var popup := add.get_popup()
 	for other_index in range(colonist_count):
@@ -2783,13 +2868,8 @@ func _randomize_preparation_choices(kind: String) -> void:
 func _reset_preparation_skills() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
-	var skills := {}
-	var passions := {}
-	for skill in CLASSIC_SKILL_IDS:
-		skills[skill] = 5
-		passions[skill] = 0
-	spec["skills"] = _derive_work_skills(skills)
-	spec["passions"] = passions
+	spec["skills"] = _derive_work_skills(_default_classic_skill_profile(_editing_character_index))
+	spec["passions"] = {}
 	character_specs[_editing_character_index] = spec
 	_show_characters()
 
@@ -2866,7 +2946,7 @@ func _save_preparation_preset() -> void:
 	if file == null:
 		_notice(_prep_local("Could not save preset.", "Hazır ayar kaydedilemedi.", "Nie można zapisać zestawu."))
 		return
-	file.store_string(JSON.stringify({"colonist_count": colonist_count, "point_limit_enabled": point_limit_enabled, "characters": character_specs, "world_characters": world_character_specs}))
+	file.store_string(JSON.stringify({"colonist_count": colonist_count, "point_limit_enabled": point_limit_enabled, "characters": character_specs, "world_characters": world_character_specs, "starting_cargo": starting_cargo}))
 	_notice(_prep_local("Starting crew saved as a preset.", "Başlangıç ekibi hazır ayar olarak kaydedildi.", "Załoga zapisana jako zestaw."))
 
 
@@ -2883,6 +2963,10 @@ func _load_preparation_preset() -> void:
 	point_limit_enabled = bool(data.get("point_limit_enabled", true))
 	character_specs = (data["characters"] as Array).duplicate(true)
 	world_character_specs = (data.get("world_characters", []) as Array).duplicate(true)
+	if data.get("starting_cargo", null) is Dictionary:
+		starting_cargo = (data["starting_cargo"] as Dictionary).duplicate(true)
+	else:
+		starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
 	_editing_character_index = 0
 	preparation_tab = "characters"
 	_show_characters()
@@ -2945,27 +3029,33 @@ func _choice_field(parent: Control, title: String, values: Array, initial_index:
 	return state
 
 
-func _arrow_choice_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, value_width := 150) -> Dictionary:
+func _arrow_choice_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, _value_width := 150) -> Dictionary:
 	var state := {"index": clampi(initial_index, 0, values.size() - 1)}
-	var row := _hbox(2)
+	var row := _hbox(0)
 	parent.add_child(row)
 	var caption := _label(title, 12, MUTED)
 	caption.custom_minimum_size.x = label_width
 	row.add_child(caption)
 	var value_label := _label(str(values[int(state["index"])]), 12, CREAM)
-	value_label.custom_minimum_size = Vector2(value_width, 27)
+	value_label.custom_minimum_size.y = 27
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var previous := _setup_button("◀", func():
 		state["index"] = posmod(int(state["index"]) - 1, values.size())
 		value_label.text = str(values[int(state["index"])] )
-		changed.call(), false, Vector2(24, 27))
+		changed.call(), false, Vector2(17, 27))
+	previous.flat = true
+	for state_name in ["normal", "hover", "pressed", "focus"]:
+		previous.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
 	row.add_child(previous)
 	row.add_child(value_label)
 	var next := _setup_button("▶", func():
 		state["index"] = posmod(int(state["index"]) + 1, values.size())
 		value_label.text = str(values[int(state["index"])])
-		changed.call(), false, Vector2(24, 27))
+		changed.call(), false, Vector2(17, 27))
+	next.flat = true
+	for state_name in ["normal", "hover", "pressed", "focus"]:
+		next.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
 	row.add_child(next)
 	state["row"] = row
 	return state
@@ -2982,27 +3072,37 @@ func _preparation_choice_chips(parent: Control, ids: Array, names: Array, select
 		if choice_index == 0:
 			continue
 		selected_count += 1
-		var chip_row := _hbox(4)
-		parent.add_child(chip_row)
+		var chip_panel := PanelContainer.new()
+		chip_panel.custom_minimum_size = Vector2(194, 27)
+		chip_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		chip_panel.add_theme_stylebox_override("panel", _style(Color("#181a1b"), Color.TRANSPARENT, 0))
+		parent.add_child(chip_panel)
+		var chip_row := _hbox(0)
+		chip_panel.add_child(chip_row)
 		var target_slot := slot
-		chip_row.add_child(_setup_button("◀", func(): _step_preparation_chip(states, target_slot, ids.size(), -1), false, Vector2(24, 27)))
 		var chip := _label(str(names[choice_index]), 12, CREAM)
-		chip.custom_minimum_size = Vector2(170, 27)
+		chip.custom_minimum_size = Vector2(169, 25)
 		chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		chip_row.add_child(chip)
-		chip_row.add_child(_setup_button("▶", func(): _step_preparation_chip(states, target_slot, ids.size(), 1), false, Vector2(24, 27)))
 		var remove := _setup_button("×", func():
 			states[target_slot]["index"] = 0
 			_save_character_inputs()
-			_show_characters(), false, Vector2(30, 28))
+			_show_characters(), false, Vector2(18, 25))
 		remove.tooltip_text = _prep_local("Remove", "Kaldır", "Usuń")
+		remove.flat = true
+		for state_name in ["normal", "hover", "pressed", "focus"]:
+			remove.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
 		chip_row.add_child(remove)
 	if selected_count < 3:
 		var add_choice := MenuButton.new()
 		add_choice.text = "+" if header != null else "+  " + add_caption
 		add_choice.tooltip_text = add_caption
-		add_choice.custom_minimum_size = Vector2(27, 27) if header != null else Vector2(180, 27)
+		add_choice.custom_minimum_size = Vector2(22, 23) if header != null else Vector2(180, 27)
+		if header != null:
+			add_choice.flat = true
+			for state_name in ["normal", "hover", "pressed", "focus"]:
+				add_choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
 		var empty_slot := -1
 		for slot in range(states.size()):
 			if int(states[slot]["index"]) == 0:
@@ -3054,7 +3154,7 @@ func _preparation_skill_field(parent: Control, title: String, initial_index: int
 	passion.level_changed.connect(func(next_level: int): state["passion"] = next_level; changed.call())
 	row.add_child(passion)
 	state["passion_button"] = passion
-	var level := PrepStepper.new(int(state["index"]), 0, 20)
+	var level := PrepStepper.new(int(state["index"]), 0, 20, "skill")
 	row.add_child(level)
 	level.changed.connect(func(value: int):
 		state["index"] = value
