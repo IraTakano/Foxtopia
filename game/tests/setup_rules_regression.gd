@@ -43,8 +43,11 @@ func _initialize() -> void:
 	var invalid := {"seed": "invalid-choice", "scenario_id": "missing",
 		"faction_specs": [{"site_id": "site_1"}]}
 	assert(not harsh.validate_setup(invalid)["ok"])
-	var mismatched := {"seed": "invalid-crew", "scenario_id": "hard_landing",
+	var edited_crew := {"seed": "editable-crew", "scenario_id": "hard_landing",
 		"colonists_per_faction": 2}
-	assert(not harsh.validate_setup(mismatched)["ok"])
+	assert(harsh.validate_setup(edited_crew)["ok"])
+	var too_many := {"seed": "invalid-crew", "scenario_id": "hard_landing",
+		"colonists_per_faction": 4}
+	assert(not harsh.validate_setup(too_many)["ok"])
 	print("SETUP_RULES_REGRESSION_OK")
 	quit()

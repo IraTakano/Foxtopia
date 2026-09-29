@@ -31,13 +31,14 @@ const RESEARCH_PROJECTS := {
 	"stonework": {"name": "Taş İşçiliği", "cost": 35, "requires": []},
 	"barriers": {"name": "Barikat", "cost": 40, "requires": ["stonework"]},
 }
-const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11, "tshirt": 8, "pants": 9}
+const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11, "tshirt": 8, "pants": 9, "cap": 6, "brim_hat": 10}
+const CLASSIC_SKILL_IDS := ["shooting", "melee", "construction", "mining", "cooking", "plants", "animals", "crafting", "artistic", "medical", "social", "intellectual"]
 const TRAIT_COSTS := {"hardworking": 6, "calm": 4, "quick": 4, "curious": 3,
 	"kind": 3, "night_owl": 2, "timid": -4, "abrasive": -4, "lazy": -6}
 const HEALTH_CONDITION_COSTS := {"asthma": -4, "bad_back": -5, "scar": -2}
 const CHILDHOOD_SKILL_BONUSES := {"rural_child": "harvest", "town_child": "haul", "apprentice": "build"}
 const ADULTHOOD_SKILL_BONUSES := {"farmer": "harvest", "builder": "build", "medic": "treat", "scholar": "research"}
-const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2, "tshirt": 0, "pants": 0, "none": 0}
+const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2, "tshirt": 0, "pants": 0, "cap": 1, "brim_hat": 2, "none": 0}
 const STARTING_RELATIONSHIP_OPINIONS := {"friend": 35, "rival": -35, "partner": 65,
 	"parent": 45, "child": 45, "sibling": 40}
 const PREPARATION_POINT_LIMIT := 12
@@ -299,7 +300,8 @@ func start_new_game(config: Dictionary) -> Dictionary:
 	if not mode in ["solo", "coop", "competitive"]:
 		mode = "solo"
 	var selected_scenario := str(config.get("scenario_id", "landfall"))
-	var count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, selected_scenario).get("colonist_count", 3))
+	var scenario_count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, selected_scenario).get("colonist_count", 3))
+	var count: int = int(config.get("colonists_per_faction", config.get("colonist_count", scenario_count)))
 	var selected_storyteller := str(config.get("storyteller_id", "steady"))
 	var selected_difficulty := str(config.get("difficulty_id", "frontier"))
 	var generated_world := preview_world(seed_text, config.get("world_options", {}))
@@ -327,9 +329,12 @@ func start_new_game(config: Dictionary) -> Dictionary:
 		if settlement_name.is_empty(): settlement_name = "Unnamed settlement"
 		var peer_ids: Array = spec.get("players", [i + 1])
 		if peer_ids.is_empty(): peer_ids = [i + 1]
+		var prepared: Array = spec.get("colonists", [])
+		var faction_count := int(spec.get("colonist_count", count))
 		var faction := {
 			"id": faction_id, "name": faction_name,
 			"settlement_name": settlement_name, "site_id": site_id,
+			"colonist_count": faction_count,
 			"players": peer_ids.duplicate(),
 			"inventory": _starting_inventory(spec, selected_scenario),
 			"research": {"project": "", "progress": 0.0, "unlocked": []},
@@ -343,11 +348,10 @@ func start_new_game(config: Dictionary) -> Dictionary:
 		site["faction_id"] = faction_id
 		site["name"] = settlement_name
 		maps[site_id] = preview_local_map(generated_world, site_id)
-		var prepared: Array = spec.get("colonists", [])
-		for j in range(count):
+		for j in range(faction_count):
 			var prepared_one: Dictionary = prepared[j] if j < prepared.size() else {}
 			colonists.append(_make_colonist(generated_world["seed"], faction_id, site_id, i, j, prepared_one))
-		_apply_starting_relationships(colonists, prepared, colonists.size() - count, count)
+		_apply_starting_relationships(colonists, prepared, colonists.size() - faction_count, faction_count)
 	active_colony_id = str(factions[0]["id"]) if not factions.is_empty() else ""
 	state = {
 		"schema": 1, "mode": mode, "seed": generated_world["seed"],
@@ -445,9 +449,9 @@ func validate_setup(config: Dictionary) -> Dictionary:
 	var preview := preview_world(str(config.get("seed", "")), config.get("world_options", {}))
 	var selected: Dictionary = {}
 	var scenario_count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(config.get("scenario_id", "landfall"))).get("colonist_count", 3))
-	if int(config.get("colonists_per_faction", config.get("colonist_count", scenario_count))) != scenario_count:
-		return _error("Starting crew size must match the selected scenario.")
-	var count: int = scenario_count
+	var count: int = int(config.get("colonists_per_faction", config.get("colonist_count", scenario_count)))
+	if count < 1 or count > 3:
+		return _error("Starting crew size must be between one and three.")
 	for raw_spec in config.get("faction_specs", []):
 		if not raw_spec is Dictionary: return _error("Invalid faction setup.")
 		var spec: Dictionary = raw_spec
@@ -480,7 +484,10 @@ func validate_setup(config: Dictionary) -> Dictionary:
 		else:
 			return _error("Choose a start tile.")
 		var prepared: Variant = spec.get("colonists", [])
-		if not prepared is Array or prepared.size() > count:
+		if not prepared is Array:
+			return _error("Invalid colonist count.")
+		var faction_count := int(spec.get("colonist_count", count))
+		if faction_count < 1 or faction_count > 3 or prepared.size() > faction_count:
 			return _error("Invalid colonist count.")
 		var declared_relationships: Dictionary = {}
 		for person_index in range(prepared.size()):
@@ -502,6 +509,8 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				return _error("Invalid starting apparel.")
 			if str(gear.get("shirt", "tshirt")) not in ["tshirt", "none"] or str(gear.get("pants", "pants")) not in ["pants", "none"]:
 				return _error("Invalid starting clothing.")
+			if str(gear.get("hat", "none")) not in ["none", "cap", "brim_hat"]:
+				return _error("Invalid starting hat.")
 			for color_key in ["shirt_color", "pants_color", "apparel_color"]:
 				if gear.has(color_key) and not Color.html_is_valid(str(gear[color_key])):
 					return _error("Invalid clothing color.")
@@ -511,7 +520,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				var other_text := str(raw_other)
 				if not other_text.is_valid_int(): return _error("Invalid starting relationship target.")
 				var other_index := int(other_text)
-				if other_index < 0 or other_index >= count or other_index == person_index:
+				if other_index < 0 or other_index >= faction_count or other_index == person_index:
 					return _error("Invalid starting relationship target.")
 				var relation_type := str(relationships[raw_other])
 				if not STARTING_RELATIONSHIP_OPINIONS.has(relation_type):
@@ -538,11 +547,11 @@ func validate_setup(config: Dictionary) -> Dictionary:
 					return _error("Invalid or repeated health condition.")
 				condition_unique[condition_id] = true
 			for skill in person.get("skills", {}).keys():
-				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat": return _error("Invalid skill.")
-				if int(person["skills"][skill]) < 0 or int(person["skills"][skill]) > 10:
-					return _error("Skill level must be between 0 and 10.")
+				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat" and not CLASSIC_SKILL_IDS.has(str(skill)): return _error("Invalid skill.")
+				if int(person["skills"][skill]) < 0 or int(person["skills"][skill]) > 20:
+					return _error("Skill level must be between 0 and 20.")
 			for skill in person.get("passions", {}).keys():
-				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat": return _error("Invalid passion skill.")
+				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat" and not CLASSIC_SKILL_IDS.has(str(skill)): return _error("Invalid passion skill.")
 				if int(person["passions"][skill]) < 0 or int(person["passions"][skill]) > 2:
 					return _error("Passion must be between 0 and 2.")
 			if int(person.get("chronological_age", age)) < int(age):
@@ -569,15 +578,18 @@ func preparation_points(person: Dictionary) -> int:
 	for raw_trait in person.get("traits", []): points += int(TRAIT_COSTS.get(str(raw_trait), 0))
 	for condition in person.get("health_conditions", []):
 		points += int(HEALTH_CONDITION_COSTS.get(str(condition), 0))
-	for skill in person.get("skills", {}).keys():
-		if WORK_TYPES.has(str(skill)) or str(skill) == "combat":
-			points += maxi(0, int(person["skills"][skill]) - 5)
+	var prepared_skills: Dictionary = person.get("skills", {})
+	var has_classic := prepared_skills.has("construction")
+	for skill in prepared_skills.keys():
+		if CLASSIC_SKILL_IDS.has(str(skill)) if has_classic else WORK_TYPES.has(str(skill)) or str(skill) == "combat":
+			points += maxi(0, int(prepared_skills[skill]) - 5)
 	var gear: Variant = person.get("starting_gear", {})
 	if gear is Dictionary:
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("weapon", "fists")), 0))
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("apparel", "clothes")), 0))
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("shirt", "none")), 0))
 		points += int(STARTING_GEAR_COSTS.get(str(gear.get("pants", "none")), 0))
+		points += int(STARTING_GEAR_COSTS.get(str(gear.get("hat", "none")), 0))
 	return points
 
 
@@ -915,7 +927,8 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 	var adulthood_skill: String = str(ADULTHOOD_SKILL_BONUSES.get(adulthood, ""))
 	if skills.has(adulthood_skill): skills[adulthood_skill] = mini(10, int(skills[adulthood_skill]) + 2)
 	for key in prepared.get("skills", {}).keys():
-		if skills.has(key): skills[key] = clampi(int(prepared["skills"][key]), 0, 10)
+		if skills.has(key) or CLASSIC_SKILL_IDS.has(str(key)):
+			skills[key] = clampi(int(prepared["skills"][key]), 0, 20)
 	var priorities: Dictionary = {}
 	for work in WORK_TYPES: priorities[work] = 5
 	for key in prepared.get("work_priorities", {}).keys():
@@ -938,9 +951,13 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 	unit_appearance["head_type"] = clampi(int(appearance.get("head_type", 0)), 0, 1)
 	var unit_equipment := {"weapon": str(starting_gear.get("weapon", "fists")),
 		"apparel": str(starting_gear.get("apparel", "clothes"))}
+	var selected_hat := str(starting_gear.get("hat", "none"))
+	if selected_hat != "none":
+		unit_equipment["hat"] = selected_hat
 	if new_garments and unit_equipment["apparel"] == "clothes":
 		unit_equipment["apparel"] = "none"
 	unit_appearance["apparel"] = unit_equipment["apparel"]
+	unit_appearance["hat"] = selected_hat
 	unit_appearance["apparel_color"] = str(starting_gear.get("apparel_color", "#735f50"))
 	if starting_gear.has("apparel_color"):
 		unit_equipment["apparel_color"] = unit_appearance["apparel_color"]

@@ -10,7 +10,7 @@ static var _garment_order: Array[String] = []
 
 
 static func draw_pawn(canvas: CanvasItem, center: Vector2, diameter: float, appearance: Dictionary, selected: bool, enemy: bool, drafted: bool) -> void:
-	var key := str([appearance.get("sex", "male"), appearance.get("body_type", 0), appearance.get("head_type", 0), appearance.get("skin", "#d9ad81"), appearance.get("hair", "short"), appearance.get("hair_color", "#4d3c32"), appearance.get("shirt", "tshirt"), appearance.get("shirt_color", appearance.get("outfit", "#527a81")), appearance.get("pants", "pants"), appearance.get("pants_color", "#343e48"), appearance.get("apparel", "none"), appearance.get("apparel_color", "#735f50"), enemy])
+	var key := str([appearance.get("sex", "male"), appearance.get("body_type", 0), appearance.get("head_type", 0), appearance.get("skin", "#d9ad81"), appearance.get("hair", "short"), appearance.get("hair_color", "#4d3c32"), appearance.get("shirt", "tshirt"), appearance.get("shirt_color", appearance.get("outfit", "#527a81")), appearance.get("pants", "pants"), appearance.get("pants_color", "#343e48"), appearance.get("apparel", "none"), appearance.get("apparel_color", "#735f50"), appearance.get("hat", "none"), enemy])
 	if not _pawns.has(key):
 		_pawns[key] = _texture(_pawn_svg(appearance, enemy))
 		_pawn_order.append(key)
@@ -83,8 +83,24 @@ static func _pawn_svg(appearance: Dictionary, enemy: bool) -> String:
 	out += _path("M 119 136 Q 128 139 137 136 L 137 151 Q 128 155 119 151 Z", skin.lightened(0.05))
 	out += _face(sex, head_type, skin, hair)
 	out += _front_hair(style, hair)
+	out += _hat(str(appearance.get("hat", "none")))
 	out += '</svg>'
 	return out
+
+
+static func _hat(hat_id: String) -> String:
+	var cloth := Color("#766b55")
+	if hat_id == "cap":
+		var cap := _path("M 83 83 C 83 48 99 34 127 33 C 157 34 174 52 173 82 Q 128 91 83 83 Z", cloth.darkened(0.10), 3.8)
+		cap += _path("M 89 72 Q 100 43 127 42 Q 148 41 161 58 Q 127 53 101 77 Z", cloth.lightened(0.17))
+		cap += _path("M 78 80 Q 129 89 186 75 Q 193 77 191 83 Q 146 102 79 87 Z", cloth.darkened(0.28), 2.6)
+		return cap
+	if hat_id == "brim_hat":
+		var brim := _path("M 97 41 Q 128 31 159 41 L 165 76 Q 129 88 91 75 Z", cloth.darkened(0.13), 3.5)
+		brim += _path("M 100 46 Q 124 36 154 46 L 158 64 Q 127 72 97 63 Z", cloth.lightened(0.15))
+		brim += _path("M 61 78 Q 122 95 194 76 Q 207 86 187 94 Q 128 109 68 94 Q 54 88 61 78 Z", cloth.darkened(0.27), 3.5)
+		return brim
+	return ""
 
 
 static func _torso_path(shoulder: int, hip: int) -> String:
@@ -190,7 +206,11 @@ static func _front_hair(style: String, hair: Color) -> String:
 
 static func _apparel_svg(item_id: String, tint: Color) -> String:
 	var out := '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><ellipse cx="128" cy="222" rx="73" ry="9" fill="#111719" opacity=".25"/>'
-	if item_id == "pants":
+	if item_id == "cap" or item_id == "brim_hat":
+		out += _path("M 66 114 Q 76 47 128 44 Q 183 46 191 114 L 183 155 Q 128 177 73 155 Z", tint.darkened(0.13), 6.0)
+		out += _path("M 77 111 Q 86 58 127 53 Q 155 52 174 80 Q 128 74 93 119 Z", tint.lightened(0.17))
+		out += _path("M 44 143 Q 128 177 212 137 Q 227 147 212 163 Q 128 199 44 165 Q 31 155 44 143 Z", tint.darkened(0.26), 5.0)
+	elif item_id == "pants":
 		out += _path("M 68 52 Q 128 61 188 52 L 179 194 Q 177 208 164 209 L 145 209 L 128 133 L 111 209 L 92 209 Q 79 208 77 194 Z", tint.darkened(0.08), 6.0)
 		out += _path("M 76 63 Q 100 68 127 68 L 123 133 L 105 199 L 86 198 Z", tint.lightened(0.14))
 		out += _path("M 129 69 Q 157 68 180 63 L 171 197 L 150 200 L 132 132 Z", tint.darkened(0.16))

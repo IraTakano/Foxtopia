@@ -12,6 +12,15 @@ func _find_option(node: Node, first_text: String) -> OptionButton:
 			return found
 	return null
 
+func _find_menu(node: Node, caption: String) -> MenuButton:
+	if node is MenuButton and ((node as MenuButton).text.contains(caption) or (node as MenuButton).tooltip_text.contains(caption)):
+		return node
+	for child in node.get_children():
+		var found := _find_menu(child, caption)
+		if found != null:
+			return found
+	return null
+
 func _find_remove(node: Node) -> Button:
 	if node is Button and (node as Button).tooltip_text == "Remove":
 		return node
@@ -30,40 +39,35 @@ func _run() -> void:
 	main.call("_advance_to_world")
 	main.call("_show_characters")
 	var input: Dictionary = (main.get("_character_inputs") as Array)[0]
-	assert((input.hair.option as OptionButton).item_count == 4)
-	(input.hair.option as OptionButton).select(2)
-	(input.hair.option as OptionButton).item_selected.emit(2)
+	(input.hair.row.get_child(3) as Button).pressed.emit()
+	(input.hair.row.get_child(3) as Button).pressed.emit()
 	assert(int((main.get("character_specs") as Array)[0]["hair_index"]) == 2)
-	(input.body_type.option as OptionButton).select(1)
-	(input.body_type.option as OptionButton).item_selected.emit(1)
+	(input.body_type.row.get_child(3) as Button).pressed.emit()
 	assert(int((main.get("character_specs") as Array)[0]["body_type"]) == 1)
-	(input.childhood.option as OptionButton).select(1)
-	(input.childhood.option as OptionButton).item_selected.emit(1)
+	(input.childhood.row.get_child(3) as Button).pressed.emit()
 	assert(str((main.get("character_specs") as Array)[0]["childhood"]) == "town_child")
-	var add_trait := _find_option(main, "+  Add trait")
+	var add_trait := _find_menu(main, "Add trait")
 	assert(add_trait != null)
-	var quick_index := -1
-	for i in range(add_trait.item_count):
-		if add_trait.get_item_text(i).begins_with("Quick"):
-			quick_index = i
-	assert(quick_index > 0)
-	add_trait.item_selected.emit(quick_index)
+	add_trait.get_popup().id_pressed.emit(3)
 	assert((main.get("character_specs") as Array)[0]["trait_ids"].has("quick"))
 	var remove := _find_remove(main)
 	assert(remove != null)
 	remove.pressed.emit()
 	assert(not (main.get("character_specs") as Array)[0]["trait_ids"].has("hardworking"))
 	input = (main.get("_character_inputs") as Array)[0]
-	(input.skills.build.level as SpinBox).value = 7
+	input.skills.construction.level.call("set_value", 7)
 	main.call("_save_character_inputs")
 	assert(int((main.get("character_specs") as Array)[0]["skills"]["build"]) == 7)
 	main.call("_set_starting_gear", "shirt", "none")
 	main.call("_set_starting_gear", "pants", "none")
 	assert(str((main.get("character_specs") as Array)[0]["starting_gear"]["shirt"]) == "none")
 	main.call("_switch_preparation_tab", "relationships")
-	var bond_picker := _find_option(main, "None")
-	assert(bond_picker != null, "The relationships page needs a direct bond picker")
-	bond_picker.item_selected.emit(6)
+	var add_bond := _find_menu(main, "Add relationship")
+	assert(add_bond != null)
+	add_bond.get_popup().id_pressed.emit(0)
+	var bond_picker := _find_menu(main, "Change relationship")
+	assert(bond_picker != null)
+	bond_picker.get_popup().id_pressed.emit(6)
 	assert(str((main.get("character_specs") as Array)[0]["starting_relationships"]["1"]) == "sibling")
 	var prepared: Dictionary = main.call("_game_setup_config")
 	var model = load("res://scripts/model/game_model.gd").new()

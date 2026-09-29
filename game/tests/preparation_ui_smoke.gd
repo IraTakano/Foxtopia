@@ -14,7 +14,7 @@ func _run() -> void:
 	var inputs: Array = main.get("_character_inputs")
 	var first: Dictionary = inputs[0]
 	(first["name"] as LineEdit).text = "Mara"
-	(first["age"] as SpinBox).value = 34
+	first["age"].call("set_value", 34)
 	main.call("_save_character_inputs")
 	main.call("_set_starting_gear", "weapon", "spear")
 	main.call("_set_starting_relation", 0, 1, "friend")

@@ -104,7 +104,7 @@ func configure_lobby(rules: Dictionary) -> Dictionary:
 		_lobby["world_options"] = options
 	for key in ["scenario_id", "storyteller_id", "difficulty_id"]:
 		_lobby[key] = str(rules.get(key, _lobby.get(key, "")))
-	_lobby["colonists_per_faction"] = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(_lobby["scenario_id"])).get("colonist_count", 3))
+	_lobby["colonists_per_faction"] = clampi(int(rules.get("colonists_per_faction", SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(_lobby["scenario_id"])).get("colonist_count", 3))), 1, 3)
 	_player_setups.clear()
 	_lobby["ready"] = {"1": true}
 	_broadcast_lobby()
@@ -135,7 +135,7 @@ func start_game(config: Dictionary) -> Dictionary:
 		return {"ok": false, "error": _net_text("Invalid game mode.", "Geçersiz oyun modu.", "Nieprawidłowy tryb gry.")}
 	setup["mode"] = selected_mode
 	var scenario: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(setup.get("scenario_id", "landfall")))
-	setup["colonists_per_faction"] = int(scenario.get("colonist_count", 3))
+	setup["colonists_per_faction"] = clampi(int(setup.get("colonists_per_faction", scenario.get("colonist_count", 3))), 1, 3)
 	var supplied: Array = setup.get("faction_specs", [])
 	var host_spec: Dictionary = supplied[0].duplicate(true) if not supplied.is_empty() else {}
 	host_spec["players"] = [1]
@@ -199,7 +199,7 @@ func _clean_setup(spec: Dictionary) -> Dictionary:
 	var clean_cargo: Dictionary = {}
 	var raw_cargo: Variant = spec.get("starting_cargo", {})
 	if raw_cargo is Dictionary:
-		for item in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket"]:
+		for item in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket", "tshirt", "pants", "cap", "brim_hat"]:
 			if raw_cargo.has(item): clean_cargo[item] = clampi(int(raw_cargo[item]), 0, 999)
 	var clean_colonists: Array = []
 	var raw_colonists: Variant = spec.get("colonists", [])
@@ -210,8 +210,10 @@ func _clean_setup(spec: Dictionary) -> Dictionary:
 			var appearance: Dictionary = {}
 			var raw_appearance: Variant = person.get("appearance", {})
 			if raw_appearance is Dictionary:
-				for key in ["hair", "hair_color", "skin", "outfit"]:
+				for key in ["hair", "hair_color", "skin", "outfit", "sex", "shirt", "shirt_color", "pants", "pants_color", "apparel", "apparel_color", "hat"]:
 					if raw_appearance.has(key): appearance[key] = str(raw_appearance[key]).substr(0, 24)
+				for key in ["body_type", "head_type"]:
+					if raw_appearance.has(key): appearance[key] = clampi(int(raw_appearance[key]), 0, 1)
 			var traits: Array = []
 			var raw_traits: Variant = person.get("traits", [])
 			if raw_traits is Array:
@@ -224,11 +226,18 @@ func _clean_setup(spec: Dictionary) -> Dictionary:
 			var raw_skills: Variant = person.get("skills", {})
 			if raw_skills is Dictionary:
 				for key in raw_skills.keys():
-					if Game.WORK_TYPES.has(str(key)) or str(key) == "combat": skills[str(key)] = clampi(int(raw_skills[key]), 0, 10)
+					if Game.WORK_TYPES.has(str(key)) or str(key) == "combat" or Game.CLASSIC_SKILL_IDS.has(str(key)):
+						skills[str(key)] = clampi(int(raw_skills[key]), 0, 20)
+			var passions: Dictionary = {}
+			var raw_passions: Variant = person.get("passions", {})
+			if raw_passions is Dictionary:
+				for key in raw_passions.keys():
+					if Game.WORK_TYPES.has(str(key)) or str(key) == "combat" or Game.CLASSIC_SKILL_IDS.has(str(key)):
+						passions[str(key)] = clampi(int(raw_passions[key]), 0, 2)
 			var starting_gear: Dictionary = {}
 			var raw_gear: Variant = person.get("starting_gear", {})
 			if raw_gear is Dictionary:
-				for key in ["weapon", "apparel"]:
+				for key in ["weapon", "apparel", "shirt", "pants", "hat", "shirt_color", "pants_color", "apparel_color"]:
 					if raw_gear.has(key): starting_gear[key] = str(raw_gear[key]).substr(0, 16)
 			var starting_relationships: Dictionary = {}
 			var raw_relationships: Variant = person.get("starting_relationships", {})
@@ -237,15 +246,21 @@ func _clean_setup(spec: Dictionary) -> Dictionary:
 					if str(key) in ["0", "1", "2"]:
 						starting_relationships[str(key)] = str(raw_relationships[key]).substr(0, 16)
 			clean_colonists.append({"name": str(person.get("name", "Colonist")).substr(0, 48),
+				"first_name": str(person.get("first_name", person.get("name", "Colonist"))).substr(0, 48),
+				"nickname": str(person.get("nickname", person.get("name", "Colonist"))).substr(0, 48),
+				"last_name": str(person.get("last_name", "")).substr(0, 48),
 				"age": int(person.get("age", 24)),
+				"chronological_age": int(person.get("chronological_age", person.get("age", 24))),
+				"favorite_color": str(person.get("favorite_color", "#8d985d")).substr(0, 16),
 				"childhood": str(person.get("childhood", "rural_child")).substr(0, 32),
 				"adulthood": str(person.get("adulthood", "farmer")).substr(0, 32),
 				"sex": str(person.get("sex", "female")).substr(0, 16),
 				"gender": str(person.get("gender", "woman")).substr(0, 16),
 				"appearance": appearance, "traits": traits, "health_conditions": conditions,
-				"skills": skills, "starting_gear": starting_gear,
+				"skills": skills, "passions": passions, "starting_gear": starting_gear,
 				"starting_relationships": starting_relationships})
 	return {
+		"colonist_count": clampi(int(spec.get("colonist_count", clean_colonists.size() if not clean_colonists.is_empty() else 3)), 1, 3),
 		"name": str(spec.get("name", "Unnamed colony")).substr(0, 48),
 		"settlement_name": str(spec.get("settlement_name", "Unnamed settlement")).substr(0, 48),
 		"site_id": str(spec.get("site_id", "")).substr(0, 64),

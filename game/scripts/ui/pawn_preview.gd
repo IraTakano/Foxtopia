@@ -17,9 +17,8 @@ func set_appearance(next_appearance: Dictionary) -> void:
 
 
 func _draw() -> void:
-	# The quiet inset background lets hair, skin and outfit colours read clearly.
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#394b47"))
-	draw_rect(Rect2(0, size.y * 0.73, size.x, size.y * 0.27), Color("#455c4e"))
-	draw_line(Vector2(0, size.y * 0.73), Vector2(size.x, size.y * 0.73), Color("#78866d", 0.28), 1.0)
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#181b1e"))
+	draw_rect(Rect2(0, size.y * 0.73, size.x, size.y * 0.27), Color("#22272b"))
+	draw_line(Vector2(0, size.y * 0.73), Vector2(size.x, size.y * 0.73), Color("#687078", 0.28), 1.0)
 	PawnVisual.draw_pawn(self, size * Vector2(0.5, 0.45), minf(size.x, size.y) * 0.79, appearance)
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#a9b4a5", 0.35), false, 1.0)
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#757b80", 0.65), false, 1.0)
