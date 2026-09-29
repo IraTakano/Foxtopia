@@ -38,7 +38,7 @@ GitHub CLI ile yayımlamak için:
 Yayımlama komutu aynı sürümün kurulum dosyası varsa onu da Release'e ekler.
 Önceden `gh auth login` ile yetkilendirme yapılmış olmalıdır.
 Güncelleyici herkese açık deponun en son kararlı release'ini kullanır.
-Bu yerel v0.1.8 paketi yayımlanmadı; otomatik dağıtım için ayrıca Release gerekir.
+v0.1.8 paketi [GitHub Releases](https://github.com/IraTakano/Foxtopia/releases/tag/v0.1.8) üzerinde yayımlandı. Sonraki güncellemelerde aynı üç varlığı yeni sürüm etiketiyle yayımlayın.
 
 Başlatıcı her açılışta GitHub Releases'i kontrol eder. Yeni sürüm varsa arşivi
 indirir, manifestteki SHA-256 özetini ve GitHub'ın asset özetini (varsa)
