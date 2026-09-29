@@ -4,7 +4,7 @@ Foxtopia, Godot 4 ile geliştirilen küçük ölçekli, 2D bir koloni simülasyo
 
 ## Oyna
 
-Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.9.exe` olarak üretilir ve yayımlandığında [GitHub Releases](https://github.com/IraTakano/Foxtopia/releases) üzerinden indirilebilir. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde GitHub Releases üzerinde güncelleme arar; yayımlanmış yeni sürümü aynı kurulum içinde indirip doğrular. Kurulum, başlatıcı, masaüstü kısayolu ve oyun penceresi aynı özgün tilki simgesini kullanır.
+Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.9.exe` olarak üretilir ve [GitHub Releases](https://github.com/IraTakano/Foxtopia/releases/tag/v0.1.9) üzerinden indirilebilir. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde GitHub Releases üzerinde güncelleme arar; yayımlanmış yeni sürümü aynı kurulum içinde indirip doğrular. Kurulum, başlatıcı, masaüstü kısayolu ve oyun penceresi aynı özgün tilki simgesini kullanır.
 
 Geliştirme sırasında Godot 4.7 ile `game/project.godot` açılabilir. Ana sahne `game/scenes/main.tscn` dosyasıdır.
 
