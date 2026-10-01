@@ -1,4 +1,5 @@
 extends SceneTree
+const PreparationPresetStore = preload("res://scripts/ui/preparation_preset_store.gd")
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -23,13 +24,17 @@ func _run() -> void:
 	var cargo: Dictionary = main.get("starting_cargo")
 	cargo["wood"] = 37
 	main.set("starting_cargo", cargo)
-	main.call("_save_preparation_preset")
+	var slot_name := "prep_ui_%d" % Time.get_ticks_usec()
+	assert(PreparationPresetStore.save_slot("crew", slot_name, main.call("_preparation_library_data", "crew")))
 	var specs: Array = main.get("character_specs")
 	(specs[0] as Dictionary)["name"] = "Changed"
 	main.set("character_specs", specs)
 	cargo["wood"] = 1
 	main.set("starting_cargo", cargo)
-	main.call("_load_preparation_preset")
+	var picker := PopupPanel.new()
+	main.add_child(picker)
+	main.call("_load_preparation_slot", "crew", slot_name, picker)
+	assert(PreparationPresetStore.delete_slot("crew", slot_name))
 	specs = main.get("character_specs")
 	assert(str(specs[0]["name"]) == "Mara")
 	assert(int((main.get("starting_cargo") as Dictionary).get("wood", 0)) == 37)

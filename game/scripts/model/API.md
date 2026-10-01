@@ -15,7 +15,7 @@ var preview = Game.preview_world("my seed")
 Game.start_new_game({
     "seed": "my seed",
     "mode": "competitive", # "solo", "coop", or "competitive"
-    "colonists_per_faction": 2, # 1..3
+    "colonists_per_faction": 2, # 1..8
     "faction_specs": [
         {"id":"faction_1", "name":"Tilki", "settlement_name":"Yuva",
          "site_id":"site_1", "players":[1],

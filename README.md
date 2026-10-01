@@ -4,7 +4,7 @@ Foxtopia, Godot 4 ile geliştirilen küçük ölçekli, 2D bir koloni simülasyo
 
 ## Oyna
 
-Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.9.exe` olarak üretilir ve [GitHub Releases](https://github.com/IraTakano/Foxtopia/releases/tag/v0.1.9) üzerinden indirilebilir. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde GitHub Releases üzerinde güncelleme arar; yayımlanmış yeni sürümü aynı kurulum içinde indirip doğrular. Kurulum, başlatıcı, masaüstü kısayolu ve oyun penceresi aynı özgün tilki simgesini kullanır.
+Güncel yerel Windows kurulum paketi `dist/Foxtopia-Setup-v0.1.27.exe` dosyasıdır. Kurulum hedefi `%LOCALAPPDATA%\KlausennGames\common\Foxtopia` olur. Oyun **Foxtopia** kısayolundan açıldığında başlatıcı her seferinde [GitHub Releases](https://github.com/IraTakano/Foxtopia/releases) üzerinde yayımlanmış güncellemeleri arar. Kurulum dosyası doğrudan çalıştırılarak da denenebilir. Kurulum, başlatıcı, masaüstü kısayolu ve oyun penceresi aynı özgün tilki simgesini kullanır.
 
 Geliştirme sırasında Godot 4.7 ile `game/project.godot` açılabilir. Ana sahne `game/scenes/main.tscn` dosyasıdır.
 
@@ -14,6 +14,8 @@ Geliştirme sırasında Godot 4.7 ile `game/project.godot` açılabilir. Ana sah
 - 50×50 yerleşke haritasında kaynak, inşa, araştırma, iş önceliği ve doğrudan kolonist emirlerinin ilk sürümleri.
 - Tek oyunculu oyunun yanında ortak veya ayrı koloni kurmaya yönelik çok oyunculu prototip.
 - Kolonist hazırlama, ihtiyaç, sağlık, baskın ve ticaret sistemlerinin gelişmekte olan sürümleri.
+
+Kolonist hazırlama ekranının kurulu v0.1.27 sürümünde kullanıcının seçtiği v0.1.19 pawn gövdesi temel alınır. Beğenilen erkek orta saç korunur; diğer model, kullanıcının Issei Hyoudou ve Kirito örnekleri doğrultusunda baş çevresinde katlı ve dağınık bir biçimle yeniden çizildi. Hazırlama portresi ve oyun içi çizim birlikte güncellendi. Yeni ezik yarası için yalnızca hafif ve orta önayarları sunulur; önceki karakter kayıtlarının değerleri korunur. FT-050 kullanıcı görsel onayı olmadan kapanmaz.
 
 Tamamlanan, yeniden düzenlenecek ve henüz yapılmamış işleri [iş ve sorun takibi](docs/issue-tracker.md) ayrı ayrı gösterir. Buradaki kapsam özeti, o listedeki açık maddelerin tamamlandığı anlamına gelmez.
 

@@ -14,18 +14,19 @@ func _run() -> void:
 	var input: Dictionary = (main.get("_character_inputs") as Array)[0]
 	input.childhood["index"] = 2
 	input.adulthood["index"] = 3
-	main.call("_save_character_inputs")
+	main.call("_refresh_character_editor")
 	var prepared: Dictionary = main.call("_game_setup_config")
 	var person: Dictionary = prepared["faction_specs"][0]["colonists"][0]
 	assert(person["childhood"] == "apprentice" and person["adulthood"] == "scholar")
-	assert(int(person["skills"]["construction"]) == 5)
-	input.skills["construction"].level.call("set_value", 8)
+	assert(int(person["skills"]["construction"]) == 2)
+	assert(int(input.skills["construction"]["index"]) == 3)
+	input.skills["construction"].level.call("set_value", 9)
 	main.call("_save_character_inputs")
 	prepared = main.call("_game_setup_config")
 	person = prepared["faction_specs"][0]["colonists"][0]
 	assert(int(person["skills"]["construction"]) == 8)
 	assert(int(person["skills"]["build"]) == 8)
-	(input.hair_color as ColorPickerButton).color = Color("#704934")
+	main.call("_set_prepared_color", "hair_color", Color("#704934"), false)
 	main.call("_save_character_inputs")
 	prepared = main.call("_game_setup_config")
 	person = prepared["faction_specs"][0]["colonists"][0]

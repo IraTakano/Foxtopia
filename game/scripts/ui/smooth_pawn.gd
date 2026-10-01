@@ -10,7 +10,7 @@ static var _garment_order: Array[String] = []
 
 
 static func draw_pawn(canvas: CanvasItem, center: Vector2, diameter: float, appearance: Dictionary, selected: bool, enemy: bool, drafted: bool) -> void:
-	var key := str([appearance.get("sex", "male"), appearance.get("body_type", 0), appearance.get("head_type", 0), appearance.get("skin", "#d9ad81"), appearance.get("hair", "short"), appearance.get("hair_color", "#4d3c32"), appearance.get("shirt", "tshirt"), appearance.get("shirt_color", appearance.get("outfit", "#527a81")), appearance.get("pants", "pants"), appearance.get("pants_color", "#343e48"), appearance.get("apparel", "none"), appearance.get("apparel_color", "#735f50"), appearance.get("hat", "none"), enemy])
+	var key := str([appearance.get("sex", "male"), appearance.get("body_type", 0), appearance.get("head_type", 0), appearance.get("skin", "#d9ad81"), appearance.get("hair", "short"), appearance.get("hair_color", "#4d3c32"), appearance.get("shirt", "tshirt"), appearance.get("shirt_color", appearance.get("outfit", "#527a81")), appearance.get("pants", "pants"), appearance.get("pants_color", "#343e48"), appearance.get("apparel", "none"), appearance.get("apparel_color", "#735f50"), appearance.get("hat", "none"), appearance.get("hat_color", "#766b55"), enemy])
 	if not _pawns.has(key):
 		_pawns[key] = _texture(_pawn_svg(appearance, enemy))
 		_pawn_order.append(key)
@@ -61,35 +61,34 @@ static func _pawn_svg(appearance: Dictionary, enemy: bool) -> String:
 	if enemy:
 		shirt = Color("#a65b51")
 	var style := str(appearance.get("hair", "bob" if sex == "female" else "short")).to_lower()
-	if sex == "female" and not ["bob", "wavy", "long", "braid"].has(style):
-		style = "bob"
-	if sex == "male" and not ["short", "sidepart", "curly", "shaved"].has(style):
-		style = "short"
-	var shoulder := 46 if sex == "female" and body_type == 0 else 50 if sex == "female" else 54 if body_type == 0 else 47
-	var hip := 51 if sex == "female" and body_type == 0 else 47 if sex == "female" else 46 if body_type == 0 else 43
+	if not ["bald", "shaved", "short", "sidepart", "curly", "bob", "medium", "wavy", "braid", "long"].has(style):
+		style = "bob" if sex == "female" else "short"
+	var shoulder := (44 if body_type == 0 else 51) if sex == "female" else (56 if body_type == 0 else 62)
+	var hip := (52 if body_type == 0 else 57) if sex == "female" else (45 if body_type == 0 else 50)
 	var out := '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">'
 	out += '<ellipse cx="128" cy="237" rx="47" ry="8" fill="#101b1b" opacity=".25"/>'
-	out += _back_hair(style, hair)
+	out += _back_hair(style, hair, sex)
 	out += _path(_torso_path(shoulder, hip), skin.darkened(0.10), 3.7)
 	out += _path("M 102 150 Q 116 143 127 151 L 127 234 Q 105 236 95 226 C 85 201 86 167 102 150 Z", skin.lightened(0.08))
 	out += _path("M 128 151 Q 145 143 155 152 C 173 171 169 208 158 231 Q 148 239 128 234 Z", skin.darkened(0.14))
-	if _wears(appearance.get("pants", "pants")):
+	var wearing_pants := _wears(appearance.get("pants", "pants"))
+	if wearing_pants:
 		out += _pants(pants)
-	if _wears(appearance.get("shirt", "tshirt")):
+	var wearing_coat := str(appearance.get("apparel", "none")) == "jacket"
+	if _wears(appearance.get("shirt", "tshirt")) and not wearing_coat:
 		out += _shirt(shirt, shoulder, hip)
-	if str(appearance.get("apparel", "none")) == "jacket":
-		out += _jacket(coat, shoulder)
+	if wearing_coat:
+		out += _jacket(coat, shoulder, hip)
 	out += _path("M 116 134 Q 128 139 140 134 L 140 153 Q 128 160 116 153 Z", skin.darkened(0.17), 2.3)
 	out += _path("M 119 136 Q 128 139 137 136 L 137 151 Q 128 155 119 151 Z", skin.lightened(0.05))
 	out += _face(sex, head_type, skin, hair)
-	out += _front_hair(style, hair)
-	out += _hat(str(appearance.get("hat", "none")))
+	out += _front_hair(style, hair, sex)
+	out += _hat(str(appearance.get("hat", "none")), _color(str(appearance.get("hat_color", "#766b55")), Color("#766b55")))
 	out += '</svg>'
 	return out
 
 
-static func _hat(hat_id: String) -> String:
-	var cloth := Color("#766b55")
+static func _hat(hat_id: String, cloth: Color) -> String:
 	if hat_id == "cap":
 		var cap := _path("M 83 83 C 83 48 99 34 127 33 C 157 34 174 52 173 82 Q 128 91 83 83 Z", cloth.darkened(0.10), 3.8)
 		cap += _path("M 89 72 Q 100 43 127 42 Q 148 41 161 58 Q 127 53 101 77 Z", cloth.lightened(0.17))
@@ -121,23 +120,27 @@ static func _shirt(color: Color, shoulder: int, hip: int) -> String:
 	var sr := str(128 + shoulder)
 	var hl := str(128 - hip)
 	var hr := str(128 + hip)
-	var out := _path("M 110 139 Q 128 148 146 139 C {sri} 138 {sr} 144 {sr} 155 C {sr2} 174 {hr} 198 {hr} 213 Q 128 229 {hl} 213 C {hl} 198 {sl2} 174 {sl} 155 C {sl} 144 {sli} 138 110 139 Z".format({"sr": sr, "sl": sl, "sri": str(114 + shoulder), "sli": str(142 - shoulder), "sr2": str(132 + shoulder), "sl2": str(124 - shoulder), "hl": hl, "hr": hr}), color.darkened(0.10), 3.4)
-	out += _path("M 109 143 Q 118 147 126 151 Q 105 178 102 214 Q 91 216 85 212 C 83 180 91 154 109 143 Z", color.lightened(0.15))
-	out += _path("M 146 143 C 166 150 174 179 171 212 Q 151 220 128 221 L 128 151 Q 137 148 146 143 Z", color.darkened(0.16))
+	var shirt_base := "M 110 139 Q 128 148 146 139 C {sri} 138 {sr} 144 {sr} 155 C {sr2} 174 {hr} 198 {hr} 213 Q 128 229 {hl} 213 C {hl} 198 {sl2} 174 {sl} 155 C {sl} 144 {sli} 138 110 139 Z".format({"sr": sr, "sl": sl, "sri": str(114 + shoulder), "sli": str(142 - shoulder), "sr2": str(132 + shoulder), "sl2": str(124 - shoulder), "hl": hl, "hr": hr})
+	var out := _path(shirt_base, color.darkened(0.10), 3.4)
+	var left_panel := "M 109 143 Q 118 147 126 151 Q 105 178 102 214 Q 91 216 85 212 C 83 180 91 154 109 143 Z"
+	var right_panel := "M 146 143 C 166 150 174 179 171 212 Q 151 220 128 221 L 128 151 Q 137 148 146 143 Z"
+	out += _path(left_panel, color.lightened(0.15))
+	out += _path(right_panel, color.darkened(0.16))
 	out += _path("M 109 139 Q 128 151 147 139 L 141 147 Q 128 156 115 147 Z", color.darkened(0.30), 1.2)
-	out += _stroke("M 82 212 Q 128 231 174 212 M 87 162 Q 96 168 101 171 M 169 162 Q 160 168 155 171", color.darkened(0.29), 2.2)
+	out += _stroke("M 82 212 Q 128 231 174 212", color.darkened(0.29), 2.2)
+	out += _stroke("M 87 162 Q 96 168 101 171 M 169 162 Q 160 168 155 171", color.darkened(0.29), 2.2)
 	out += _stroke("M 100 165 Q 110 181 106 196 M 155 171 Q 148 185 153 198 M 118 206 Q 128 209 137 205", color.darkened(0.19), 1.6)
 	return out
 
 
-static func _jacket(color: Color, shoulder: int) -> String:
-	var sl := str(128 - shoulder)
-	var sr := str(128 + shoulder)
-	var out := _path("M 108 137 Q 90 137 {sl} 155 Q 76 180 94 210 Q 108 217 121 218 L 121 164 Z".format({"sl": sl}), color.darkened(0.08), 3.2)
-	out += _path("M 148 137 Q 166 137 {sr} 155 Q 180 180 162 210 Q 148 217 135 218 L 135 164 Z".format({"sr": sr}), color.darkened(0.17), 3.2)
-	out += _path("M 108 138 L 121 165 L 126 156 L 116 141 Z", color.lightened(0.16), 1.7)
-	out += _path("M 148 138 L 135 165 L 130 156 L 140 141 Z", color.lightened(0.05), 1.7)
-	out += _stroke("M 91 165 Q 98 171 103 173 M 165 173 Q 158 169 165 165", color.darkened(0.34), 2.0)
+static func _jacket(color: Color, shoulder: int, hip: int) -> String:
+	# The outer layer follows the same outline as the body, so neither shirt
+	# nor skin can leak through its sides as broad body types change width.
+	var out := _path(_torso_path(shoulder, hip), color.darkened(0.09), 3.7)
+	out += _path("M 109 140 L 126 159 L 119 173 L 104 151 Z", color.lightened(0.12), 1.7)
+	out += _path("M 147 140 L 130 159 L 137 173 L 152 151 Z", color.lightened(0.08), 1.7)
+	out += _stroke("M 128 169 Q 130 200 128 233", color.darkened(0.29), 2.4)
+	out += '<circle cx="132" cy="186" r="2" fill="#%s"/><circle cx="132" cy="210" r="2" fill="#%s"/>' % [color.darkened(0.38).to_html(false), color.darkened(0.38).to_html(false)]
 	return out
 
 
@@ -162,8 +165,10 @@ static func _face(sex: String, head_type: int, skin: Color, hair: Color) -> Stri
 	return out
 
 
-static func _back_hair(style: String, hair: Color) -> String:
+static func _back_hair(style: String, hair: Color, sex: String = "female") -> String:
 	if style in ["long", "braid"]:
+		if style == "long" and sex == "male":
+			return ""
 		var out := _path("M 94 60 C 74 74 74 94 76 119 L 79 161 Q 88 176 101 165 L 104 125 L 152 125 L 155 165 Q 168 176 177 161 L 180 117 C 182 76 165 50 128 50 Q 107 50 94 60 Z", hair.darkened(0.20), 3.6)
 		if style == "braid":
 			out += _path("M 171 117 C 186 124 189 140 179 150 C 191 161 187 173 176 178 C 185 190 180 199 169 198 Q 158 182 164 155 Z", hair.darkened(0.09), 2.7)
@@ -171,17 +176,27 @@ static func _back_hair(style: String, hair: Color) -> String:
 		return out
 	if style in ["bob", "wavy"]:
 		return _path("M 94 58 C 75 72 75 92 77 114 L 79 146 Q 86 163 101 156 L 105 129 L 151 129 L 155 156 Q 170 163 177 146 L 179 111 C 181 76 164 51 128 50 Q 108 50 94 58 Z", hair.darkened(0.17), 3.4)
+	if style == "medium":
+		if sex == "male":
+			return ""
+		return _path("M 96 61 C 80 74 79 96 81 117 L 83 139 Q 89 151 102 144 L 104 121 L 152 121 L 154 144 Q 168 151 173 139 L 175 116 C 177 79 161 52 128 51 Q 109 51 96 61 Z", hair.darkened(0.18), 3.4)
 	return ""
 
 
-static func _front_hair(style: String, hair: Color) -> String:
+static func _front_hair(style: String, hair: Color, sex: String = "female") -> String:
 	var out := ""
 	match style:
+		"bald":
+			return ""
 		"shaved":
 			out = _path("M 85 84 C 84 63 103 49 128 49 C 154 49 172 65 171 84 Q 149 73 129 74 Q 104 73 85 84 Z", hair.darkened(0.15), 2.6)
 		"short":
-			out = _path("M 84 91 C 80 64 100 47 128 47 C 158 47 175 65 171 91 Q 164 78 151 74 Q 138 82 122 73 Q 101 84 84 91 Z", hair.darkened(0.09), 3.0)
-			out += _path("M 90 73 Q 104 52 129 54 Q 142 54 151 61 Q 127 60 112 69 Z", hair.lightened(0.17))
+			if sex == "female":
+				out = _path("M 82 99 C 79 72 97 49 128 48 C 157 47 175 69 174 91 C 174 102 169 111 164 116 Q 158 112 159 100 L 158 88 C 146 93 135 92 125 89 C 111 95 97 100 82 99 Z", hair.darkened(0.08), 3.0)
+				out += _stroke("M 92 76 Q 103 56 129 56 Q 145 56 157 69", hair.lightened(0.12), 2.0)
+				return out
+			out = _path("M 84 91 C 82 68 97 52 123 49 C 142 47 156 54 165 64 Q 174 76 170 88 C 151 80 131 81 118 83 Q 101 82 84 91 Z", hair.darkened(0.09), 3.0)
+			out += _stroke("M 95 68 Q 110 53 134 54 Q 151 56 162 69", hair.lightened(0.15), 2.0)
 		"sidepart":
 			out = _path("M 83 91 C 80 62 99 47 129 47 C 159 47 176 65 171 89 Q 159 81 147 70 Q 116 92 84 91 Z", hair.darkened(0.10), 3.0)
 			out += _path("M 87 83 Q 94 52 130 53 Q 146 53 158 65 Q 120 83 87 83 Z", hair.lightened(0.13))
@@ -195,7 +210,17 @@ static func _front_hair(style: String, hair: Color) -> String:
 		"wavy":
 			out = _path("M 82 104 C 77 67 98 47 129 46 C 162 45 179 69 173 107 L 168 129 Q 159 114 164 91 Q 152 85 143 75 Q 132 86 118 79 Q 104 91 91 85 Q 100 111 87 126 Z", hair.darkened(0.07), 3.0)
 			out += _stroke("M 89 75 Q 101 60 114 67 Q 127 53 141 65 Q 157 58 166 79", hair.lightened(0.22), 3.4)
+		"medium":
+			if sex == "male":
+				out = _path("M 84 90 C 80 70 94 55 112 50 C 137 44 161 54 169 71 Q 173 82 167 94 Q 159 89 156 79 Q 149 88 139 84 Q 129 93 120 84 Q 103 96 92 89 L 85 98 Z", hair.darkened(0.09), 3.0)
+				out += _stroke("M 95 68 Q 108 52 130 53 Q 148 55 159 65", hair.lightened(0.14), 1.8)
+			else:
+				out = _path("M 83 102 C 79 66 99 48 128 47 C 160 47 177 68 173 103 L 167 130 Q 159 121 163 87 Q 144 91 136 75 Q 117 87 98 80 Q 95 115 87 131 Z", hair.darkened(0.07), 3.0)
 		"long":
+			if sex == "male":
+				out = _path("M 81 92 Q 75 73 88 58 L 88 52 L 98 54 Q 113 44 126 47 L 135 44 Q 158 48 169 63 L 176 66 L 173 78 Q 179 93 172 107 L 166 100 L 162 93 Q 156 105 149 99 L 145 88 Q 137 105 124 101 L 127 88 Q 115 104 105 100 L 105 91 Q 95 103 85 99 L 83 112 Q 77 103 81 92 Z", hair.darkened(0.08), 3.0)
+				out += _stroke("M 89 71 Q 106 51 128 53 Q 153 55 165 69 M 138 60 Q 128 78 113 84", hair.lightened(0.13), 1.8)
+				return out
 			out = _path("M 81 101 C 78 64 97 46 128 46 C 161 46 180 65 174 101 Q 170 119 170 145 Q 159 134 163 91 Q 149 83 141 73 Q 119 87 99 82 Q 93 113 85 144 Z", hair.darkened(0.08), 3.0)
 			out += _path("M 91 72 Q 108 49 135 51 Q 155 53 166 75 Q 138 58 119 70 Q 105 76 91 72 Z", hair.lightened(0.16))
 		"braid":

@@ -20,6 +20,8 @@ func _run() -> void:
 	await process_frame
 	assert(main.get("screen") == "game")
 	assert(game.has_unsaved_changes())
+	# The initial colony naming overlay is handled by the naming flow test.
+	main.set("_naming_prompt_open", false)
 	main.call("_request_exit", true)
 	var warning_button: Button
 	for button in main.find_children("*", "Button", true, false):

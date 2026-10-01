@@ -1,5 +1,6 @@
 extends Node
 class_name GameModel
+const PreparationRules = preload("res://scripts/model/preparation_rules.gd")
 
 const SetupCatalog = preload("res://scripts/model/setup_catalog.gd")
 const ClimateCalendar = preload("res://scripts/model/climate_calendar.gd")
@@ -31,17 +32,27 @@ const RESEARCH_PROJECTS := {
 	"stonework": {"name": "Taş İşçiliği", "cost": 35, "requires": []},
 	"barriers": {"name": "Barikat", "cost": 40, "requires": ["stonework"]},
 }
-const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11, "tshirt": 8, "pants": 9, "cap": 6, "brim_hat": 10}
+const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18,
+	"jacket": 11, "tshirt": 8, "pants": 9, "cap": 6, "brim_hat": 10}
+# These are the inventory types that the current game can place and use. Hats
+# are starting-gear choices, but cannot yet be equipped from cargo in play.
+const PREPARATION_CARGO_IDS := ["wood", "stone", "food", "medicine", "silver",
+	"spear", "jacket", "tshirt", "pants"]
+const PREPARATION_DISPLAY_COSTS := {}
 const CLASSIC_SKILL_IDS := ["shooting", "melee", "construction", "mining", "cooking", "plants", "animals", "crafting", "artistic", "medical", "social", "intellectual"]
+const MAX_PREPARED_COLONISTS := 8
 const TRAIT_COSTS := {"hardworking": 6, "calm": 4, "quick": 4, "curious": 3,
-	"kind": 3, "night_owl": 2, "timid": -4, "abrasive": -4, "lazy": -6}
-const HEALTH_CONDITION_COSTS := {"asthma": -4, "bad_back": -5, "scar": -2}
-const CHILDHOOD_SKILL_BONUSES := {"rural_child": "harvest", "town_child": "haul", "apprentice": "build"}
-const ADULTHOOD_SKILL_BONUSES := {"farmer": "harvest", "builder": "build", "medic": "treat", "scholar": "research"}
+	"kind": 3, "night_owl": 2, "timid": -4, "abrasive": -4, "lazy": -6,
+	"pyromaniac": -2, "fast_walker": 4, "ugly": -4}
+const HEALTH_CONDITION_COSTS := {"asthma": -4, "bad_back": -5, "scar": -2,
+	"cut_light": -3, "cut_deep": -6, "bruise": -1, "burn": -4, "scratch": -3}
+const CHILDHOOD_SKILL_BONUSES := {"rural_child": "harvest", "town_child": "haul", "apprentice": "build",
+	"vatgrown_soldier": "combat", "unknown": ""}
+const ADULTHOOD_SKILL_BONUSES := {"farmer": "harvest", "builder": "build", "medic": "treat", "scholar": "research", "unknown": ""}
 const STARTING_GEAR_COSTS := {"fists": 0, "spear": 3, "clothes": 0, "jacket": 2, "tshirt": 0, "pants": 0, "cap": 1, "brim_hat": 2, "none": 0}
 const STARTING_RELATIONSHIP_OPINIONS := {"friend": 35, "rival": -35, "partner": 65,
-	"parent": 45, "child": 45, "sibling": 40}
-const PREPARATION_POINT_LIMIT := 12
+	"parent": 45, "child": 45, "sibling": 40, "grandparent": 35, "grandchild": 35}
+const PREPARATION_POINT_LIMIT := 900
 const FIRST_NAMES := ["Ada", "Deniz", "Efe", "Elif", "Emir", "Maya", "Mert", "Nil", "Selin", "Tuna", "Zeynep", "Arda"]
 const SITE_NAMES := ["Çınar", "Kavak", "Akkaya", "Yeşilova", "Güneydere", "Kuzeyyaka", "Taşlık", "Yelbayır", "Söğüt", "Gökova", "Kızıltepe", "Ilıca", "Umut", "Serin", "Akpınar", "Günyeli"]
 
@@ -288,7 +299,7 @@ func _starting_inventory(spec: Dictionary, scenario_id: String) -> Dictionary:
 		for item in defaults.keys():
 			inventory[item] = clampi(int(chosen.get(item, 0)), 0, 999)
 		for item in chosen.keys():
-			if ITEM_PRICES.has(str(item)) or str(item) == "silver":
+			if PREPARATION_CARGO_IDS.has(str(item)):
 				inventory[item] = clampi(int(chosen[item]), 0, 999)
 	return inventory
 
@@ -316,6 +327,7 @@ func start_new_game(config: Dictionary) -> Dictionary:
 	var factions: Array = []
 	var players: Dictionary = {}
 	var colonists: Array = []
+	var world_people: Array = []
 	var maps: Dictionary = {}
 	var used_sites: Array = []
 	for i in range(specs.size()):
@@ -352,6 +364,11 @@ func start_new_game(config: Dictionary) -> Dictionary:
 			var prepared_one: Dictionary = prepared[j] if j < prepared.size() else {}
 			colonists.append(_make_colonist(generated_world["seed"], faction_id, site_id, i, j, prepared_one))
 		_apply_starting_relationships(colonists, prepared, colonists.size() - faction_count, faction_count)
+		var world_offset := world_people.size()
+		var prepared_world: Array = spec.get("world_characters", [])
+		for world_index in prepared_world.size():
+			world_people.append(_make_prepared_world_person(faction_id, i, world_index, prepared_world[world_index]))
+		_apply_starting_external_relationships(colonists, world_people, spec.get("external_relationships", []), colonists.size() - faction_count, world_offset)
 	active_colony_id = str(factions[0]["id"]) if not factions.is_empty() else ""
 	state = {
 		"schema": 1, "mode": mode, "seed": generated_world["seed"],
@@ -360,7 +377,7 @@ func start_new_game(config: Dictionary) -> Dictionary:
 		"difficulty_id": selected_difficulty, "raid_cycle": 0, "caravan_cycle": 0,
 		"colonists_per_faction": count,
 		"world": generated_world, "factions": factions, "players": players,
-		"maps": maps, "colonists": colonists, "orders": [], "raiders": [],
+		"maps": maps, "colonists": colonists, "world_people": world_people, "orders": [], "raiders": [],
 		"caravans": [], "trade_offers": [], "events": [],
 		"point_limit_enabled": bool(config.get("point_limit_enabled", true)),
 		"research_projects": RESEARCH_PROJECTS.duplicate(true),
@@ -423,6 +440,13 @@ func add_late_player(peer_id: int, spec: Dictionary = {}) -> Dictionary:
 		state["colonists"].append(_make_colonist(str(state["seed"]), faction_id, site_id, index, j, person))
 	_apply_starting_relationships(state["colonists"], prepared, first_colonist_index,
 		int(state.get("colonists_per_faction", 3)))
+	if not state.has("world_people"):
+		state["world_people"] = []
+	var world_offset: int = state["world_people"].size()
+	var prepared_world: Array = spec.get("world_characters", [])
+	for world_index in prepared_world.size():
+		state["world_people"].append(_make_prepared_world_person(faction_id, index, world_index, prepared_world[world_index]))
+	_apply_starting_external_relationships(state["colonists"], state["world_people"], spec.get("external_relationships", []), first_colonist_index, world_offset)
 	_event("player_joined", "%s established a new colony." % faction_name, site_id,
 		"event.player_joined", {"faction_name": faction_name})
 	_emit_change()
@@ -450,8 +474,8 @@ func validate_setup(config: Dictionary) -> Dictionary:
 	var selected: Dictionary = {}
 	var scenario_count: int = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, str(config.get("scenario_id", "landfall"))).get("colonist_count", 3))
 	var count: int = int(config.get("colonists_per_faction", config.get("colonist_count", scenario_count)))
-	if count < 1 or count > 3:
-		return _error("Starting crew size must be between one and three.")
+	if count < 1 or count > MAX_PREPARED_COLONISTS:
+		return _error("Starting crew size must be between one and eight.")
 	for raw_spec in config.get("faction_specs", []):
 		if not raw_spec is Dictionary: return _error("Invalid faction setup.")
 		var spec: Dictionary = raw_spec
@@ -459,7 +483,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 			var cargo: Variant = spec["starting_cargo"]
 			if not cargo is Dictionary: return _error("Invalid starting cargo.")
 			for item in cargo.keys():
-				if str(item) not in ["wood", "stone", "food", "medicine", "silver", "spear", "jacket", "tshirt", "pants"]:
+				if not PREPARATION_CARGO_IDS.has(str(item)):
 					return _error("Invalid starting cargo item.")
 				if int(cargo[item]) < 0 or int(cargo[item]) > 999:
 					return _error("Starting cargo quantity must be between 0 and 999.")
@@ -487,7 +511,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 		if not prepared is Array:
 			return _error("Invalid colonist count.")
 		var faction_count := int(spec.get("colonist_count", count))
-		if faction_count < 1 or faction_count > 3 or prepared.size() > faction_count:
+		if faction_count < 1 or faction_count > MAX_PREPARED_COLONISTS or prepared.size() > faction_count:
 			return _error("Invalid colonist count.")
 		var declared_relationships: Dictionary = {}
 		for person_index in range(prepared.size()):
@@ -511,7 +535,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				return _error("Invalid starting clothing.")
 			if str(gear.get("hat", "none")) not in ["none", "cap", "brim_hat"]:
 				return _error("Invalid starting hat.")
-			for color_key in ["shirt_color", "pants_color", "apparel_color"]:
+			for color_key in ["shirt_color", "pants_color", "apparel_color", "hat_color"]:
 				if gear.has(color_key) and not Color.html_is_valid(str(gear[color_key])):
 					return _error("Invalid clothing color.")
 			var relationships: Variant = person.get("starting_relationships", {})
@@ -530,11 +554,13 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				if person_index > other_index:
 					if relation_type == "parent": normalized_relation = "child"
 					elif relation_type == "child": normalized_relation = "parent"
+					elif relation_type == "grandparent": normalized_relation = "grandchild"
+					elif relation_type == "grandchild": normalized_relation = "grandparent"
 				if declared_relationships.has(pair_key) and declared_relationships[pair_key] != normalized_relation:
 					return _error("Conflicting starting relationships.")
 				declared_relationships[pair_key] = normalized_relation
 			var traits: Array = person.get("traits", [])
-			if traits.size() > 3: return _error("A colonist can have at most three traits.")
+			if traits.size() > TRAIT_COSTS.size(): return _error("Too many colonist traits.")
 			var trait_unique: Dictionary = {}
 			for raw_trait in traits:
 				var trait_id := str(raw_trait)
@@ -546,6 +572,8 @@ func validate_setup(config: Dictionary) -> Dictionary:
 				if not HEALTH_CONDITION_COSTS.has(condition_id) or condition_unique.has(condition_id):
 					return _error("Invalid or repeated health condition.")
 				condition_unique[condition_id] = true
+			var injury_error: String = PreparationRules.preparation_injury_error(person)
+			if not injury_error.is_empty(): return _error(injury_error)
 			for skill in person.get("skills", {}).keys():
 				if not WORK_TYPES.has(str(skill)) and str(skill) != "combat" and not CLASSIC_SKILL_IDS.has(str(skill)): return _error("Invalid skill.")
 				if int(person["skills"][skill]) < 0 or int(person["skills"][skill]) > 20:
@@ -559,8 +587,7 @@ func validate_setup(config: Dictionary) -> Dictionary:
 			if person.has("favorite_color") and not Color.html_is_valid(str(person["favorite_color"])):
 				return _error("Invalid favorite color.")
 			var points := preparation_points(person)
-			if bool(config.get("point_limit_enabled", true)) and points > PREPARATION_POINT_LIMIT:
-				return _error("Colonist preparation exceeds the point limit.")
+			if points < 0: return _error("Invalid preparation cost.")
 			if str(person.get("sex", "female")) not in ["female", "male"]:
 				return _error("Invalid sex selection.")
 			var appearance: Variant = person.get("appearance", {})
@@ -570,27 +597,222 @@ func validate_setup(config: Dictionary) -> Dictionary:
 						return _error("Invalid body or head type.")
 			if str(person.get("gender", "woman")) not in ["woman", "man", "nonbinary"]:
 				return _error("Invalid gender selection.")
+		var parent_counts := {}
+		var parent_sexes := {}
+		var grandparent_counts := {}
+		for pair_key in declared_relationships:
+			var pair := str(pair_key).split("_")
+			var smaller := int(pair[0])
+			var larger := int(pair[1])
+			var relation := str(declared_relationships[pair_key])
+			if relation in ["grandparent", "grandchild"]:
+				var grandparent_index := smaller if relation == "grandparent" else larger
+				var grandchild_index := larger if relation == "grandparent" else smaller
+				grandparent_counts[grandchild_index] = int(grandparent_counts.get(grandchild_index, 0)) + 1
+				if int(grandparent_counts[grandchild_index]) > 4: return _error("A colonist can have at most four grandparents.")
+				if grandparent_index < prepared.size() and grandchild_index < prepared.size():
+					var grandparent: Dictionary = prepared[grandparent_index]
+					var grandchild: Dictionary = prepared[grandchild_index]
+					if int(grandparent.get("chronological_age", grandparent.get("age", 25))) < int(grandchild.get("chronological_age", grandchild.get("age", 25))) + 32:
+						return _error("A grandparent must be at least thirty-two years older than their grandchild.")
+				continue
+			if relation not in ["parent", "child"]: continue
+			var parent_index := smaller if relation == "parent" else larger
+			var child_index := larger if relation == "parent" else smaller
+			parent_counts[child_index] = int(parent_counts.get(child_index, 0)) + 1
+			if int(parent_counts[child_index]) > 2: return _error("A colonist can have at most two parents.")
+			if parent_index < prepared.size() and child_index < prepared.size():
+				var parent: Dictionary = prepared[parent_index]
+				var child: Dictionary = prepared[child_index]
+				if int(parent.get("chronological_age", parent.get("age", 25))) < int(child.get("chronological_age", child.get("age", 25))) + 16:
+					return _error("A parent must be at least sixteen years older than their child.")
+				var parent_sex := str(parent.get("sex", "female"))
+				var sex_key := "%d_%s" % [child_index, parent_sex]
+				if parent_sexes.has(sex_key): return _error("A child can have one mother and one father.")
+				parent_sexes[sex_key] = true
+		var outside_validation := _validate_prepared_world_relationships(prepared, spec, declared_relationships)
+		if not bool(outside_validation.get("ok", false)):
+			return outside_validation
+		if bool(config.get("point_limit_enabled", false)) and preparation_total_points(prepared, spec.get("starting_cargo", {})) > preparation_budget(str(config.get("scenario_id", "landfall"))):
+			return _error("Preparation exceeds the scenario point limit.")
+	return _ok()
+
+
+func _valid_prepared_relation_key(key: String, colony_count: int, world_count: int) -> bool:
+	if key.length() < 3 or key.substr(1, 1) != ":" or not key.substr(2).is_valid_int():
+		return false
+	var index := int(key.substr(2))
+	if key.begins_with("c:"):
+		return index >= 0 and index < colony_count
+	if key.begins_with("w:"):
+		return index >= 0 and index < world_count
+	return false
+
+
+func _prepared_relation_person(prepared: Array, world_people: Array, key: String) -> Dictionary:
+	return prepared[int(key.substr(2))] if key.begins_with("c:") else world_people[int(key.substr(2))]
+
+
+func _prepared_ancestry_path_exists(adjacency: Dictionary, from_key: String, to_key: String) -> bool:
+	var pending: Array = [from_key]
+	var visited: Dictionary = {}
+	while not pending.is_empty():
+		var current := str(pending.pop_back())
+		if current == to_key:
+			return true
+		if visited.has(current):
+			continue
+		visited[current] = true
+		for next_key in adjacency.get(current, []):
+			pending.append(str(next_key))
+	return false
+
+
+func _validate_prepared_world_relationships(prepared: Array, spec: Dictionary, colony_relations: Dictionary) -> Dictionary:
+	var world_value: Variant = spec.get("world_characters", [])
+	var bonds_value: Variant = spec.get("external_relationships", [])
+	if not world_value is Array or not bonds_value is Array:
+		return _error("Invalid outside relationships.")
+	var world_people: Array = world_value
+	var outside_bonds: Array = bonds_value
+	if world_people.size() > 32 or outside_bonds.size() > 256:
+		return _error("Too many outside people or relationships.")
+	for raw_person in world_people:
+		if not raw_person is Dictionary:
+			return _error("Invalid world person.")
+		var person: Dictionary = raw_person
+		var age_value: Variant = person.get("age", 25)
+		if not (age_value is int or age_value is float) or float(age_value) != float(int(age_value)) or int(age_value) < 18 or int(age_value) > 80:
+			return _error("World person age must be between 18 and 80.")
+		if int(person.get("chronological_age", age_value)) < int(age_value):
+			return _error("World person chronological age is invalid.")
+		if str(person.get("name", "")).strip_edges().is_empty() or str(person.get("sex", "female")) not in ["female", "male"]:
+			return _error("Invalid world person identity.")
+	var all_bonds: Array = []
+	for pair_key in colony_relations:
+		var pair := str(pair_key).split("_")
+		all_bonds.append({"from": "c:%s" % pair[0], "to": "c:%s" % pair[1], "relation": str(colony_relations[pair_key])})
+	var known_pairs: Dictionary = {}
+	for raw_bond in outside_bonds:
+		if not raw_bond is Dictionary:
+			return _error("Invalid outside relationship.")
+		var bond: Dictionary = raw_bond
+		var first_key := str(bond.get("from", ""))
+		var second_key := str(bond.get("to", ""))
+		var relation_id := str(bond.get("relation", ""))
+		if not _valid_prepared_relation_key(first_key, prepared.size(), world_people.size()) or not _valid_prepared_relation_key(second_key, prepared.size(), world_people.size()) or first_key == second_key:
+			return _error("Invalid outside relationship target.")
+		if first_key.begins_with("c:") and second_key.begins_with("c:"):
+			return _error("Colony relationships must use the colony section.")
+		if not STARTING_RELATIONSHIP_OPINIONS.has(relation_id):
+			return _error("Invalid outside relationship type.")
+		var sorted_pair := [first_key, second_key]
+		sorted_pair.sort()
+		var pair_id := "%s|%s" % sorted_pair
+		if known_pairs.has(pair_id):
+			return _error("Duplicate outside relationship.")
+		known_pairs[pair_id] = true
+		all_bonds.append(bond)
+	var parent_counts: Dictionary = {}
+	var parent_sexes: Dictionary = {}
+	var grandparent_counts: Dictionary = {}
+	var partner_counts: Dictionary = {}
+	var ancestry: Dictionary = {}
+	for raw_bond in all_bonds:
+		var bond: Dictionary = raw_bond
+		var first_key := str(bond["from"])
+		var second_key := str(bond["to"])
+		var relation_id := str(bond["relation"])
+		if relation_id == "partner":
+			for key in [first_key, second_key]:
+				partner_counts[key] = int(partner_counts.get(key, 0)) + 1
+				if int(partner_counts[key]) > 1:
+					return _error("A person may have at most one partner.")
+		if relation_id not in ["parent", "child", "grandparent", "grandchild"]:
+			continue
+		var older_key := first_key if relation_id in ["parent", "grandparent"] else second_key
+		var younger_key := second_key if relation_id in ["parent", "grandparent"] else first_key
+		var older := _prepared_relation_person(prepared, world_people, older_key)
+		var younger := _prepared_relation_person(prepared, world_people, younger_key)
+		var is_grandparent := relation_id in ["grandparent", "grandchild"]
+		var age_gap := 32 if is_grandparent else 16
+		if int(older.get("chronological_age", older.get("age", 25))) < int(younger.get("chronological_age", younger.get("age", 25))) + age_gap:
+			return _error("Family relationship ages do not match.")
+		if is_grandparent:
+			grandparent_counts[younger_key] = int(grandparent_counts.get(younger_key, 0)) + 1
+			if int(grandparent_counts[younger_key]) > 4:
+				return _error("A person may have at most four grandparents.")
+		else:
+			parent_counts[younger_key] = int(parent_counts.get(younger_key, 0)) + 1
+			if int(parent_counts[younger_key]) > 2:
+				return _error("A person may have at most two parents.")
+			var sex_key := "%s|%s" % [younger_key, str(older.get("sex", "female"))]
+			if parent_sexes.has(sex_key):
+				return _error("A person may have one mother and one father.")
+			parent_sexes[sex_key] = true
+		if not ancestry.has(older_key):
+			ancestry[older_key] = []
+		(ancestry[older_key] as Array).append(younger_key)
+	for older_key in ancestry:
+		for younger_key in ancestry[older_key]:
+			if _prepared_ancestry_path_exists(ancestry, str(younger_key), str(older_key)):
+				return _error("A family relationship cannot contain a cycle.")
 	return _ok()
 
 
 func preparation_points(person: Dictionary) -> int:
-	var points := 0
-	for raw_trait in person.get("traits", []): points += int(TRAIT_COSTS.get(str(raw_trait), 0))
+	var points := 300
+	var traits: Array = person.get("traits", [])
+	var trait_and_condition_points := 0
+	for raw_trait in traits: trait_and_condition_points += int(TRAIT_COSTS.get(str(raw_trait), 0)) * 20
+	for extra_index in range(3, traits.size()):
+		trait_and_condition_points += roundi(100.0 * pow(2.5, float(extra_index - 3)))
 	for condition in person.get("health_conditions", []):
-		points += int(HEALTH_CONDITION_COSTS.get(str(condition), 0))
+		trait_and_condition_points += int(HEALTH_CONDITION_COSTS.get(str(condition), 0)) * 20
+	for entry in person.get("health_injuries", []):
+		if entry is Dictionary:
+			trait_and_condition_points += roundi(float(HEALTH_CONDITION_COSTS.get(str(entry.get("kind", "")), 0)) *
+				20.0 * float(maxi(0, int(entry.get("count", 1)))) * PreparationRules.injury_point_factor(entry))
+	# Stacking disadvantages should not make a highly skilled pawn nearly free.
+	points += maxi(-120, trait_and_condition_points)
 	var prepared_skills: Dictionary = person.get("skills", {})
 	var has_classic := prepared_skills.has("construction")
-	for skill in prepared_skills.keys():
+	var evaluated_skills := PreparationRules.effective_skills(prepared_skills, str(person.get("childhood", "rural_child")), str(person.get("adulthood", "farmer")), traits, person.get("health_conditions", [])) if has_classic else prepared_skills
+	for skill in evaluated_skills.keys():
 		if CLASSIC_SKILL_IDS.has(str(skill)) if has_classic else WORK_TYPES.has(str(skill)) or str(skill) == "combat":
-			points += maxi(0, int(prepared_skills[skill]) - 5)
+			var level := maxi(0, int(evaluated_skills[skill]))
+			points += level * 12 + 2 * maxi(0, level - 5) * maxi(0, level - 5)
+	var passion_units := 0
+	for skill in person.get("passions", {}).keys():
+		if CLASSIC_SKILL_IDS.has(str(skill)):
+			passion_units += 1 if int(person["passions"][skill]) == 1 else 3 if int(person["passions"][skill]) == 2 else 0
+	points += passion_units * 20 + maxi(0, passion_units - 8) * 20
 	var gear: Variant = person.get("starting_gear", {})
 	if gear is Dictionary:
-		points += int(STARTING_GEAR_COSTS.get(str(gear.get("weapon", "fists")), 0))
-		points += int(STARTING_GEAR_COSTS.get(str(gear.get("apparel", "clothes")), 0))
-		points += int(STARTING_GEAR_COSTS.get(str(gear.get("shirt", "none")), 0))
-		points += int(STARTING_GEAR_COSTS.get(str(gear.get("pants", "none")), 0))
-		points += int(STARTING_GEAR_COSTS.get(str(gear.get("hat", "none")), 0))
-	return points
+		for gear_id in ["weapon", "apparel", "shirt", "pants", "hat"]:
+			var item_id := str(gear.get(gear_id, "none"))
+			points += int(ITEM_PRICES.get(item_id, 0))
+	return maxi(0, points)
+
+
+func preparation_total_points(people: Array, cargo: Dictionary) -> int:
+	var spent := 0
+	for person in people:
+		if person is Dictionary:
+			spent += preparation_points(person)
+	for item_id in cargo:
+		spent += int(cargo[item_id]) * int(ITEM_PRICES.get(str(item_id), 1))
+	return spent
+
+
+func preparation_budget(selected_scenario_id: String) -> int:
+	var scenario: Dictionary = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, selected_scenario_id)
+	var count := int(scenario.get("colonist_count", 3))
+	var inventory: Dictionary = scenario.get("inventory", {})
+	var goods := 0
+	for item_id in inventory:
+		goods += int(inventory[item_id]) * int(ITEM_PRICES.get(str(item_id), 1))
+	return count * PREPARATION_POINT_LIMIT + goods
 
 
 func issue_command(peer_id: int, command: Dictionary) -> Dictionary:
@@ -646,6 +868,7 @@ func get_snapshot(peer_id: int = 0) -> Dictionary:
 	if copy["maps"].has(site_id): visible_maps[site_id] = copy["maps"][site_id]
 	copy["maps"] = visible_maps
 	copy["colonists"] = copy["colonists"].filter(func(c): return c["faction_id"] == faction_id)
+	copy["world_people"] = copy.get("world_people", []).filter(func(person): return person.get("faction_id", "") == faction_id)
 	copy["orders"] = copy["orders"].filter(func(o): return o["faction_id"] == faction_id)
 	copy["raiders"] = copy["raiders"].filter(func(r): return r["site_id"] == site_id)
 	copy["caravans"] = copy["caravans"].filter(func(c): return c.get("faction_id", "") == faction_id or c.get("from_faction", "") == faction_id or c.get("to_faction", "") == faction_id)
@@ -844,6 +1067,7 @@ func _migrate_loaded_state() -> void:
 		saved_world["calendar"] = ClimateCalendar.world_calendar()
 	if not state.has("colonists_per_faction"): state["colonists_per_faction"] = 3
 	if not state.has("point_limit_enabled"): state["point_limit_enabled"] = true
+	if not state.has("world_people"): state["world_people"] = []
 	if not state.has("scenario_id"): state["scenario_id"] = "landfall"
 	if not state.has("storyteller_id"): state["storyteller_id"] = "steady"
 	if not state.has("difficulty_id"): state["difficulty_id"] = "frontier"
@@ -929,16 +1153,39 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 	for key in prepared.get("skills", {}).keys():
 		if skills.has(key) or CLASSIC_SKILL_IDS.has(str(key)):
 			skills[key] = clampi(int(prepared["skills"][key]), 0, 20)
+	var prepared_conditions: Array = prepared.get("health_conditions", [])
+	var incapable: Array = PreparationRules.incapable_of(childhood, adulthood, traits, prepared_conditions)
+	if prepared.get("skills", {}).has("construction"):
+		var effective := PreparationRules.effective_skills(prepared.get("skills", {}), childhood, adulthood, traits, prepared_conditions)
+		for classic_skill in CLASSIC_SKILL_IDS:
+			skills[classic_skill] = clampi(int(effective.get(classic_skill, 5)), 0, 20)
+		skills["chop"] = int(skills.get("plants", 5))
+		skills["harvest"] = int(skills.get("plants", 5))
+		skills["mine"] = int(skills.get("mining", 5))
+		skills["build"] = int(skills.get("construction", 5))
+		skills["research"] = int(skills.get("intellectual", 5))
+		skills["treat"] = int(skills.get("medical", 5))
+		skills["combat"] = maxi(int(skills.get("shooting", 5)), int(skills.get("melee", 5)))
 	var priorities: Dictionary = {}
 	for work in WORK_TYPES: priorities[work] = 5
 	for key in prepared.get("work_priorities", {}).keys():
 		if priorities.has(key): priorities[key] = clampi(int(prepared["work_priorities"][key]), 0, 9)
+	if incapable.has("medical"): priorities["treat"] = 0
+	if incapable.has("haul"): priorities["haul"] = 0
 	var appearance: Dictionary = prepared.get("appearance", {})
 	var conditions: Array = []
 	for raw_condition in prepared.get("health_conditions", []):
 		var condition := str(raw_condition)
 		if HEALTH_CONDITION_COSTS.has(condition) and not conditions.has(condition): conditions.append(condition)
-	var starting_hp := 92.0 if conditions.has("bad_back") else 100.0
+	var starting_wounds: Array = []
+	var starting_bleeding := 0.0
+	var starting_hp := 100.0
+	for injury in PreparationRules.prepared_injuries(prepared):
+		starting_wounds.append({"kind": str(injury["kind"]), "body_part": str(injury["body_part"]),
+			"severity": float(injury["severity"]), "source_condition": str(injury["source_condition"]),
+			"cause": str(injury.get("cause", "unknown")), "severity_tier": str(injury.get("severity_tier", "")), "time": 0})
+		starting_bleeding += float(injury["bleeding"])
+		starting_hp -= float(injury["severity"])
 	var starting_gear: Dictionary = prepared.get("starting_gear", {})
 	var sex := str(prepared.get("sex", "female" if index % 2 == 0 else "male"))
 	var new_garments := starting_gear.has("shirt") or starting_gear.has("pants")
@@ -954,10 +1201,12 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 	var selected_hat := str(starting_gear.get("hat", "none"))
 	if selected_hat != "none":
 		unit_equipment["hat"] = selected_hat
+		unit_equipment["hat_color"] = str(starting_gear.get("hat_color", "#bd8a11"))
 	if new_garments and unit_equipment["apparel"] == "clothes":
 		unit_equipment["apparel"] = "none"
 	unit_appearance["apparel"] = unit_equipment["apparel"]
 	unit_appearance["hat"] = selected_hat
+	unit_appearance["hat_color"] = str(starting_gear.get("hat_color", "#bd8a11"))
 	unit_appearance["apparel_color"] = str(starting_gear.get("apparel_color", "#735f50"))
 	if starting_gear.has("apparel_color"):
 		unit_equipment["apparel_color"] = unit_appearance["apparel_color"]
@@ -985,12 +1234,13 @@ func _make_colonist(seed_text: String, faction_id: String, site_id: String, fact
 		"x": 23 + index, "y": 25, "previous_x": 23 + index, "previous_y": 25,
 		"facing": "down",
 		"appearance": unit_appearance,
-		"traits": traits.duplicate(), "skills": skills, "passions": prepared.get("passions", {}).duplicate(true), "work_priorities": priorities,
+		"traits": traits.duplicate(), "skills": skills, "passions": prepared.get("passions", {}).duplicate(true), "work_priorities": priorities, "incapable_of": incapable,
 		"schedule": _default_schedule(),
 		"relationships": {}, "relationship_types": {},
 		"needs": {"hunger": 100.0, "rest": 100.0, "mood": 75.0, "thoughts": []},
-		"health": {"hp": starting_hp, "max_hp": 100.0, "bleeding": 0.0,
-			"wounds": [], "conditions": conditions},
+		"health": {"hp": starting_hp, "max_hp": 100.0, "bleeding": starting_bleeding,
+			"wounds": starting_wounds, "conditions": conditions,
+			"pain": PreparationRules.health_pain({"wounds": starting_wounds, "conditions": conditions})},
 		"equipment": unit_equipment,
 		"drafted": false, "manual": {}, "current_order": "", "work_left": 0.0,
 		"resting": false, "carrying": {}, "idle_target": {}, "idle_until": 0,
@@ -1016,8 +1266,43 @@ func _apply_starting_relationships(colonists: Array, prepared: Array, offset: in
 			source["relationships"][str(other["id"])] = STARTING_RELATIONSHIP_OPINIONS[relation_type]
 			other["relationships"][str(source["id"])] = STARTING_RELATIONSHIP_OPINIONS[relation_type]
 			source["relationship_types"][str(other["id"])] = relation_type
-			var reverse_type := "child" if relation_type == "parent" else "parent" if relation_type == "child" else relation_type
+			var reverse_type := "child" if relation_type == "parent" else "parent" if relation_type == "child" else "grandchild" if relation_type == "grandparent" else "grandparent" if relation_type == "grandchild" else relation_type
 			other["relationship_types"][str(source["id"])] = reverse_type
+
+
+func _make_prepared_world_person(faction_id: String, faction_index: int, world_index: int, prepared: Dictionary) -> Dictionary:
+	return {"id": "world_person_%d_%d" % [faction_index + 1, world_index + 1],
+		"faction_id": faction_id,
+		"name": str(prepared.get("name", "World person")),
+		"first_name": str(prepared.get("first_name", prepared.get("name", "World person"))),
+		"nickname": str(prepared.get("nickname", "")),
+		"last_name": str(prepared.get("last_name", "")),
+		"sex": str(prepared.get("sex", "female")),
+		"age": int(prepared.get("age", 25)),
+		"chronological_age": int(prepared.get("chronological_age", prepared.get("age", 25))),
+		"appearance": prepared.get("appearance", {}).duplicate(true),
+		"relationships": {}, "relationship_types": {}}
+
+
+func _apply_starting_external_relationships(colonists: Array, world_people: Array, bonds: Array, colony_offset: int, world_offset: int) -> void:
+	for raw_bond in bonds:
+		if not raw_bond is Dictionary:
+			continue
+		var bond: Dictionary = raw_bond
+		var first_key := str(bond.get("from", ""))
+		var second_key := str(bond.get("to", ""))
+		var relation_id := str(bond.get("relation", ""))
+		if not STARTING_RELATIONSHIP_OPINIONS.has(relation_id):
+			continue
+		var first: Dictionary = colonists[colony_offset + int(first_key.substr(2))] if first_key.begins_with("c:") else world_people[world_offset + int(first_key.substr(2))]
+		var second: Dictionary = colonists[colony_offset + int(second_key.substr(2))] if second_key.begins_with("c:") else world_people[world_offset + int(second_key.substr(2))]
+		var first_id := str(first["id"])
+		var second_id := str(second["id"])
+		first["relationships"][second_id] = STARTING_RELATIONSHIP_OPINIONS[relation_id]
+		second["relationships"][first_id] = STARTING_RELATIONSHIP_OPINIONS[relation_id]
+		first["relationship_types"][second_id] = relation_id
+		var reverse_id := "child" if relation_id == "parent" else "parent" if relation_id == "child" else "grandchild" if relation_id == "grandparent" else "grandparent" if relation_id == "grandchild" else relation_id
+		second["relationship_types"][first_id] = reverse_id
 
 
 func _generate_local_map(seed_text: String, site_id: String, biome: String, site_info: Dictionary = {}) -> Dictionary:
@@ -1249,6 +1534,9 @@ func _command_work_priority(faction_id: String, command: Dictionary) -> Dictiona
 	if not WORK_TYPES.has(work): return _error("Geçersiz iş türü.")
 	var priority: int = int(command.get("priority", -1))
 	if priority < 0 or priority > 9: return _error("İş önceliği Kapalı (0) veya 1-9 olmalı.")
+	var incapable: Array = colonist.get("incapable_of", [])
+	if priority > 0 and ((work == "treat" and incapable.has("medical")) or incapable.has(work)):
+		return _error("Kolonist bu işi yapamaz.")
 	colonist["work_priorities"][work] = priority
 	return _ok()
 
@@ -1744,6 +2032,7 @@ func _tick_colonist(colonist: Dictionary) -> void:
 	needs["rest"] = maxf(0.0, float(needs["rest"]) - 0.11)
 	if float(health["bleeding"]) > 0.0:
 		health["hp"] = maxf(0.0, float(health["hp"]) - float(health["bleeding"]) * 0.10)
+		health["bleeding"] = maxf(0.0, float(health["bleeding"]) - 0.0015)
 	if float(needs["hunger"]) <= 0.0:
 		health["hp"] = maxf(0.0, float(health["hp"]) - 0.2)
 	if float(health["hp"]) <= 0.0:
@@ -1753,6 +2042,17 @@ func _tick_colonist(colonist: Dictionary) -> void:
 		_event("death", "%s hayatını kaybetti." % colonist["name"], str(colonist["site_id"]),
 			"event.death", {"colonist_name": str(colonist["name"])}, [str(colonist["id"])])
 		return
+	for wound in health.get("wounds", []):
+		if str(wound.get("kind", "")) == "scar": continue
+		wound["severity"] = maxf(0.0, float(wound.get("severity", 0.0)) - 0.0125)
+	var open_wounds: Array = []
+	for wound in health.get("wounds", []):
+		if str(wound.get("kind", "")) == "scar" or float(wound.get("severity", 0.0)) > 0.0:
+			open_wounds.append(wound)
+		else:
+			var healed_condition := str(wound.get("source_condition", ""))
+			if not healed_condition.is_empty(): (health["conditions"] as Array).erase(healed_condition)
+	health["wounds"] = open_wounds
 	if float(health["bleeding"]) <= 0.0 and float(health["hp"]) < 100.0:
 		health["hp"] = minf(100.0, float(health["hp"]) + 0.025)
 	_update_health_summary(health)
@@ -1841,10 +2141,17 @@ func _update_mood(colonist: Dictionary) -> void:
 	elif float(needs["hunger"]) > 70.0: status.append({"label": "Fed", "value": 3})
 	if float(needs["rest"]) < 30.0: status.append({"label": "Tired", "value": -13})
 	elif float(needs["rest"]) > 75.0: status.append({"label": "Well rested", "value": 3})
-	if float(colonist["health"]["hp"]) < 65.0: status.append({"label": "In pain", "value": -10})
+	var pain: float = PreparationRules.health_pain(colonist["health"])
+	var pain_penalty: int = PreparationRules.pain_mood_penalty(pain)
+	if pain_penalty < 0:
+		status.append({"label": "In pain (%d%%)" % roundi(pain * 100.0), "value": pain_penalty})
 	if colonist["traits"].has("night_owl"):
-		var night := posmod(int(state["time"]), 600) >= 360
-		status.append({"label": "Night owl at night" if night else "Night owl in daylight", "value": 4 if night else -3})
+		var day_length: int = maxi(1, int(state.get("day_length", 600)))
+		var hour: int = (8 + floori(float(posmod(int(state["time"]), day_length)) * 24.0 / float(day_length))) % 24
+		if hour >= 23 or hour < 6:
+			status.append({"label": "Night owl at night", "value": 16})
+		elif hour >= 11 and hour < 18:
+			status.append({"label": "Night owl in daylight", "value": -10})
 	for entry in status:
 		active.append({"kind": "status", "label": entry["label"], "value": entry["value"],
 			"expires_at": int(state["time"]) + 2})
@@ -1852,7 +2159,6 @@ func _update_mood(colonist: Dictionary) -> void:
 	needs["thoughts"] = active
 	var target := 65.0 + thought_score
 	if colonist["traits"].has("calm"): target += 8.0
-	if colonist["traits"].has("abrasive"): target -= 5.0
 	needs["mood"] = move_toward(float(needs["mood"]), clampf(target, 0.0, 100.0), 0.12)
 
 
@@ -1860,15 +2166,18 @@ func _update_health_summary(health: Dictionary) -> void:
 	var grouped: Dictionary = {}
 	for wound in health.get("wounds", []):
 		var kind := str(wound.get("kind", "injury"))
-		if not grouped.has(kind): grouped[kind] = {"kind": kind, "count": 0, "max_severity": 0.0}
-		grouped[kind]["count"] = int(grouped[kind]["count"]) + 1
-		grouped[kind]["max_severity"] = maxf(float(grouped[kind]["max_severity"]), float(wound.get("severity", 0.0)))
+		var part := str(wound.get("body_part", "torso"))
+		var group_key := "%s:%s" % [kind, part]
+		if not grouped.has(group_key): grouped[group_key] = {"kind": kind, "body_part": part, "count": 0, "max_severity": 0.0}
+		grouped[group_key]["count"] = int(grouped[group_key]["count"]) + 1
+		grouped[group_key]["max_severity"] = maxf(float(grouped[group_key]["max_severity"]), float(wound.get("severity", 0.0)))
 	var summary: Array = []
 	for entry in grouped.values():
 		var severity: float = float(entry["max_severity"])
-		entry["severity_label"] = "minor" if severity < 5.0 else "moderate" if severity < 10.0 else "severe" if severity < 17.0 else "critical"
+		entry["severity_label"] = "permanent" if str(entry["kind"]) == "scar" else "minor" if severity < 5.0 else "moderate" if severity < 10.0 else "severe" if severity < 17.0 else "critical"
 		summary.append(entry)
 	health["wound_summary"] = summary
+	health["pain"] = PreparationRules.health_pain(health)
 
 
 func _tick_social() -> void:
@@ -1883,11 +2192,21 @@ func _tick_social() -> void:
 			if not people.is_empty() and int(state["time"]) >= 60:
 				_prompt_colony_naming(faction)
 			continue
-		var first: Dictionary = people[0]
-		var second: Dictionary = people[1]
-		if abs(int(first["x"]) - int(second["x"])) + abs(int(first["y"]) - int(second["y"])) > 5: continue
+		var nearby_pairs: Array = []
+		for first_index in range(people.size()):
+			for second_index in range(first_index + 1, people.size()):
+				var candidate_first: Dictionary = people[first_index]
+				var candidate_second: Dictionary = people[second_index]
+				if abs(int(candidate_first["x"]) - int(candidate_second["x"])) + abs(int(candidate_first["y"]) - int(candidate_second["y"])) <= 5:
+					nearby_pairs.append([candidate_first, candidate_second])
+		if nearby_pairs.is_empty(): continue
+		var selected_pair: Array = nearby_pairs[posmod(int(state["time"]) / 30, nearby_pairs.size())]
+		var first: Dictionary = selected_pair[0]
+		var second: Dictionary = selected_pair[1]
 		var relation_type := str(first.get("relationship_types", {}).get(str(second["id"]), ""))
-		var conflict: bool = relation_type == "rival" or first["traits"].has("abrasive") or second["traits"].has("abrasive")
+		var abrasive: bool = first["traits"].has("abrasive") or second["traits"].has("abrasive")
+		var argument_interval: int = int(PreparationRules.TRAIT_EFFECTS["abrasive"]["argument_interval"])
+		var conflict: bool = relation_type == "rival" or (abrasive and posmod(int(state["time"]) / 30, argument_interval) == 0)
 		var value := -5 if relation_type == "rival" else -3 if conflict else 5 if relation_type == "partner" else 4 if relation_type == "friend" else 3
 		var label := "Argument with %s" if conflict else "Pleasant conversation with %s"
 		for pair in [[first, second], [second, first]]:
@@ -1897,8 +2216,23 @@ func _tick_social() -> void:
 			thoughts.append({"kind": "social", "label": label % other["name"], "value": value,
 				"expires_at": int(state["time"]) + 120})
 			if thoughts.size() > 10: thoughts.pop_front()
-			var old: int = int(speaker["relationships"].get(str(other["id"]), 0))
-			speaker["relationships"][str(other["id"])] = clampi(old + value, -100, 100)
+			var other_id := str(other["id"])
+			var old: int = int(speaker["relationships"].get(other_id, 0))
+			var seen: Dictionary = speaker.get("first_impressions", {})
+			if not seen.has(other_id):
+				if other["traits"].has("ugly") and not speaker["traits"].has("kind"):
+					old += int(PreparationRules.TRAIT_EFFECTS["ugly"]["first_impression_opinion"])
+				seen[other_id] = true
+				speaker["first_impressions"] = seen
+			var opinion_change := value
+			var kind_effects: Dictionary = PreparationRules.TRAIT_EFFECTS["kind"]
+			if speaker["traits"].has("kind") and not conflict and posmod(int(state["time"]) / 30, int(kind_effects["kind_words_interval"])) == 0:
+				var recipient_thoughts: Array = other["needs"]["thoughts"]
+				recipient_thoughts.append({"kind": "social", "label": "Kind words from %s" % speaker["name"],
+					"value": int(kind_effects["kind_words_mood"]), "expires_at": int(state["time"]) + 120})
+				if recipient_thoughts.size() > 10: recipient_thoughts.pop_front()
+				other["relationships"][str(speaker["id"])] = clampi(int(other["relationships"].get(str(speaker["id"]), 0)) + int(kind_effects["kind_words_opinion"]), -100, 100)
+			speaker["relationships"][str(other["id"])] = clampi(old + opinion_change, -100, 100)
 		_event("social", "%s and %s %s." % [first["name"], second["name"], "argued" if conflict else "talked"],
 			str(faction["site_id"]), "event.social_argument" if conflict else "event.social_talk",
 			{"first_name": str(first["name"]), "second_name": str(second["name"])},
@@ -2032,15 +2366,23 @@ func _tick_treat(colonist: Dictionary) -> bool:
 	if not _move_towards(colonist, int(target["x"]), int(target["y"]), 1): return not _route_failed(colonist)
 	var inventory: Dictionary = _faction_by_id(str(colonist["faction_id"]))["inventory"]
 	var advanced_aid: bool = _faction_by_id(str(colonist["faction_id"]))["research"]["unlocked"].has("first_aid")
-	var caring_bonus := 5.0 if colonist["traits"].has("kind") else 0.0
 	if int(inventory.get("medicine", 0)) > 0:
 		inventory["medicine"] = int(inventory["medicine"]) - 1
 		target["health"]["bleeding"] = 0.0
-		target["health"]["hp"] = minf(100.0, float(target["health"]["hp"]) + (30.0 if advanced_aid else 20.0) + caring_bonus)
-		if not target["health"]["wounds"].is_empty(): target["health"]["wounds"].pop_front()
+		target["health"]["hp"] = minf(100.0, float(target["health"]["hp"]) + (30.0 if advanced_aid else 20.0))
+		var treatable_index := -1
+		for wound_index in (target["health"]["wounds"] as Array).size():
+			if str(target["health"]["wounds"][wound_index].get("kind", "")) != "scar":
+				treatable_index = wound_index
+				break
+		if treatable_index >= 0:
+			var treated_wound: Dictionary = target["health"]["wounds"].pop_at(treatable_index)
+			var treated_condition := str(treated_wound.get("source_condition", ""))
+			if not treated_condition.is_empty(): (target["health"]["conditions"] as Array).erase(treated_condition)
 	else:
 		target["health"]["bleeding"] = maxf(0.0, float(target["health"]["bleeding"]) - (0.25 if advanced_aid else 0.12))
-		target["health"]["hp"] = minf(100.0, float(target["health"]["hp"]) + (4.0 if advanced_aid else 2.0) + caring_bonus * 0.2)
+		target["health"]["hp"] = minf(100.0, float(target["health"]["hp"]) + (4.0 if advanced_aid else 2.0))
+	_update_health_summary(target["health"])
 	return true
 
 
@@ -2139,11 +2481,12 @@ func _tick_order(colonist: Dictionary, order: Dictionary) -> void:
 	var work_type := _work_for_order(str(order["kind"]))
 	var skill: int = int(colonist["skills"].get(work_type, 2))
 	var rate := 0.14 + float(skill) * 0.018
-	if colonist["traits"].has("hardworking"): rate *= 1.25
-	if colonist["traits"].has("timid") and work_type == "build": rate *= 0.9
-	if colonist["traits"].has("lazy"): rate *= 0.78
+	if colonist["traits"].has("hardworking"): rate *= float(PreparationRules.TRAIT_EFFECTS["hardworking"]["work_speed_factor"])
+	if colonist["traits"].has("lazy"): rate *= float(PreparationRules.TRAIT_EFFECTS["lazy"]["work_speed_factor"])
 	if (colonist["health"].get("conditions", []) as Array).has("bad_back") and work_type in ["mine", "haul", "build"]: rate *= 0.76
 	if (colonist["health"].get("conditions", []) as Array).has("asthma"): rate *= 0.87
+	rate *= PreparationRules.pain_work_factor(PreparationRules.health_pain(colonist["health"]))
+	rate *= PreparationRules.injury_work_factor(colonist["health"], work_type)
 	order["progress"] = minf(1.0, float(order["progress"]) + rate)
 	if float(order["progress"]) >= 1.0:
 		_complete_order(colonist, order)
@@ -2251,7 +2594,9 @@ func _tick_research(colonist: Dictionary) -> bool:
 	if bench.is_empty(): return false
 	if not _move_towards(colonist, int(bench["x"]), int(bench["y"]), 1): return not _route_failed(colonist)
 	var rate := 0.75 + float(colonist["skills"]["research"]) * 0.13
-	if colonist["traits"].has("curious"): rate *= 1.3
+	if colonist["traits"].has("curious"): rate *= float(PreparationRules.TRAIT_EFFECTS["curious"]["research_speed_factor"])
+	rate *= PreparationRules.pain_work_factor(PreparationRules.health_pain(colonist["health"]))
+	rate *= PreparationRules.injury_work_factor(colonist["health"], "research")
 	research["progress"] = float(research["progress"]) + rate
 	if float(research["progress"]) >= float(RESEARCH_PROJECTS[project]["cost"]):
 		research["unlocked"].append(project)
@@ -2305,7 +2650,7 @@ func _move_towards(actor: Dictionary, target_x: int, target_y: int, acceptable_d
 		route["origin"] = next
 		route["steps"] = steps
 		_route_cache[actor_id] = route
-	if not arrived and allow_quick_step and actor.get("traits", []).has("quick") and int(state["time"]) % 2 == 0:
+	if not arrived and allow_quick_step and (actor.get("traits", []).has("quick") or actor.get("traits", []).has("fast_walker")) and int(state["time"]) % 2 == 0:
 		return _move_towards(actor, target_x, target_y, acceptable_distance, false)
 	return arrived
 
@@ -2377,7 +2722,9 @@ func _attack_raider(colonist: Dictionary, raider: Dictionary) -> void:
 		return
 	var damage := 10.0 + float(colonist["skills"]["combat"]) * 1.2
 	if colonist["equipment"]["weapon"] == "spear": damage += 10.0
-	if colonist["traits"].has("timid"): damage *= 0.75
+	if colonist["traits"].has("timid"): damage *= float(PreparationRules.TRAIT_EFFECTS["timid"]["combat_damage_factor"])
+	damage *= PreparationRules.pain_work_factor(PreparationRules.health_pain(colonist["health"]))
+	damage *= PreparationRules.injury_work_factor(colonist["health"], "combat")
 	raider["hp"] = maxf(0.0, float(raider["hp"]) - damage)
 	colonist["attack_cooldown"] = 2
 	if float(raider["hp"]) <= 0.0:

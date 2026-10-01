@@ -26,7 +26,7 @@ func _initialize() -> void:
 	var dressed_image := _render(base)
 	var bare_image := _render(bare)
 	assert(_color_distance(dressed_image.get_pixel(128, 180), bare_image.get_pixel(128, 180)) > 0.1, "Shirt does not change the body.")
-	assert(_color_distance(dressed_image.get_pixel(128, 227), bare_image.get_pixel(128, 227)) > 0.1, "Pants do not change the body.")
+	assert(_color_distance(dressed_image.get_pixel(128, 205), bare_image.get_pixel(128, 205)) > 0.1, "Pants do not change the body.")
 	var jacket: Dictionary = base.duplicate(true)
 	jacket["apparel"] = "jacket"
 	assert(_color_distance(_render(jacket).get_pixel(112, 180), dressed_image.get_pixel(112, 180)) > 0.05, "Jacket layer is missing.")

@@ -9,6 +9,9 @@ const ApparelIconScript = preload("res://scripts/ui/apparel_icon.gd")
 const SettingsScript = preload("res://scripts/ui/settings.gd")
 const I18n = preload("res://scripts/ui/i18n.gd")
 const SetupCatalog = preload("res://scripts/model/setup_catalog.gd")
+const PreparationPresetStore = preload("res://scripts/ui/preparation_preset_store.gd")
+const PreparationNamePool = preload("res://scripts/ui/preparation_name_pool.gd")
+const PreparationRules = preload("res://scripts/model/preparation_rules.gd")
 
 const BG := Color("#1b1d1e")
 const PANEL := Color("#282b2c")
@@ -26,19 +29,39 @@ const HUD_ACTIVE := Color("#4c6068")
 
 const JOBS := ["chop", "mine", "harvest", "haul", "build", "treat", "research"]
 const JOB_LABELS := ["Chop", "Mine", "Harvest", "Haul", "Build", "Care", "Research"]
-const TRAIT_IDS := ["", "hardworking", "calm", "quick", "curious", "kind", "night_owl", "timid", "abrasive", "lazy"]
-const TRAIT_NAMES := ["None", "Hardworking (+6)", "Calm (+4)", "Quick (+4)", "Curious (+3)", "Kind (+3)", "Night owl (+2)", "Timid (-4)", "Abrasive (-4)", "Lazy (-6)"]
-const CONDITION_IDS := ["", "asthma", "bad_back", "scar"]
-const CONDITION_NAMES := ["None", "Asthma (-4)", "Bad back (-5)", "Scar (-2)"]
+const TRAIT_IDS := ["", "hardworking", "calm", "quick", "curious", "kind", "night_owl", "timid", "abrasive", "lazy", "pyromaniac", "fast_walker", "ugly"]
+const TRAIT_NAMES := ["None", "Hardworking", "Calm", "Quick", "Curious", "Kind", "Night owl", "Timid", "Abrasive", "Lazy", "Pyromaniac", "Fast walker", "Ugly"]
+const CONDITION_IDS := ["", "asthma", "bad_back", "scar", "cut_light", "cut_deep", "bruise", "burn", "scratch"]
+const CONDITION_NAMES := ["None", "Asthma", "Bad back", "Scar", "Light cut", "Deep cut", "Bruise", "Burn", "Scratch"]
+const CHRONIC_CONDITION_IDS := ["", "asthma", "bad_back"]
+const INJURY_KIND_IDS := ["scar", "cut_light", "cut_deep", "bruise", "burn", "scratch"]
+const INJURY_BODY_PART_IDS := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
+const CHILDHOOD_IDS := ["rural_child", "town_child", "apprentice", "vatgrown_soldier", "unknown"]
+const ADULTHOOD_IDS := ["farmer", "builder", "medic", "scholar", "unknown"]
 const SKILL_IDS := ["chop", "mine", "harvest", "haul", "build", "research", "treat", "combat"]
-const CLASSIC_SKILL_IDS := ["shooting", "melee", "construction", "mining", "cooking", "plants", "animals", "crafting", "artistic", "medical", "social", "intellectual"]
+const CLASSIC_SKILL_IDS := ["shooting", "melee", "social", "animals", "medical", "cooking", "construction", "plants", "mining", "artistic", "crafting", "intellectual"]
 const HAIR_OPTIONS := ["Short", "Wavy", "Long", "Curly", "Shaved"]
 const SKIN_OPTIONS := ["#f8dcc3", "#efc69f", "#e7ad82", "#d99568", "#cb875d", "#b97952", "#a86b48", "#925b3d", "#7d4e36", "#6a422f", "#573729", "#442c23"]
 const OUTFIT_OPTIONS := ["#527a81", "#b16f59", "#7b8664", "#92759a", "#b89c65"]
 const HAIR_COLOR_OPTIONS := ["#282421", "#4d3c32", "#704934", "#8b6449", "#ad7850", "#bb9b69", "#d1b880", "#8c5f56", "#754d48", "#a2a2a0", "#e5dfd2", "#343a3a"]
-const MALE_HAIR_IDS := ["short", "sidepart", "curly", "shaved"]
-const FEMALE_HAIR_IDS := ["bob", "wavy", "long", "braid"]
-const ITEM_PRICES := {"wood": 2, "stone": 3, "food": 4, "medicine": 12, "spear": 18, "jacket": 11, "tshirt": 8, "pants": 9, "cap": 6, "brim_hat": 10}
+const LEGACY_MALE_HAIR_IDS := ["short", "sidepart", "curly", "shaved", "bald", "bob", "wavy", "long", "braid", "medium"]
+const LEGACY_FEMALE_HAIR_IDS := ["bob", "wavy", "long", "braid", "bald", "short", "sidepart", "curly", "shaved", "medium"]
+const MALE_HAIR_IDS := ["bald", "shaved", "short", "sidepart", "curly", "medium", "long"]
+const FEMALE_HAIR_IDS := ["bald", "short", "bob", "medium", "wavy", "braid", "long"]
+const PREPARATION_FEMALE_NAMES := "Ada,Aisha,Alara,Alba,Alea,Alexandra,Alina,Amara,Amelia,Anika,Aria,Asena,Aslı,Ayla,Bahar,Bella,Beren,Bianca,Carla,Celia,Clara,Dalia,Defne,Deniz,Derya,Dila,Ece,Elena,Elif,Elina,Elisa,Elvan,Emilia,Esma,Estelle,Eva,Fatma,Freya,Gabriela,Gizem,Hana,Hazel,Helena,Ilgın,Ines,Iris,Jade,Jana,Jasmine,Juno,Kara,Lara,Lea,Lena,Leyla,Lila,Lina,Livia,Luna,Mara,Marina,Maya,Melis,Mina,Mira,Nadia,Nara,Neva,Nika,Nila,Nilay,Nora,Olivia,Öykü,Petra,Reya,Rina,Rosa,Sara,Selin,Sena,Seren,Sofia,Suna,Talia,Tara,Uma,Vera,Yasemin,Zara,Zehra,Zeynep"
+const PREPARATION_MALE_NAMES := "Adem,Adrian,Ahmet,Akın,Ali,Alp,Aras,Arda,Arden,Aslan,Atlas,Baran,Barış,Batu,Ben,Bora,Can,Cem,Deniz,Doruk,Efe,Ege,Emir,Emre,Enes,Eray,Eren,Erik,Faris,Felix,Galip,Hakan,Harun,Hugo,Ivan,Jack,Jonas,Kaan,Kai,Kerem,Kuzey,Leon,Liam,Lucas,Marco,Mateo,Max,Mert,Mika,Milo,Miran,Nadir,Nazım,Noah,Okan,Omar,Onur,Orhan,Ozan,Patrick,Rafael,Rami,Ravi,Robin,Roman,Roni,Samir,Sarp,Selim,Serhat,Silas,Sinan,Soren,Tamer,Theo,Tomas,Tuna,Utku,Vedat,Viktor,Yağız,Yaman,Yusuf,Zeki"
+const PREPARATION_SURNAMES := "Acar,Aksoy,Alkan,Altın,Arden,Arslan,Aslan,Aydın,Başar,Bennett,Bergen,Blake,Bozkurt,Brown,Carter,Çelik,Demir,Deniz,Doyle,Durmaz,Erdoğan,Eren,Ergin,Eroğlu,Everett,Fen,Fischer,Foster,Gale,Garcia,Giray,Güneş,Hale,Han,Harris,Hart,Hayes,Holm,Işık,Kara,Kaya,Keskin,Khan,King,Klein,Korkmaz,Kurt,Lane,Larsen,Lee,Marin,Marsh,Martin,Mercer,Miller,Moore,Moran,Moreau,Narin,Nolan,Özdemir,Özen,Park,Petrov,Reed,Rivera,Rowan,Santos,Scott,Sever,Shaw,Silva,Stone,Şahin,Tan,Taylor,Thorne,Toprak,Torres,Turner,Uzun,Vale,Vega,Walker,Ward,West,Wright,Yalçın,Yılmaz,Yıldız,Zane"
+const PREPARATION_TURKISH_FEMALE_NAMES := "Ada,Alara,Asena,Aslı,Ayla,Bahar,Beren,Defne,Deniz,Derya,Dila,Ece,Elif,Elvan,Esma,Fatma,Gizem,Ilgın,Leyla,Melis,Mina,Mira,Neva,Nilay,Öykü,Selin,Sena,Seren,Suna,Yasemin,Zehra,Zeynep"
+const PREPARATION_TURKISH_MALE_NAMES := "Adem,Ahmet,Akın,Ali,Alp,Aras,Arda,Aslan,Baran,Barış,Batu,Bora,Can,Cem,Deniz,Doruk,Efe,Ege,Emir,Emre,Enes,Eray,Eren,Galip,Hakan,Harun,Kaan,Kerem,Kuzey,Mert,Miran,Nazım,Okan,Onur,Orhan,Ozan,Sarp,Selim,Serhat,Sinan,Tamer,Tuna,Utku,Vedat,Yağız,Yaman,Yusuf,Zeki"
+const PREPARATION_TURKISH_SURNAMES := "Acar,Aksoy,Alkan,Altın,Arslan,Aslan,Aydın,Başar,Bozkurt,Çelik,Demir,Deniz,Durmaz,Erdoğan,Eren,Ergin,Eroğlu,Giray,Güneş,Işık,Kara,Kaya,Keskin,Korkmaz,Kurt,Narin,Özdemir,Özen,Sever,Şahin,Tan,Toprak,Uzun,Yalçın,Yılmaz,Yıldız"
+const PREPARATION_INTERNATIONAL_SURNAMES := "Arden,Bennett,Bergen,Blake,Brown,Carter,Doyle,Everett,Fen,Fischer,Foster,Gale,Garcia,Hale,Han,Harris,Hart,Hayes,Holm,Khan,King,Klein,Lane,Larsen,Lee,Marin,Marsh,Martin,Mercer,Miller,Moore,Moran,Moreau,Nolan,Park,Petrov,Reed,Rivera,Rowan,Santos,Scott,Shaw,Silva,Stone,Taylor,Thorne,Torres,Turner,Vale,Vega,Walker,Ward,West,Wright,Zane"
+const PREPARATION_TURKISH_NICKNAMES := "Kıvılcım,Gölge,Boz,Kaya,Mavi,Fırtına,Yıldırım,Çınar,Kuzgun,Şahin,Çakıl,Kum,Ayaz,Poyraz,Yel,Gece,Gündüz,Işık,Çakır,Kurt,Asi,Sarp,Duman,Kırağı,Dalgıç,Çelik,Çevik,Minik,Yaman,Çakmak,Sessiz,Parlak,Derin,İzci,Usta,Tilki,Bulut,Şafak,Kıvırcık,Boncuk,Çiçek,Ateş,Akarsu,Yosun,Kartal,Kırlangıç,Rüzgar,Serçe,Denizci,Kaptan,Yıldız,Arı,Çita,Fındık,Kömür,Kırmızı,İnci,Şimşek,Gümüş,Kelebek,Şeker,Kara,Akça,Tunaç,Bilge,Çoban,Ozan,Ardıç,Çam,Tekir,Pars,Meraklı,Şanslı"
+const PREPARATION_INTERNATIONAL_NICKNAMES := "Sparrow,Scout,Rook,Wren,Raven,Fox,Ghost,Ash,Ember,Flint,Stone,Slate,River,Storm,Blaze,Frost,Dusk,Dawn,Shade,Sunny,Patch,Doc,Sparks,Red,Blue,Gold,Silver,Bee,Kit,Mouse,Bear,Hawk,Finch,Swift,Dash,Skip,Whisper,Whistle,Arrow,Comet,Star,Orbit,Nova,Tinker,Forge,Anchor,Compass,North,South,Drift,Rusty,Pepper,Sage,Maple,Willow,Moss,Thorn,Clover,Pine,Bramble,Acorn,Brook,Lark,Moth,Cricket,Otter,Junebug,Lucky,Smudge,Cinder,Harbor,Skipper,Quest,Shiver,Bolt,Pixie,Smokey,Sunny,Midnight,Chime,Glimmer,Teacup,Marbles,Crimson,Indigo,Glint"
+const PREPARATION_TURKISH_NICKNAME_PREFIXES := "Sessiz,Yaban,Gece,Şafak,Kuzey,Güney,Gümüş,Altın,Kızıl,Mavi,Kara,Ak,Saklı,Serin,Derin,Uçan,Keskin,Küçük,Büyük,Hızlı,Eski,Yeni,Uzak,Yakın,Parlak,Sakin,Yalnız,Cesur,Kırık,İnce,Yüksek,Alçak,Genç,Bilge,Çevik,Neşeli,Soğuk,Sıcak,Sisli,Ayazlı"
+const PREPARATION_INTERNATIONAL_NICKNAME_PREFIXES := "Quiet,Wild,Night,Dawn,North,South,Silver,Golden,Red,Blue,Black,White,Hidden,Cool,Deep,Swift,Little,Grand,Fast,Old,New,Far,Near,Bright,Calm,Lone,Brave,Broken,Thin,High,Low,Young,Wise,Amber,Pale,Stormy,Cloudy,Misty,Winter,Summer"
+const PREPARATION_EXTRA_TURKISH_NICKNAMES := "Akbaba,Alaca,Aslan,Avcı,Badem,Bal,Balta,Baykuş,Bıçak,Boğa,Bozkır,Böcek,Buz,Ceylan,Çapa,Çayır,Çaylak,Çerağ,Çiğdem,Çiftçi,Çizgi,Demir,Diken,Dolunay,Dönence,Doruk,Ekin,Engerek,Eşkin,Fener,Fok,Geyik,Gölcük,Güneş,Güvercin,Hançer,Hazine,Horoz,Ilgaz,İğne,İncir,İpek,İpekçi,Karaca,Karga,Kasırga,Kaval,Kılıç,Kirpi,Kök,Kumru,Kumul,Kuyu,Leylek,Lodos,Martı,Mercan,Mızrak,Nar,Nehir,Nöbetçi,Ocak,Orman,Oymak,Palamut,Pamuk,Panter,Papatya,Pınar,Pus,Pusula,Rota,Sabır,Saksağan,Salkım,Sansar,Sarmaşık,Saz,Sedef,Sel,Seren,Ses,Sığırcık,Siper,Sis,Söğüt,Şövalye,Taş,Tavşan,Tayfun,Telaş,Tılsım,Tohum,Toprak,Uçurtma,Ufuk,Uysal,Vadi,Yağmur,Yakut,Yaprak,Yelken,Yengeç,Yılan,Yolcu,Yonca,Zeytin,Zırh,Zümrüt"
+const PREPARATION_EXTRA_INTERNATIONAL_NICKNAMES := "Badger,Bison,Lynx,Heron,Osprey,Kestrel,Robin,Crow,Magpie,Mantis,Gecko,Mink,Stoat,Weasel,Ferret,Mole,Boar,Stag,Elk,Fawn,Doe,Puma,Cougar,Jaguar,Panther,Falcon,Eagle,Owl,Nightowl,Firefly,Firebug,Glowworm,Beetle,Hopper,Salmon,Pike,Minnow,Marlin,Shell,Pebble,Boulder,Granite,Marble,Quartz,Copper,Bronze,Iron,Onyx,Opal,Jade,Pearl,Ruby,Topaz,Jasper,Garnet,Cobalt,Azure,Umber,Saffron,Sable,Scarlet,Violet,Lilac,Teal,Olive,Hazel,Coral,Briar,Rowan,Cedar,Aspen,Birch,Elm,Fir,Spruce,Ashen,Thistle,Fern,Nettle,Huckle,Juniper,Bracken,Fennel,Thyme,Basil,Pollen,Honeybee,Bumble,Quiver,Archer,Ranger,Wanderer,Nomad,Rover,Drifter,Rambler,Wayfarer,Keeper,Watcher,Seeker,Builder,Crafter,Stitch,Needle,Thread,Button,Tumbler,Knuckle,Rocket,Snap,Flicker,Lantern,Beacon,Jester,Joker,Grin,Smirk,Gleam,Shimmer,Twinkle,Ripple,Rumble,Thunder,Hail,Snow,Rain,Gust,Gale,Zephyr,Eclipse,Solstice,Meteor,Nebula,Cosmos,Zodiac,Saturn,Mars,Pluto,Mercury,Venus,Galaxy,Horizon"
+const ITEM_PRICES := GameModel.ITEM_PRICES
 # The model uses 600 simulation steps per day. An MVP step includes full pawn
 # decisions and movement, so matching RimWorld's real-time day length made even
 # the fastest setting feel inert. Keep the in-game calendar unchanged while
@@ -53,7 +76,9 @@ const RESEARCH_PROJECTS := [
 
 class PawnPortrait extends Control:
 	const PawnDrawer = preload("res://scripts/ui/pawn_visual.gd")
+	const PreparationPawnArt = preload("res://scripts/ui/preparation_pawn_art.gd")
 	var appearance: Dictionary = {}
+	var classic_preparation := false
 	var is_selected := false
 	var is_drafted := false
 
@@ -65,65 +90,283 @@ class PawnPortrait extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
+		if classic_preparation:
+			var drawing_size := 100.0 if size.y >= 70.0 else 80.0
+			var drawing_top := -7.0 if size.y >= 70.0 else -10.0
+			PreparationPawnArt.draw_pawn(self, Rect2((size.x - drawing_size) * 0.5, drawing_top, drawing_size, drawing_size), appearance)
+			return
 		PawnDrawer.draw_pawn(self, Vector2(size.x * 0.5, size.y * 0.45), minf(size.x, size.y) * 0.78, appearance, is_selected, false, is_drafted)
 
 
 class FamilyGraph extends Control:
 	var clusters: Array = []
 	var edges: Array = []
+	var families: Array = []
+	const LINK_COLOR := Color("#8e9796")
+	const LINK_WIDTH := 8.0
 
 	func _draw() -> void:
 		for cluster in clusters:
 			var rect: Rect2 = cluster
-			draw_rect(rect, Color("#212224"))
-			draw_rect(rect, Color("#3c3d3f"), false, 1.0)
+			draw_rect(rect, Color("#292b2d"))
+		for family in families:
+			var parents: Array = family["parents"]
+			var children: Array = family["children"]
+			if parents.is_empty() or children.is_empty():
+				continue
+			var color := LINK_COLOR
+			var rail_y := (float(parents[0].y) + float(children[0].y)) * 0.5
+			var left_x := INF
+			var right_x := -INF
+			for parent in parents:
+				var center: Vector2 = parent
+				left_x = minf(left_x, center.x)
+				right_x = maxf(right_x, center.x)
+				_draw_segment(center, Vector2(center.x, rail_y), color)
+			for child in children:
+				var center: Vector2 = child
+				left_x = minf(left_x, center.x)
+				right_x = maxf(right_x, center.x)
+			_draw_segment(Vector2(left_x, rail_y), Vector2(right_x, rail_y), color)
+			for child in children:
+				var center: Vector2 = child
+				_draw_segment(Vector2(center.x, rail_y), Vector2(center.x, center.y - 6.0), color)
+				_draw_arrow_head(Vector2(center.x, center.y - 4.0), Vector2.DOWN, color)
 		for edge in edges:
 			var start: Vector2 = edge["start"]
 			var finish: Vector2 = edge["finish"]
 			var active: bool = edge["active"]
-			var color := Color("#a7a8a6") if active else Color("#5d6062")
+			var color := LINK_COLOR if active else Color("#67716f")
 			if str(edge.get("kind", "parent")) == "sibling":
-				draw_line(start, finish, color, 7.0)
+				_draw_segment(start, finish, color)
 			else:
 				var arrow_direction := 1.0 if finish.y >= start.y else -1.0
-				var arrow_base_y := finish.y - arrow_direction * 14.0
+				var arrow_base_y := finish.y - arrow_direction * 6.0
 				var middle_y := (start.y + arrow_base_y) * 0.5
-				_block_segment(start, Vector2(start.x, middle_y), color)
-				_block_segment(Vector2(start.x, middle_y), Vector2(finish.x, middle_y), color)
-				_block_segment(Vector2(finish.x, middle_y), Vector2(finish.x, arrow_base_y), color)
-				draw_colored_polygon(PackedVector2Array([Vector2(finish.x - 12.0, arrow_base_y), finish, Vector2(finish.x + 12.0, arrow_base_y)]), color)
+				_draw_segment(start, Vector2(start.x, middle_y), color)
+				_draw_segment(Vector2(start.x, middle_y), Vector2(finish.x, middle_y), color)
+				_draw_segment(Vector2(finish.x, middle_y), Vector2(finish.x, arrow_base_y), color)
+				_draw_arrow_head(Vector2(finish.x, finish.y - arrow_direction * 4.0), Vector2(0, arrow_direction), color)
 
-	func _block_segment(start: Vector2, finish: Vector2, color: Color) -> void:
-		var width := 11.0
-		if is_equal_approx(start.x, finish.x):
-			draw_rect(Rect2(Vector2(start.x - width * 0.5, minf(start.y, finish.y)), Vector2(width, absf(finish.y - start.y))), color)
+	func _draw_segment(start: Vector2, finish: Vector2, color: Color) -> void:
+		if start.distance_squared_to(finish) < 0.25:
+			return
+		# Draw one solid rail with integer-aligned edges. At reduced window sizes
+		# a thin outlined stroke breaks into visibly jagged pixels.
+		if absf(start.x - finish.x) < 0.25:
+			var top := minf(start.y, finish.y)
+			draw_rect(Rect2(roundf(start.x - LINK_WIDTH * 0.5), floorf(top), LINK_WIDTH, ceilf(absf(finish.y - start.y))), color)
+		elif absf(start.y - finish.y) < 0.25:
+			var left := minf(start.x, finish.x)
+			draw_rect(Rect2(floorf(left), roundf(start.y - LINK_WIDTH * 0.5), ceilf(absf(finish.x - start.x)), LINK_WIDTH), color)
 		else:
-			draw_rect(Rect2(Vector2(minf(start.x, finish.x), start.y - width * 0.5), Vector2(absf(finish.x - start.x), width)), color)
+			draw_line(start, finish, color, LINK_WIDTH, true)
+
+	func _draw_arrow_head(tip: Vector2, direction: Vector2, color: Color) -> void:
+		var back := tip - direction * 16.0
+		var side := Vector2(-direction.y, direction.x) * 12.0
+		var shape := PackedVector2Array([tip, back + side, back - side])
+		draw_colored_polygon(shape, color)
+		draw_polyline(PackedVector2Array([tip, back + side, back - side, tip]), color, 2.0, true)
 
 
 class RelationshipArrow extends Control:
 	var forward := true
+	var _arrow_texture: Texture2D
+
+	func _ready() -> void:
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var points := "2,2 136,2 158,16 136,30 2,30" if forward else "22,2 158,2 158,30 22,30 0,16"
+		var svg := '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="32" viewBox="0 0 160 32"><polygon points="%s" fill="#626c6d"/><polyline points="%s" fill="none" stroke="#9ba5a5" stroke-width="2" stroke-linejoin="round"/></svg>' % [points, points]
+		var arrow_image := Image.new()
+		if arrow_image.load_svg_from_buffer(svg.to_utf8_buffer(), 4.0) == OK:
+			_arrow_texture = ImageTexture.create_from_image(arrow_image)
 
 	func _draw() -> void:
-		var head := 14.0
-		var points := PackedVector2Array()
-		if forward:
-			points = PackedVector2Array([Vector2.ZERO, Vector2(size.x - head, 0), Vector2(size.x, size.y * 0.5), Vector2(size.x - head, size.y), Vector2(0, size.y)])
-		else:
-			points = PackedVector2Array([Vector2(head, 0), Vector2(size.x, 0), Vector2(size.x, size.y), Vector2(head, size.y), Vector2(0, size.y * 0.5)])
-		draw_colored_polygon(points, Color("#696b6c"))
+		if _arrow_texture != null:
+			draw_texture_rect(_arrow_texture, Rect2(Vector2.ZERO, size), false)
 
 
 class PrepDiceButton extends Button:
+	func _ready() -> void:
+		flat = true
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
 	func _draw() -> void:
-		var side := 14.0
+		var side := minf(15.0, minf(size.x, size.y) - 4.0)
 		var origin := (size - Vector2.ONE * side) * 0.5
-		draw_rect(Rect2(origin, Vector2.ONE * side), Color("#c2c2be"))
-		draw_rect(Rect2(origin, Vector2.ONE * side), Color("#26292b"), false, 1.0)
-		var ink := Color("#252829")
-		for mark in [Vector2(3, 3), Vector2(9, 3), Vector2(5, 6), Vector2(10, 8), Vector2(3, 10)]:
-			draw_line(origin + mark, origin + mark + Vector2(2, 2), ink, 1.5)
-		draw_line(origin + Vector2(8, 11), origin + Vector2(11, 11), ink, 1.3)
+		var ink := Color("#d1d0c9")
+		draw_rect(Rect2(origin, Vector2.ONE * side), ink, false, 1.2)
+		for mark in [Vector2(3.5, 3.5), Vector2(11.5, 3.5), Vector2(7.5, 7.5), Vector2(3.5, 11.5), Vector2(11.5, 11.5)]:
+			draw_circle(origin + mark * side / 15.0, 1.05, ink)
+
+
+class PrepInfoButton extends Button:
+	func _ready() -> void:
+		flat = true
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var center := size * 0.5
+		var ink := Color("#d1d0c9")
+		draw_arc(center, 7.5, 0.0, TAU, 24, ink, 1.2, true)
+		draw_circle(center + Vector2(0, -3.8), 1.1, ink)
+		draw_line(center + Vector2(0, -0.5), center + Vector2(0, 4.6), ink, 1.6, true)
+
+
+class PrepResetButton extends Button:
+	func _ready() -> void:
+		flat = true
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var center := size * 0.5
+		var ink := Color("#d1d0c9")
+		draw_arc(center, 7.5, -2.5, 3.45, 28, ink, 1.7, true)
+		draw_colored_polygon(PackedVector2Array([center + Vector2(-8.1, -1.5), center + Vector2(-8.0, -7.4), center + Vector2(-2.6, -3.3)]), ink)
+
+
+class PrepPointLimitButton extends Button:
+	var enabled := false
+
+	func _ready() -> void:
+		flat = true
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var ink := Color("#4fb963") if enabled else Color("#d22329")
+		var left := 4.0
+		var right := size.x - 4.0
+		var top := 4.0
+		var bottom := size.y - 4.0
+		if enabled:
+			draw_line(Vector2(left, size.y * 0.53), Vector2(size.x * 0.42, bottom), ink, 3.5)
+			draw_line(Vector2(size.x * 0.42, bottom), Vector2(right, top), ink, 3.5)
+		else:
+			draw_line(Vector2(left, top), Vector2(right, bottom), ink, 3.5)
+			draw_line(Vector2(right, top), Vector2(left, bottom), ink, 3.5)
+
+
+class PrepColorButton extends Button:
+	signal color_changed(next_color: Color)
+	var color := Color.WHITE
+
+	func _ready() -> void:
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var inside := Rect2(Vector2(2, 2), size - Vector2(4, 4))
+		draw_rect(inside, color)
+		draw_rect(inside, Color("#6b6a65"), false, 1.0)
+
+	func set_picked_color(next_color: Color) -> void:
+		color = next_color
+		queue_redraw()
+		color_changed.emit(next_color)
+
+
+class PrepColorActionButton extends Button:
+	var action := "copy"
+
+	func _ready() -> void:
+		flat = true
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		for state in ["normal", "hover", "pressed", "focus"]:
+			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	func _draw() -> void:
+		var ink := Color("#e5e2d9")
+		var shadow := Color("#111417")
+		var accent := Color("#c9a46d")
+		if is_hovered():
+			draw_rect(Rect2(Vector2.ZERO, size), Color("#414344"))
+		if action == "eyedropper":
+			draw_colored_polygon(PackedVector2Array([Vector2(3, 21), Vector2(4, 16), Vector2(7, 19)]), ink)
+			draw_colored_polygon(PackedVector2Array([Vector2(4, 16), Vector2(14, 6), Vector2(19, 11), Vector2(9, 21)]), shadow)
+			draw_colored_polygon(PackedVector2Array([Vector2(7, 16), Vector2(14, 9), Vector2(16, 11), Vector2(9, 18)]), ink)
+			draw_colored_polygon(PackedVector2Array([Vector2(13, 6), Vector2(17, 2), Vector2(21, 2), Vector2(24, 5), Vector2(24, 8), Vector2(19, 13)]), shadow)
+			draw_colored_polygon(PackedVector2Array([Vector2(15, 6), Vector2(18, 3), Vector2(21, 3), Vector2(23, 5), Vector2(23, 8), Vector2(19, 11)]), ink)
+			draw_circle(Vector2(20, 6), 1.2, shadow)
+			return
+		# Two paper outlines with a clear direction mark, on the color-name row.
+		draw_rect(Rect2(3, 7, 11, 13), shadow)
+		draw_rect(Rect2(3, 7, 11, 13), ink, false, 1.5)
+		draw_rect(Rect2(7, 3, 11, 13), shadow)
+		draw_rect(Rect2(7, 3, 11, 13), ink, false, 1.5)
+		if action == "copy":
+			draw_line(Vector2(17, 10), Vector2(22, 5), shadow, 3.5, true)
+			draw_line(Vector2(17, 10), Vector2(22, 5), accent, 2.0, true)
+			draw_line(Vector2(17, 5), Vector2(22, 5), accent, 2.0, true)
+			draw_line(Vector2(22, 5), Vector2(22, 10), accent, 2.0, true)
+		else:
+			draw_line(Vector2(10, 16), Vector2(5, 21), shadow, 3.5, true)
+			draw_line(Vector2(10, 16), Vector2(5, 21), accent, 2.0, true)
+			draw_line(Vector2(5, 16), Vector2(5, 21), accent, 2.0, true)
+			draw_line(Vector2(5, 21), Vector2(10, 21), accent, 2.0, true)
+
+
+class PrepColorWheel extends Control:
+	signal color_changed(next_color: Color)
+	const DIAMETER := 176
+	var color := Color.WHITE
+	var _wheel_texture: ImageTexture
+	var _drag_part := ""
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(208, 184)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		var image := Image.create(DIAMETER, DIAMETER, false, Image.FORMAT_RGBA8)
+		var radius := float(DIAMETER) * 0.5
+		for y in range(DIAMETER):
+			for x in range(DIAMETER):
+				var offset := Vector2(float(x) + 0.5 - radius, float(y) + 0.5 - radius)
+				var saturation := offset.length() / radius
+				if saturation > 1.0:
+					image.set_pixel(x, y, Color.TRANSPARENT)
+				else:
+					var hue := fposmod(atan2(offset.y, offset.x) / TAU, 1.0)
+					image.set_pixel(x, y, Color.from_hsv(hue, saturation, 1.0))
+		_wheel_texture = ImageTexture.create_from_image(image)
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_texture(_wheel_texture, Vector2(2, 2))
+		var center := Vector2(90, 90)
+		var angle := color.h * TAU
+		var marker := center + Vector2(cos(angle), sin(angle)) * color.s * 87.0
+		draw_circle(marker, 7.0, Color.BLACK)
+		draw_circle(marker, 5.0, color)
+		draw_arc(marker, 6.0, 0.0, TAU, 24, Color.WHITE, 1.5, true)
+		for y in range(176):
+			var value := 1.0 - float(y) / 175.0
+			draw_rect(Rect2(189, 2 + y, 15, 1), Color.from_hsv(color.h, color.s, value))
+		draw_rect(Rect2(188, 1, 17, 178), Color("#696a68"), false, 1)
+		var marker_y := 2.0 + (1.0 - color.v) * 175.0
+		draw_line(Vector2(186, marker_y), Vector2(207, marker_y), Color.WHITE, 2.0)
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_drag_part = "value" if event.position.x >= 185.0 else "wheel"
+				_pick(event.position)
+			else:
+				_drag_part = ""
+		elif event is InputEventMouseMotion and not _drag_part.is_empty():
+			_pick(event.position)
+
+	func _pick(point: Vector2) -> void:
+		if _drag_part == "value":
+			color = Color.from_hsv(color.h, color.s, clampf(1.0 - (point.y - 2.0) / 175.0, 0.0, 1.0))
+		else:
+			var offset := point - Vector2(90, 90)
+			color = Color.from_hsv(fposmod(atan2(offset.y, offset.x) / TAU, 1.0), clampf(offset.length() / 87.5, 0.0, 1.0), color.v)
+		queue_redraw()
+		color_changed.emit(color)
 
 
 class PrepGenderButton extends Button:
@@ -137,7 +380,9 @@ class PrepGenderButton extends Button:
 			add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
 	func _draw() -> void:
-		var ink := Color("#e2dbce") if selected else Color("#a8a8a4")
+		var ink := Color("#ef9cb9") if not is_male else Color("#80b9e5")
+		if not selected:
+			ink.a = 0.64
 		var center := Vector2(8.5, 9.0)
 		draw_arc(center, 4.4, 0.0, TAU, 24, ink, 1.8, true)
 		if is_male:
@@ -148,14 +393,14 @@ class PrepGenderButton extends Button:
 			draw_line(center + Vector2(0, 4.4), center + Vector2(0, 9.2), ink, 1.8, true)
 			draw_line(center + Vector2(-2.6, 7.0), center + Vector2(2.6, 7.0), ink, 1.8, true)
 
-
 class PassionFlame extends Button:
 	signal level_changed(next_level: int)
 	var level := 0
+	static var _icons: Dictionary = {}
 
 	func _ready() -> void:
 		flat = true
-		custom_minimum_size = Vector2(27, 25)
+		custom_minimum_size = Vector2(22, 21)
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		pressed.connect(_cycle)
 
@@ -165,25 +410,25 @@ class PassionFlame extends Button:
 		queue_redraw()
 
 	func _draw() -> void:
-		var count := 2 if level == 2 else 1
-		for flame_index in range(count):
-			var scale_factor := 0.65 if count == 2 else 0.86
-			var origin := Vector2(1.5 + float(flame_index) * 11.0, 2.0) if count == 2 else Vector2(4.0, 1.0)
-			var points := PackedVector2Array([
-				origin + Vector2(8, 0) * scale_factor,
-				origin + Vector2(12, 7) * scale_factor,
-				origin + Vector2(15, 4) * scale_factor,
-				origin + Vector2(17, 13) * scale_factor,
-				origin + Vector2(15, 20) * scale_factor,
-				origin + Vector2(10, 23) * scale_factor,
-				origin + Vector2(4, 20) * scale_factor,
-				origin + Vector2(2, 14) * scale_factor,
-				origin + Vector2(6, 10) * scale_factor
-			])
-			draw_colored_polygon(points, Color("#f1953c") if level > 0 else Color("#56575a"))
-			if level > 0:
-				var center := origin + Vector2(10, 17) * scale_factor
-				draw_circle(center, 2.8 * scale_factor, Color("#ffd071"))
+		if not _icons.has(level):
+			var flame_path := 'M12 2 C13 7 17 8 17 13 C17 18 14.6 21 11.7 21 C8.4 21 6 18.2 6 14.8 C6 11.7 7.9 9.5 9.3 7.3 C9.2 10 10.5 10.9 11.4 11.3 C12.9 8.9 12.2 5.5 12 2 Z'
+			var core_path := 'M11.8 12.7 C13.3 14.3 14.1 15.4 14.1 17 C14.1 19.2 12.8 20.4 11.5 20.4 C10 20.4 8.9 19.1 8.9 17.4 C8.9 15.7 10.2 14.4 11.8 12.7 Z'
+			var svg := '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24">'
+			if level == 0:
+				svg += '<path d="%s" fill="none" stroke="#55595a" stroke-width="1.6" stroke-linejoin="round"/>' % flame_path
+			elif level == 1:
+				svg += '<path d="%s" fill="#ec8139" stroke="#97471f" stroke-width=".8" stroke-linejoin="round"/><path d="%s" fill="#ffd57a"/>' % [flame_path, core_path]
+			else:
+				svg += '<g transform="translate(-4 7) scale(.65)"><path d="%s" fill="#e77932"/><path d="%s" fill="#ffd176"/></g>' % [flame_path, core_path]
+				svg += '<path d="%s" fill="#f2973e" stroke="#97471f" stroke-width=".7"/><path d="%s" fill="#ffdc86"/>' % [flame_path, core_path]
+				svg += '<g transform="translate(11 7) scale(.65)"><path d="%s" fill="#e77932"/><path d="%s" fill="#ffd176"/></g>' % [flame_path, core_path]
+			svg += '</svg>'
+			var source := Image.new()
+			if source.load_svg_from_string(svg) == OK:
+				_icons[level] = ImageTexture.create_from_image(source)
+		if _icons.has(level):
+			var bounds := Rect2(Vector2(5, 4), Vector2(12, 13)) if level == 0 else Rect2(Vector2(6, 4), Vector2(11, 14)) if level == 1 else Rect2(Vector2(1, 1), Vector2(20, 19))
+			draw_texture_rect(_icons[level], bounds, false)
 
 
 class PrepStepper extends HBoxContainer:
@@ -193,6 +438,8 @@ class PrepStepper extends HBoxContainer:
 	var maximum := 100
 	var display_mode := "standard"
 	var field: LineEdit
+	var track: Control
+	var skill_display: Button
 
 	func _init(initial_value: int = 0, lower: int = 0, upper: int = 100, mode: String = "standard") -> void:
 		minimum = lower
@@ -203,18 +450,19 @@ class PrepStepper extends HBoxContainer:
 	func _ready() -> void:
 		add_theme_constant_override("separation", 0 if display_mode != "standard" else 2)
 		var previous := Button.new()
-		previous.text = "◀"
-		previous.custom_minimum_size = Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)
+		previous.text = "<"
+		previous.custom_minimum_size = Vector2(14, 21) if display_mode == "skill" else (Vector2(17, 25) if display_mode == "age" else (Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)))
 		previous.pressed.connect(func(): set_value(value - 1))
 		field = LineEdit.new()
 		field.text = str(value)
 		field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		field.custom_minimum_size = Vector2(36, 25) if display_mode != "standard" else Vector2(42, 25)
+		field.custom_minimum_size = Vector2(20, 21) if display_mode == "skill" else (Vector2(48, 25) if display_mode == "age" else (Vector2(36, 25) if display_mode != "standard" else Vector2(42, 25)))
+		field.add_theme_font_size_override("font_size", 12)
 		field.text_submitted.connect(func(_text: String): _commit())
 		field.focus_exited.connect(_commit)
 		var next := Button.new()
-		next.text = "▶"
-		next.custom_minimum_size = Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)
+		next.text = ">"
+		next.custom_minimum_size = Vector2(14, 21) if display_mode == "skill" else (Vector2(17, 25) if display_mode == "age" else (Vector2(18, 25) if display_mode != "standard" else Vector2(23, 25)))
 		next.pressed.connect(func(): set_value(value + 1))
 		if display_mode != "standard":
 			previous.flat = true
@@ -224,8 +472,39 @@ class PrepStepper extends HBoxContainer:
 		if display_mode == "inline":
 			field.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 			field.add_theme_stylebox_override("read_only", StyleBoxEmpty.new())
+		if display_mode in ["skill", "age"]:
+			for state_name in ["normal", "focus", "read_only"]:
+				var field_style := StyleBoxFlat.new()
+				field_style.bg_color = Color("#494b4d") if display_mode == "skill" else Color("#17191a")
+				field_style.set_content_margin_all(0)
+				field.add_theme_stylebox_override(state_name, field_style)
 		if display_mode == "skill":
+			skill_display = Button.new()
+			skill_display.text = str(value)
+			skill_display.custom_minimum_size = Vector2(20, 21)
+			skill_display.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			skill_display.add_theme_font_size_override("font_size", 12)
+			for state_name in ["normal", "hover", "pressed"]:
+				var cell := StyleBoxFlat.new()
+				cell.bg_color = Color("#494b4d") if state_name == "normal" else Color("#555759")
+				cell.set_content_margin_all(0)
+				skill_display.add_theme_stylebox_override(state_name, cell)
+			skill_display.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+			skill_display.pressed.connect(func():
+				skill_display.visible = false
+				field.visible = true
+				field.grab_focus()
+				field.select_all())
+			add_child(skill_display)
 			add_child(field)
+			field.visible = false
+			field.focus_exited.connect(_finish_skill_edit)
+			field.text_submitted.connect(func(_text: String): _finish_skill_edit())
+			track = PrepSkillTrack.new()
+			track.custom_minimum_size = Vector2(74, 21)
+			track.level = value
+			track.level_picked.connect(func(next_level: int): set_value(next_level))
+			add_child(track)
 			add_child(previous)
 			add_child(next)
 		else:
@@ -233,13 +512,107 @@ class PrepStepper extends HBoxContainer:
 			add_child(field)
 			add_child(next)
 
-	func set_value(next_value: int) -> void:
+	func set_value(next_value: int, emit_change := true) -> void:
 		value = clampi(next_value, minimum, maximum)
 		field.text = str(value)
-		changed.emit(value)
+		if is_instance_valid(skill_display):
+			skill_display.text = str(value)
+		if is_instance_valid(track):
+			track.level = value
+			track.queue_redraw()
+		if emit_change:
+			changed.emit(value)
 
 	func _commit() -> void:
 		set_value(int(field.text) if field.text.is_valid_int() else value)
+
+	func _finish_skill_edit() -> void:
+		if display_mode == "skill" and is_instance_valid(skill_display):
+			field.visible = false
+			skill_display.visible = true
+
+
+class PrepSkillTrack extends Control:
+	signal level_picked(next_level: int)
+	var level := 0
+	var dragging := false
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, 21)), Color("#292b2d"))
+		draw_rect(Rect2(Vector2.ZERO, Vector2(size.x, 21)), Color("#545658"), false, 1.0)
+		if level > 0:
+			draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2) * float(level) / 20.0, 19)), Color("#58615b"))
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			dragging = event.pressed
+			if dragging:
+				level_picked.emit(clampi(roundi(event.position.x / maxf(1.0, size.x) * 20.0), 0, 20))
+		elif event is InputEventMouseMotion and dragging:
+			level_picked.emit(clampi(roundi(event.position.x / maxf(1.0, size.x) * 20.0), 0, 20))
+
+
+class PrepCargoIcon extends Control:
+	var item_id := ""
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(36, 36)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(size.x / 36.0, size.y / 36.0))
+		match item_id:
+			"packaged_survival_meal":
+				draw_rect(Rect2(4, 10, 28, 20), Color("#443820"))
+				draw_rect(Rect2(5, 8, 26, 20), Color("#b58929"))
+				draw_rect(Rect2(5, 8, 26, 5), Color("#d6ac37"))
+				draw_line(Vector2(8, 19), Vector2(28, 19), Color("#916b22"), 2)
+			"medicine":
+				draw_rect(Rect2(3, 8, 30, 22), Color("#263c40"))
+				draw_rect(Rect2(5, 9, 26, 19), Color("#568e91"))
+				draw_rect(Rect2(15, 11, 6, 16), Color("#afd1ce"))
+				draw_rect(Rect2(10, 16, 16, 6), Color("#afd1ce"))
+			"component":
+				var metal := Color("#9a9a8d")
+				var edge := Color("#555953")
+				draw_colored_polygon(PackedVector2Array([Vector2(3, 11), Vector2(9, 5), Vector2(17, 13), Vector2(27, 3), Vector2(33, 9), Vector2(23, 18), Vector2(33, 27), Vector2(27, 33), Vector2(18, 23), Vector2(9, 32), Vector2(3, 27), Vector2(13, 18)]), edge)
+				draw_circle(Vector2(18, 18), 10, metal)
+				draw_circle(Vector2(18, 18), 4, Color("#5e615d"))
+			"pistol":
+				draw_rect(Rect2(5, 13, 24, 5), Color("#242629"))
+				draw_rect(Rect2(6, 12, 20, 3), Color("#595e5f"))
+				draw_colored_polygon(PackedVector2Array([Vector2(12, 17), Vector2(21, 17), Vector2(18, 28), Vector2(13, 27)]), Color("#4f3b31"))
+				draw_rect(Rect2(25, 14, 7, 2), Color("#9a8571"))
+			"assault_rifle", "sniper_rifle":
+				draw_rect(Rect2(2, 16, 32, 4), Color("#25292a"))
+				draw_rect(Rect2(10, 14, 15, 4), Color("#4b5152"))
+				draw_line(Vector2(13, 19), Vector2(16, 29), Color("#323637"), 4)
+				draw_line(Vector2(8, 20), Vector2(4, 25), Color("#323637"), 3)
+				if item_id == "sniper_rifle":
+					draw_rect(Rect2(15, 10, 11, 3), Color("#242829"))
+					draw_rect(Rect2(31, 17, 5, 2), Color("#202526"))
+			"chemfuel":
+				draw_rect(Rect2(8, 8, 23, 25), Color("#571d21"))
+				draw_rect(Rect2(10, 10, 19, 21), Color("#a52e34"))
+				draw_rect(Rect2(12, 6, 11, 5), Color("#481d20"))
+				draw_line(Vector2(16, 16), Vector2(24, 25), Color("#622225"), 2)
+				draw_line(Vector2(24, 16), Vector2(16, 25), Color("#622225"), 2)
+			"female_elephant":
+				draw_colored_polygon(PackedVector2Array([Vector2(4, 17), Vector2(8, 11), Vector2(24, 10), Vector2(30, 16), Vector2(29, 25), Vector2(26, 25), Vector2(25, 31), Vector2(20, 31), Vector2(20, 25), Vector2(12, 25), Vector2(10, 31), Vector2(6, 31)]), Color("#818281"))
+				draw_circle(Vector2(27, 16), 7, Color("#9d9e9b"))
+				draw_rect(Rect2(30, 17, 4, 12), Color("#8e908e"))
+				draw_circle(Vector2(29, 14), 1.2, Color("#333435"))
+			"spear":
+				draw_line(Vector2(5, 30), Vector2(29, 7), Color("#825d37"), 4)
+				draw_colored_polygon(PackedVector2Array([Vector2(24, 9), Vector2(33, 2), Vector2(30, 15)]), Color("#a2aaa6"))
+			_:
+				draw_rect(Rect2(5, 8, 26, 22), Color("#6f7372"))
+				draw_rect(Rect2(7, 10, 22, 5), Color("#a1a5a2"))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 class PrepGrain extends Control:
@@ -264,6 +637,9 @@ var world_options := {"coverage": 0.50, "rainfall": 0.50, "temperature": 0.50, "
 var starting_cargo: Dictionary = {}
 var _cargo_search_text := ""
 var _preparation_grain: Texture2D
+var _preparation_copied_color := ""
+var _preparation_sample_target: PrepColorButton
+var _preparation_sample_overlay: ColorRect
 var _selected_equipment_catalog_id := "wood"
 var _equipment_category_filter := 0
 var _equipment_material_filter := 0
@@ -276,8 +652,17 @@ var faction_name := "Unnamed colony"
 var settlement_name := "Unnamed settlement"
 var character_specs: Array = []
 var world_character_specs: Array = []
-var _world_roster_expanded := true
-var point_limit_enabled := false
+var external_relationships: Array = []
+var _colony_relation_first_index := 0
+var _colony_relation_second_index := 1
+var _external_source_index := 0
+var _external_target_key := "c:0"
+var _world_roster_expanded := false
+var _preparation_appearance_category := 0
+var _used_prepared_full_names: Dictionary = {}
+var _used_prepared_first_names: Dictionary = {}
+var _used_prepared_nicknames: Dictionary = {}
+var point_limit_enabled := true
 var current_tab := ""
 var pawn_tab := ""
 var order_category := "Designate"
@@ -430,6 +815,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if is_instance_valid(_preparation_sample_target):
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_end_preparation_color_sampling()
+			get_viewport().set_input_as_handled()
+			return
+	if screen == "characters" and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var name_focus := get_viewport().gui_get_focus_owner()
+		if name_focus is LineEdit and name_focus.get_parent() != null and name_focus.get_parent().name == "PreparationNames":
+			if not name_focus.get_global_rect().has_point(event.position):
+				name_focus.release_focus()
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	if _naming_prompt_open:
@@ -645,7 +1040,7 @@ func _clear_screen() -> VBoxContainer:
 	margin.add_theme_constant_override("margin_bottom", edge)
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var content := _vbox(0 if screen == "game" else 12)
+	var content := _vbox(0 if screen in ["game", "characters"] else 12)
 	margin.add_child(content)
 	return content
 
@@ -769,11 +1164,14 @@ func _setup_card(minimum := Vector2.ZERO, emphasis := false) -> PanelContainer:
 
 func _preparation_panel(minimum := Vector2.ZERO, outer := false) -> PanelContainer:
 	var card := _panel(minimum)
-	var style := _style(Color("#1b1d20") if outer else Color("#262729"), Color("#4b4c4e") if outer else Color("#2b2d2f"), 0)
-	style.content_margin_left = 10
-	style.content_margin_top = 9
-	style.content_margin_right = 10
-	style.content_margin_bottom = 17 if outer else 9
+	var style := _style(Color("#202223") if outer else Color("#232526"), Color("#a99065") if outer else Color("#3b3d3f"), 0)
+	style.content_margin_left = 0 if outer else 9
+	style.content_margin_top = 0 if outer else 9
+	style.content_margin_right = 0 if outer else 9
+	style.content_margin_bottom = 0 if outer else 9
+	if outer:
+		style.shadow_color = Color(0, 0, 0, 0.38)
+		style.shadow_size = 5
 	card.add_theme_stylebox_override("panel", style)
 	if _preparation_grain == null:
 		var noise := Image.create_empty(48, 48, false, Image.FORMAT_RGBA8)
@@ -786,6 +1184,7 @@ func _preparation_panel(minimum := Vector2.ZERO, outer := false) -> PanelContain
 		_preparation_grain = ImageTexture.create_from_image(noise)
 	var grain_layer := PrepGrain.new()
 	grain_layer.grain = _preparation_grain
+	grain_layer.modulate.a = 0.8 if outer else 0.25
 	grain_layer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grain_layer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	card.add_child(grain_layer)
@@ -806,18 +1205,40 @@ func _preparation_dice_button(action: Callable, hint: String, minimum := Vector2
 			button.add_theme_stylebox_override(state, _style(Color("#36383a") if state == "normal" else Color("#4b4d4f"), Color("#6a6c6d"), 0))
 	return button
 
+func _preparation_name_input_style(field: LineEdit) -> void:
+	for state in ["normal", "focus", "read_only"]:
+		var style := _style(Color("#191b1d"), Color("#555759") if state != "focus" else GOLD, 0)
+		style.content_margin_left = 7
+		style.content_margin_right = 7
+		style.content_margin_top = 4
+		style.content_margin_bottom = 4
+		field.add_theme_stylebox_override(state, style)
+
 
 func _square_preparation_controls(parent: Control) -> void:
-	for item in parent.find_children("*", "Button", true, false):
-		var button: Button = item
-		if button.flat:
+	for item in parent.find_children("*", "Control", true, false):
+		var control: Control = item
+		if control.has_meta("prep_curved_tab"):
 			continue
-		for state in ["normal", "hover", "pressed"]:
-			var current := button.get_theme_stylebox(state)
+		if control is Button and (control as Button).flat:
+			continue
+		if not (control is Button or control is LineEdit or control is PanelContainer):
+			continue
+		for state in ["normal", "hover", "pressed", "focus", "read_only", "panel"]:
+			var inherited_style: bool = (control is Button and state in ["normal", "hover", "pressed", "focus"]) or (control is LineEdit and state in ["normal", "focus", "read_only"]) or (control is PanelContainer and state == "panel")
+			if not control.has_theme_stylebox_override(state) and not inherited_style:
+				continue
+			var current := control.get_theme_stylebox(state)
 			if current is StyleBoxFlat:
 				var square := (current as StyleBoxFlat).duplicate() as StyleBoxFlat
 				square.set_corner_radius_all(0)
-				button.add_theme_stylebox_override(state, square)
+				control.add_theme_stylebox_override(state, square)
+	for popup_item in parent.find_children("*", "PopupPanel", true, false):
+		var popup := popup_item as PopupPanel
+		popup.add_theme_stylebox_override("panel", _style(Color("#262729"), Color("#555759"), 0))
+	for menu_item in parent.find_children("*", "MenuButton", true, false):
+		var menu := (menu_item as MenuButton).get_popup()
+		menu.add_theme_stylebox_override("panel", _style(Color("#262729"), Color("#555759"), 0))
 
 
 func _preparation_tab_button(label_text: String, action: Callable, selected: bool) -> Button:
@@ -937,11 +1358,19 @@ func _begin_session(kind: String) -> void:
 	faction_name = "Unnamed colony"
 	settlement_name = "Unnamed settlement"
 	character_specs.clear()
-	world_character_specs.clear()
+	world_character_specs = _default_world_prepared_specs()
+	external_relationships = []
+	_external_source_index = 0
+	_external_target_key = "c:0"
+	_world_roster_expanded = false
 	starting_cargo.clear()
 	_cargo_search_text = ""
+	_equipment_category_filter = 0
+	_equipment_material_filter = 0
+	_selected_equipment_catalog_id = "wood"
+	_preparation_appearance_category = 0
 	colonist_count = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("colonist_count", 3))
-	point_limit_enabled = false
+	point_limit_enabled = true
 	_editing_character_index = 0
 	preparation_tab = "characters"
 	if kind == "solo":
@@ -1208,7 +1637,11 @@ func _select_scenario(id: String) -> void:
 	scenario_id = id
 	colonist_count = int(SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("colonist_count", 3))
 	character_specs.clear()
-	world_character_specs.clear()
+	world_character_specs = _default_world_prepared_specs()
+	external_relationships = []
+	_external_source_index = 0
+	_external_target_key = "c:0"
+	_world_roster_expanded = false
 	starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
 	_show_scenario_selection()
 
@@ -1630,6 +2063,10 @@ func _select_random_site() -> void:
 
 
 func _show_characters() -> void:
+	var color_dialog := get_node_or_null("PreparationColorDialog")
+	if color_dialog != null:
+		color_dialog.queue_free()
+	_end_preparation_color_sampling()
 	screen = "characters"
 	if character_specs.size() > colonist_count:
 		character_specs.resize(colonist_count)
@@ -1638,67 +2075,101 @@ func _show_characters() -> void:
 		character_specs.append(_default_prepared_spec(i))
 	_editing_character_index = clampi(_editing_character_index, 0, colonist_count - 1)
 	var root := _clear_screen()
+	_add_menu_backdrop()
 	var frame_row := _hbox(0)
 	frame_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(frame_row)
 	var left_margin := Control.new()
 	left_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	frame_row.add_child(left_margin)
-	var frame_height := maxf(490.0, size.y - 24.0)
-	var frame := _preparation_panel(Vector2(maxf(760.0, size.x - 24.0), frame_height), true)
-	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	frame_row.add_child(frame)
+	# EdB's three columns are laid out for this fixed logical canvas. Keep the
+	# whole canvas centered instead of leaving an unused area inside a wide frame.
+	var frame_width := 1020.0
+	var frame_height := 764.0
+	var available_width := size.x - (40.0 if size.x < 1020.0 else 0.0)
+	var available_height := size.y - (40.0 if size.y < 764.0 else 0.0)
+	var preparation_scale := minf(1.0, minf(available_width / 1020.0, available_height / 764.0))
+	var frame_holder := Control.new()
+	frame_holder.custom_minimum_size = Vector2(frame_width, frame_height) * preparation_scale
+	frame_holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	frame_row.add_child(frame_holder)
+	var frame := _preparation_panel(Vector2(frame_width, frame_height), true)
+	frame.name = "PreparationFrame"
+	frame.position = Vector2.ZERO
+	frame.size = Vector2(frame_width, frame_height)
+	frame.scale = Vector2.ONE * preparation_scale
+	frame_holder.add_child(frame)
 	var right_margin := Control.new()
 	right_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	frame_row.add_child(right_margin)
-	var inner := _vbox(5)
+	var inner := _vbox(0)
 	frame.add_child(inner)
-	var heading := _hbox(10)
+	var heading := Control.new()
+	heading.custom_minimum_size.y = 50.0
 	inner.add_child(heading)
-	heading.add_child(_label(_prep_local("Prepare Carefully", "Özenle Hazırla", "Przygotuj starannie"), 21, CREAM))
-	var head_fill := Control.new()
-	head_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.add_child(head_fill)
-	heading.add_child(_label(_prep_local("Use Point Limits", "Puan Sınırını Kullan", "Użyj limitu punktów"), 13, MUTED))
-	var limit_toggle := Button.new()
-	limit_toggle.text = "✓" if point_limit_enabled else "✕"
-	limit_toggle.flat = true
-	limit_toggle.custom_minimum_size = Vector2(29, 29)
-	limit_toggle.add_theme_font_size_override("font_size", 23)
+	var points_column := _vbox(0)
+	points_column.position = Vector2(frame_width - 244.0, 1)
+	points_column.size = Vector2(226, 42)
+	heading.add_child(points_column)
+	_character_points = _label("", 13, MUTED)
+	_character_points.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	points_column.add_child(_character_points)
+	var point_toggle_row := _hbox(4)
+	point_toggle_row.alignment = BoxContainer.ALIGNMENT_END
+	points_column.add_child(point_toggle_row)
+	var point_limit_label := _label(_prep_local("Use Point Limits", "Puan Sınırını Kullan", "Użyj limitu punktów"), 13, MUTED)
+	point_limit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	point_toggle_row.add_child(point_limit_label)
+	var limit_toggle := PrepPointLimitButton.new()
+	limit_toggle.enabled = point_limit_enabled
+	limit_toggle.custom_minimum_size = Vector2(23, 23)
 	limit_toggle.pressed.connect(func(): point_limit_enabled = not point_limit_enabled; _show_characters())
 	limit_toggle.name = "PreparationPointLimitToggle"
-	limit_toggle.add_theme_color_override("font_color", Color("#54c56a") if point_limit_enabled else RED)
-	heading.add_child(limit_toggle)
-	var points_fill := Control.new()
-	points_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.add_child(points_fill)
-	_character_points = _label("", 13, MUTED)
-	heading.add_child(_character_points)
-	var tabs := _hbox(0)
+	point_toggle_row.add_child(limit_toggle)
+	var tabs := Control.new()
+	tabs.name = "PreparationTabs"
+	tabs.custom_minimum_size.y = 32.0
 	inner.add_child(tabs)
-	for tab_id in ["characters", "relationships", "equipment"]:
+	for tab_index in range(3):
+		var tab_id: String = ["characters", "relationships", "equipment"][tab_index]
 		var chosen_tab: String = tab_id
 		var tab_name := _prep_local("Characters", "Karakterler", "Postacie") if tab_id == "characters" else _prep_local("Relationships", "İlişkiler", "Relacje") if tab_id == "relationships" else _prep_local("Equipment", "Ekipman", "Wyposażenie")
 		var tab_button := _preparation_tab_button(tab_name, func(): _switch_preparation_tab(chosen_tab), tab_id == preparation_tab)
+		tab_button.custom_minimum_size = Vector2(200, 32)
+		tab_button.size = Vector2(200, 32)
+		tab_button.position = Vector2(tab_index * 190.0, 0)
+		tab_button.set_meta("prep_curved_tab", true)
 		for tab_state in ["normal", "hover", "pressed"]:
-			var tab_style := tab_button.get_theme_stylebox(tab_state).duplicate() as StyleBoxFlat
-			tab_style.corner_radius_top_left = 3
-			tab_style.corner_radius_top_right = 3
+			var tab_style := (tab_button.get_theme_stylebox(tab_state) as StyleBoxFlat).duplicate() as StyleBoxFlat
+			tab_style.corner_radius_top_left = 22
+			tab_style.corner_radius_top_right = 22
 			tab_style.corner_radius_bottom_left = 0
 			tab_style.corner_radius_bottom_right = 0
+			tab_style.border_width_bottom = 0 if tab_id == preparation_tab else 1
 			tab_button.add_theme_stylebox_override(tab_state, tab_style)
 		tabs.add_child(tab_button)
-	var tab_fill := Control.new()
-	tab_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tabs.add_child(tab_fill)
+	var body_panel := PanelContainer.new()
+	var body_style := _style(Color("#303234"), Color("#707173"), 0)
+	body_style.content_margin_left = 15
+	body_style.content_margin_top = 15
+	body_style.content_margin_right = 13
+	body_style.content_margin_bottom = 15
+	body_panel.add_theme_stylebox_override("panel", body_style)
+	body_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	inner.add_child(body_panel)
+	var body_grain := PrepGrain.new()
+	body_grain.grain = _preparation_grain
+	body_grain.modulate = Color(1.0, 1.0, 1.0, 0.5)
+	body_panel.add_child(body_grain)
 	var body_scroll := ScrollContainer.new()
 	body_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	body_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	inner.add_child(body_scroll)
-	var body := _hbox(5)
-	body.custom_minimum_size = Vector2(maxf(1176.0, minf(1320.0, size.x - 100.0)), maxf(370.0, frame_height - 130.0))
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body_panel.add_child(body_scroll)
+	var body := _hbox(12)
+	body.custom_minimum_size = Vector2(frame_width - 46.0, maxf(290.0, frame_height - 190.0))
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_scroll.add_child(body)
@@ -1711,19 +2182,37 @@ func _show_characters() -> void:
 	else:
 		_build_preparation_character(body)
 	_refresh_character_points()
-	var footer := _hbox(8)
+	var footer_gap := Control.new()
+	footer_gap.custom_minimum_size.y = 18.0
+	inner.add_child(footer_gap)
+	var footer := Control.new()
+	footer.custom_minimum_size.y = 37.0
 	inner.add_child(footer)
-	footer.add_child(_setup_button("←  " + _tr("common.back"), _return_to_world_from_characters, true, Vector2(120, 35)))
-	var foot_fill := Control.new()
-	foot_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	footer.add_child(foot_fill)
-	footer.add_child(_setup_button(_prep_local("Load preset", "Hazır ayar yükle", "Wczytaj zestaw"), _load_preparation_preset, true, Vector2(120, 35)))
-	footer.add_child(_setup_button(_prep_local("Save preset", "Hazır ayar kaydet", "Zapisz zestaw"), _save_preparation_preset, true, Vector2(120, 35)))
-	var foot_fill_right := Control.new()
-	foot_fill_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	footer.add_child(foot_fill_right)
-	footer.add_child(_setup_button(_prep_local("Start", "Başlat", "Rozpocznij") + "  →", _advance_to_lobby, true, Vector2(145, 35)))
+	var footer_buttons := [
+		_setup_button(_tr("common.back"), _return_to_world_from_characters, true, Vector2(149, 37)),
+		_setup_button(_prep_local("Load preset", "Hazır ayar yükle", "Wczytaj zestaw"), _load_preparation_preset, true, Vector2(149, 37)),
+		_setup_button(_prep_local("Save preset", "Hazır ayar kaydet", "Zapisz zestaw"), _save_preparation_preset, true, Vector2(149, 37)),
+		_setup_button(_prep_local("Start", "Başlat", "Rozpocznij"), _advance_to_lobby, true, Vector2(149, 37))
+	]
+	for footer_index in range(footer_buttons.size()):
+		var footer_button: Button = footer_buttons[footer_index]
+		footer.add_child(footer_button)
+		footer_button.size = Vector2(149, 37)
+		match footer_index:
+			0: footer_button.position = Vector2.ZERO
+			1: footer_button.position = Vector2(frame_width * 0.5 - 163, 0)
+			2: footer_button.position = Vector2(frame_width * 0.5 + 12, 0)
+			3: footer_button.position = Vector2(frame_width - 149, 0)
 	_square_preparation_controls(frame)
+	if preparation_scale < 1.0:
+		_fit_preparation_frame_after_layout(frame, preparation_scale)
+
+
+func _fit_preparation_frame_after_layout(frame: Control, factor: float) -> void:
+	await get_tree().process_frame
+	if is_instance_valid(frame):
+		frame.pivot_offset = Vector2.ZERO
+		frame.scale = Vector2.ONE * factor
 
 
 func _prep_local(en: String, tr: String, pl: String) -> String:
@@ -1739,98 +2228,341 @@ func _switch_preparation_tab(tab_id: String) -> void:
 func _on_preparation_sex_changed() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index]
-	spec["hair_index"] = 0
+	spec["hair_style"] = "short"
+	spec["hair_index"] = (MALE_HAIR_IDS if str(spec.get("sex", "female")) == "male" else FEMALE_HAIR_IDS).find("short")
 	_show_characters()
 
 
 func _hair_options_for_sex(sex: String) -> Array:
 	if sex == "male":
-		return [_prep_local("Short", "Kısa", "Krótkie"), _prep_local("Side part", "Yandan ayrık", "Z przedziałkiem"), _prep_local("Curly", "Kıvırcık", "Kręcone"), _prep_local("Shaved", "Kazınmış", "Wygolone")]
-	return [_prep_local("Bob", "Küt", "Bob"), _prep_local("Wavy", "Dalgalı", "Falowane"), _prep_local("Long", "Uzun", "Długie"), _prep_local("Braid", "Örgü", "Warkocz")]
+		return [_prep_local("Bald", "Kel", "Łysy"), _prep_local("Buzz cut", "Kazınmış", "Ogolony"), _prep_local("Short crop", "Kısa kesim", "Krótkie cięcie"), _prep_local("Side part", "Yandan ayrık", "Z przedziałkiem"), _prep_local("Curly", "Kıvırcık", "Kręcone"), _prep_local("Medium", "Orta", "Średnie"), _prep_local("Long", "Uzun", "Długie")]
+	return [_prep_local("Bald", "Kel", "Łysa"), _prep_local("Pixie", "Pixie", "Pixie"), _prep_local("Bob", "Küt", "Bob"), _prep_local("Medium", "Orta", "Średnie"), _prep_local("Wavy", "Dalgalı", "Falowane"), _prep_local("Braid", "Örgü", "Warkocz"), _prep_local("Long", "Uzun", "Długie")]
 
 
-func _preparation_color_field(parent: VBoxContainer, title: String, initial_color: String, presets: Array, changed: Callable) -> ColorPickerButton:
+func _preparation_hair_style(spec: Dictionary) -> String:
+	var male := str(spec.get("sex", "female")) == "male"
+	var current_ids := MALE_HAIR_IDS if male else FEMALE_HAIR_IDS
+	var saved_id := str(spec.get("hair_style", ""))
+	if current_ids.has(saved_id):
+		return saved_id
+	var legacy_ids := LEGACY_MALE_HAIR_IDS if male else LEGACY_FEMALE_HAIR_IDS
+	var legacy_id := str(legacy_ids[clampi(int(spec.get("hair_index", 0)), 0, legacy_ids.size() - 1)])
+	if current_ids.has(legacy_id):
+		return legacy_id
+	return "medium" if legacy_id in ["bob", "wavy", "sidepart", "curly"] else "long" if legacy_id == "braid" else "short"
+
+
+func _preparation_color_field(parent: VBoxContainer, title: String, initial_color: String, presets: Array, changed: Callable) -> PrepColorButton:
 	var row := _hbox(5)
 	parent.add_child(row)
 	var caption := _label(title, 11, MUTED)
 	caption.custom_minimum_size.x = 75
 	row.add_child(caption)
-	var picker := ColorPickerButton.new()
-	picker.custom_minimum_size = Vector2(132, 29)
+	var picker := PrepColorButton.new()
+	picker.custom_minimum_size = Vector2(132, 25)
 	picker.color = Color(initial_color)
-	picker.edit_alpha = false
 	picker.tooltip_text = _prep_local("Choose any color", "İstediğin rengi seç", "Wybierz dowolny kolor")
 	picker.color_changed.connect(func(_color: Color): changed.call())
+	picker.pressed.connect(func(): _open_preparation_color_dialog(picker))
 	row.add_child(picker)
-	var swatches := GridContainer.new()
-	swatches.columns = 6
-	swatches.add_theme_constant_override("h_separation", 3)
-	swatches.add_theme_constant_override("v_separation", 3)
-	parent.add_child(swatches)
-	for hex_color in presets:
-		var picked_color := Color(str(hex_color))
-		var swatch := Button.new()
-		swatch.custom_minimum_size = Vector2(22, 21)
-		swatch.tooltip_text = str(hex_color)
-		swatch.add_theme_stylebox_override("normal", _style(picked_color, Color("#53626a"), 1))
-		swatch.add_theme_stylebox_override("hover", _style(picked_color.lightened(0.12), GOLD, 2))
-		swatch.pressed.connect(func(): picker.color = picked_color; changed.call())
-		swatches.add_child(swatch)
 	return picker
 
 
+func _end_preparation_color_sampling() -> void:
+	_preparation_sample_target = null
+	if is_instance_valid(_preparation_sample_overlay):
+		_preparation_sample_overlay.queue_free()
+	_preparation_sample_overlay = null
+
+
+func _begin_preparation_color_sampling(target: PrepColorButton) -> void:
+	_end_preparation_color_sampling()
+	if not is_instance_valid(target):
+		return
+	_preparation_sample_target = target
+	var overlay := ColorRect.new()
+	overlay.name = "PreparationColorSamplingOverlay"
+	overlay.color = Color.TRANSPARENT
+	overlay.z_index = 40
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.mouse_default_cursor_shape = Control.CURSOR_CROSS
+	add_child(overlay)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_preparation_sample_overlay = overlay
+	var hint := PanelContainer.new()
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint.add_theme_stylebox_override("panel", _style(Color("#191c1e"), GOLD, 0))
+	_preparation_place(overlay, hint, maxf(10.0, (size.x - 420.0) * 0.5), 17, 420, 31)
+	var hint_label := _label(_prep_local("Eyedropper active  ·  Click a color  ·  Esc cancels", "Damlalık etkin  ·  Bir renge tıkla  ·  Esc iptal", "Pipeta aktywna  ·  Kliknij kolor  ·  Esc anuluje"), 12, CREAM)
+	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint.add_child(hint_label)
+	var sampled := {"done": false}
+	overlay.gui_input.connect(func(event: InputEvent):
+		if not event is InputEventMouseButton:
+			return
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			_end_preparation_color_sampling()
+			overlay.accept_event()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				var chosen := DisplayServer.screen_get_pixel(DisplayServer.mouse_get_position())
+				if is_instance_valid(_preparation_sample_target):
+					_preparation_sample_target.set_picked_color(chosen)
+				sampled["done"] = true
+			elif bool(sampled["done"]):
+				_end_preparation_color_sampling()
+			overlay.accept_event())
+
+
+func _open_preparation_color_dialog(target: PrepColorButton) -> void:
+	var existing := get_node_or_null("PreparationColorDialog")
+	if existing != null:
+		existing.queue_free()
+	var dialog := PanelContainer.new()
+	dialog.name = "PreparationColorDialog"
+	dialog.z_index = 30
+	dialog.position = Vector2(maxf(10.0, size.x - 280.0), 105.0)
+	dialog.custom_minimum_size = Vector2(230, 252)
+	dialog.add_theme_stylebox_override("panel", _style(Color("#27292a"), GOLD, 0))
+	add_child(dialog)
+	var content := _vbox(5)
+	dialog.add_child(content)
+	var header := _hbox(5)
+	header.mouse_default_cursor_shape = Control.CURSOR_MOVE
+	content.add_child(header)
+	var header_label := _label(_prep_local("Color", "Renk", "Kolor") + "  ⠿", 14, CREAM)
+	header_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(header_label)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(gap)
+	var sample_button := PrepColorActionButton.new()
+	sample_button.action = "eyedropper"
+	sample_button.custom_minimum_size = Vector2(26, 24)
+	sample_button.pressed.connect(func(): _begin_preparation_color_sampling(target))
+	sample_button.tooltip_text = _prep_local("Pick a color from the screen, then click a pixel", "Ekrandan renk almak için bir piksele tıkla", "Pobierz kolor z ekranu")
+	header.add_child(sample_button)
+	header.add_child(_preparation_classic_bare_button("×", dialog.queue_free, 22, 22, 18))
+	var drag_state := {"active": false, "origin": Vector2.ZERO}
+	header.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			drag_state["active"] = event.pressed
+			drag_state["origin"] = event.global_position - dialog.position
+		elif event is InputEventMouseMotion and bool(drag_state["active"]):
+			dialog.position = (event.global_position - drag_state["origin"]).clamp(Vector2.ZERO, size - dialog.size))
+	var wheel := PrepColorWheel.new()
+	wheel.name = "PreparationColorWheel"
+	wheel.color = target.color
+	wheel.color_changed.connect(func(next_color: Color): target.set_picked_color(next_color))
+	content.add_child(wheel)
+	var selected_row := _hbox(6)
+	content.add_child(selected_row)
+	var selected_label := _label(_prep_local("Selected", "Seçilen", "Wybrany") + "  #" + target.color.to_html(false).to_upper(), 12, CREAM)
+	selected_label.name = "PreparationSelectedColorLabel"
+	selected_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selected_row.add_child(selected_label)
+	var selected_patch := Panel.new()
+	selected_patch.name = "PreparationSelectedColorPreview"
+	selected_patch.custom_minimum_size = Vector2(30, 21)
+	selected_patch.add_theme_stylebox_override("panel", _style(target.color, Color("#ded7c9"), 0))
+	selected_row.add_child(selected_patch)
+	target.color_changed.connect(func(next_color: Color):
+		if not is_instance_valid(dialog):
+			return
+		wheel.color = next_color
+		wheel.queue_redraw()
+		selected_label.text = _prep_local("Selected", "Seçilen", "Wybrany") + "  #" + next_color.to_html(false).to_upper()
+		selected_patch.add_theme_stylebox_override("panel", _style(next_color, Color("#ded7c9"), 0)))
+
+
 func _preparation_roster(body: HBoxContainer) -> void:
-	var panel := _preparation_panel(Vector2(170, 0))
+	var panel := PanelContainer.new()
 	panel.name = "PreparationRoster"
+	panel.custom_minimum_size.x = 110
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var panel_style := _style(Color("#202123"), Color.TRANSPARENT, 0)
+	panel_style.content_margin_left = 6
+	panel_style.content_margin_top = 6
+	panel_style.content_margin_right = 5
+	panel_style.content_margin_bottom = 4
+	panel.add_theme_stylebox_override("panel", panel_style)
 	body.add_child(panel)
-	var roster := _vbox(4)
+	var roster := _vbox(6)
 	panel.add_child(roster)
-	roster.add_child(_label(_prep_local("Colony", "Koloni", "Kolonia"), 18, CREAM))
+	var actions := _hbox(4)
+	roster.add_child(actions)
+	var add_button := _setup_button(_prep_local("Add", "Ekle", "Dodaj"), _add_prepared_colonist, true, Vector2(69, 22))
+	add_button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_button.add_theme_font_size_override("font_size", 11)
+	add_button.tooltip_text = _prep_local("Add colonist (maximum eight)", "Kolonist ekle (en fazla sekiz)", "Dodaj kolonistę (maksymalnie ośmiu)")
+	actions.add_child(add_button)
+	var options := MenuButton.new()
+	options.flat = false
+	options.text = "..."
+	options.custom_minimum_size = Vector2(25, 22)
+	options.add_theme_font_size_override("font_size", 11)
+	for state in ["normal", "hover", "pressed"]:
+		var option_style := _style(Color("#755a39") if state == "normal" else Color("#8c6b45"), GOLD if state == "hover" else Color("#a78a59"), 0)
+		option_style.border_width_left = 2
+		option_style.border_width_top = 2
+		option_style.border_width_right = 2
+		option_style.border_width_bottom = 2
+		options.add_theme_stylebox_override(state, option_style)
+	actions.add_child(options)
+	var choices := options.get_popup()
+	choices.add_item(_prep_local("Add random colonist", "Rastgele kolonist ekle", "Dodaj losowego kolonistę"), 0)
+	choices.add_separator(_prep_local("World", "Dünya", "Świat"))
+	for world_index in world_character_specs.size():
+		choices.add_item(str(world_character_specs[world_index].get("name", "Colonist")), 100 + world_index)
+	choices.id_pressed.connect(func(id: int):
+		if id == 0:
+			_add_prepared_colonist()
+		else:
+			_restore_world_colonist(id - 100))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	roster.add_child(scroll)
+	var cards := _vbox(0)
+	cards.custom_minimum_size.x = 83
+	scroll.add_child(cards)
 	for i in colonist_count:
 		var spec: Dictionary = character_specs[i]
 		var index_copy := i
-		var row := _hbox(3)
-		roster.add_child(row)
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(83, 116)
+		card.tooltip_text = _prepared_display_name(spec)
+		card.pressed.connect(func(): _select_character_editor(index_copy))
+		for state in ["normal", "hover", "pressed"]:
+			var card_fill := Color("#38393a") if i == _editing_character_index else Color("#202123")
+			if state == "hover": card_fill = Color("#444547")
+			if state == "pressed": card_fill = Color("#2e3032")
+			var card_style := _style(card_fill, Color("#55575a") if i == _editing_character_index else Color.TRANSPARENT, 0)
+			card_style.content_margin_left = 0
+			card_style.content_margin_right = 0
+			card_style.content_margin_top = 0
+			card_style.content_margin_bottom = 0
+			card.add_theme_stylebox_override(state, card_style)
+		card.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		cards.add_child(card)
 		var portrait := PawnPortrait.new()
-		portrait.custom_minimum_size = Vector2(39, 46)
+		portrait.classic_preparation = true
+		portrait.name = "RosterPortrait"
+		portrait.custom_minimum_size = Vector2(70, 78)
+		portrait.position = Vector2(6, 1)
+		portrait.size = Vector2(70, 78)
 		portrait.appearance = _spec_appearance(spec)
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(portrait)
-		var button := _preparation_tab_button(str(spec.get("name", "Colonist")), func(): _select_character_editor(index_copy), i == _editing_character_index)
-		button.custom_minimum_size = Vector2(90, 46)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.add_theme_font_size_override("font_size", 12)
-		row.add_child(button)
-		var remove := _setup_button("×", func(): _remove_prepared_colonist(index_copy), false, Vector2(24, 25))
-		remove.tooltip_text = _prep_local("Move to World pool", "Dünya havuzuna taşı", "Przenieś do puli świata")
-		remove.disabled = colonist_count <= 1
-		row.add_child(remove)
-		_roster_buttons.append(button)
-	var add_button := _setup_button("+  " + _prep_local("Add", "Ekle", "Dodaj"), _add_prepared_colonist, true, Vector2(0, 29))
-	add_button.tooltip_text = _prep_local("Add colonist (maximum three)", "Kolonist ekle (en fazla üç)", "Dodaj kolonistę (maksymalnie trzech)")
-	roster.add_child(add_button)
-	if size.y >= 700.0:
-		roster.add_child(_spacer())
-	roster.add_child(HSeparator.new())
-	var world_toggle := _preparation_tab_button("%s (%d)  %s" % [_prep_local("World", "Dünya", "Świat"), world_character_specs.size(), "▴" if _world_roster_expanded else "▾"], func():
+		card.add_child(portrait)
+		var name_label := _label(_prepared_display_name(spec), 12, CREAM)
+		name_label.name = "RosterName"
+		name_label.position = Vector2(1, 79)
+		name_label.size = Vector2(81, 16)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.clip_text = true
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name_label.tooltip_text = _prepared_display_name(spec)
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(name_label)
+		var role_label := _label(_preparation_roster_role(spec), 11, MUTED)
+		role_label.name = "RosterRole"
+		role_label.position = Vector2(1, 95)
+		role_label.size = Vector2(81, 16)
+		role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		role_label.clip_text = true
+		role_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(role_label)
+		if i == _editing_character_index and colonist_count > 1:
+			var remove := Button.new()
+			remove.text = "×"
+			remove.flat = true
+			remove.position = Vector2(68, 1)
+			remove.size = Vector2(14, 16)
+			remove.add_theme_font_size_override("font_size", 15)
+			remove.tooltip_text = _prep_local("Move to World pool", "Dünya havuzuna taşı", "Przenieś do puli świata")
+			remove.pressed.connect(func(): _remove_prepared_colonist(index_copy))
+			card.add_child(remove)
+		_roster_buttons.append(card)
+	var world_header := Button.new()
+	world_header.name = "PreparationWorldHeader"
+	world_header.text = "%s (%d) %s" % [_prep_local("World", "Dünya", "Świat"), world_character_specs.size(), "▾" if _world_roster_expanded else "▸"]
+	world_header.custom_minimum_size = Vector2(83, 25)
+	world_header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	world_header.add_theme_font_size_override("font_size", 11)
+	for state in ["normal", "hover", "pressed"]:
+		world_header.add_theme_stylebox_override(state, _style(Color("#292b2c") if state == "normal" else Color("#353738"), Color.TRANSPARENT, 0))
+	cards.add_child(world_header)
+	var world_section := _vbox(0)
+	world_section.name = "PreparationWorldSection"
+	cards.add_child(world_section)
+	world_section.visible = _world_roster_expanded
+	world_header.pressed.connect(func():
 		_world_roster_expanded = not _world_roster_expanded
-		_save_character_inputs()
-		_show_characters(), false)
-	world_toggle.custom_minimum_size = Vector2(0, 29)
-	roster.add_child(world_toggle)
-	if _world_roster_expanded:
-		for world_index in world_character_specs.size():
-			var world_spec: Dictionary = world_character_specs[world_index]
-			var selected_world_index := world_index
-			var restore := _setup_button("+  " + str(world_spec.get("name", "Colonist")), func(): _restore_world_colonist(selected_world_index), false, Vector2(0, 28))
-			restore.disabled = colonist_count >= 3
-			roster.add_child(restore)
+		world_section.visible = _world_roster_expanded
+		world_header.text = "%s (%d) %s" % [_prep_local("World", "Dünya", "Świat"), world_character_specs.size(), "▾" if _world_roster_expanded else "▸"])
+	for world_index in world_character_specs.size():
+		var world_spec: Dictionary = world_character_specs[world_index]
+		var world_index_copy := world_index
+		var world_card := Button.new()
+		world_card.custom_minimum_size = Vector2(83, 116)
+		world_card.tooltip_text = "%s\n%s" % [_prepared_display_name(world_spec),
+			_prep_local("Add this person from World", "Bu kişiyi Dünya'dan ekle", "Dodaj tę osobę ze świata")]
+		world_card.disabled = colonist_count >= 8
+		world_card.pressed.connect(func(): _restore_world_colonist(world_index_copy))
+		for state in ["normal", "hover", "pressed"]:
+			var world_style := _style(Color("#222325") if state == "normal" else Color("#383a3b"), Color.TRANSPARENT, 0)
+			world_style.content_margin_left = 0
+			world_style.content_margin_right = 0
+			world_style.content_margin_top = 0
+			world_style.content_margin_bottom = 0
+			world_card.add_theme_stylebox_override(state, world_style)
+		world_card.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		world_section.add_child(world_card)
+		var world_portrait := PawnPortrait.new()
+		world_portrait.classic_preparation = true
+		world_portrait.appearance = _spec_appearance(world_spec)
+		world_portrait.position = Vector2(6, 1)
+		world_portrait.size = Vector2(70, 78)
+		world_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		world_card.add_child(world_portrait)
+		var world_name := _label(_prepared_display_name(world_spec), 12, CREAM)
+		world_name.position = Vector2(1, 79)
+		world_name.size = Vector2(81, 16)
+		world_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		world_name.clip_text = true
+		world_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		world_name.tooltip_text = _prepared_display_name(world_spec)
+		world_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		world_card.add_child(world_name)
+		var world_role := _label(_preparation_roster_role(world_spec), 11, MUTED)
+		world_role.position = Vector2(1, 95)
+		world_role.size = Vector2(81, 16)
+		world_role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		world_role.clip_text = true
+		world_role.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		world_role.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		world_card.add_child(world_role)
+
+
+func _preparation_roster_role(spec: Dictionary) -> String:
+	if str(spec.get("adulthood", "farmer")) == "unknown":
+		return _prep_local("Unknown", "Bilinmiyor", "Nieznane")
+	if str(spec.get("childhood", "")) == "vatgrown_soldier":
+		return _prep_local("Vatgrown", "Tankta yetişmiş", "Z kadzi")
+	match str(spec.get("adulthood", "farmer")):
+		"builder": return _prep_local("Builder", "İnşaatçı", "Budowniczy")
+		"medic": return _prep_local("Medic", "Sağlıkçı", "Medyk")
+		"scholar": return _prep_local("Scholar", "Araştırmacı", "Badacz")
+		_: return _prep_local("Farmer", "Çiftçi", "Rolnik")
 
 
 func _default_prepared_spec(index: int) -> Dictionary:
 	var i := clampi(index, 0, 2)
-	var nickname := str(["Ada", "Baran", "Deniz"][i])
+	var nickname := str(["Wren", "Boz", "Mavi"][i])
 	var default_passions := [
 		{"plants": 2, "animals": 1},
 		{"construction": 2, "mining": 1},
@@ -1838,7 +2570,7 @@ func _default_prepared_spec(index: int) -> Dictionary:
 	]
 	return {
 		"name": nickname, "first_name": ["Adeline", "Baran", "Deniz"][i],
-		"nickname": nickname, "last_name": ["Fox", "Vale", "Arden"][i],
+		"nickname": nickname, "last_name": ["Fox", "Kaya", "Aksoy"][i],
 		"hair_index": i % 4, "hair_color": HAIR_COLOR_OPTIONS[i + 1],
 		"skin_color": SKIN_OPTIONS[i * 3], "body_type": i % 2, "head_type": i % 2,
 		"trait_ids": ["hardworking"] if i == 0 else ["calm"] if i == 1 else ["quick"],
@@ -1849,31 +2581,45 @@ func _default_prepared_spec(index: int) -> Dictionary:
 		"passions": default_passions[i]
 	}
 
+func _default_world_prepared_specs() -> Array:
+	var candidates: Array = []
+	var names := ["Mara", "Robin", "Iris", "Tomas", "Elin"]
+	var nicknames := ["Scout", "Rook", "Sage", "Tinker", "Fable"]
+	var surnames := ["Keene", "Ortiz", "Marsh", "Voss", "Hale"]
+	for i in names.size():
+		var spec := _default_prepared_spec(i % 3)
+		spec["name"] = nicknames[i]
+		spec["nickname"] = nicknames[i]
+		spec["first_name"] = names[i]
+		spec["last_name"] = surnames[i]
+		spec["sex"] = "male" if i in [1, 3] else "female"
+		spec["hair_index"] = i % 4
+		spec["skin_color"] = SKIN_OPTIONS[(i * 2 + 1) % SKIN_OPTIONS.size()]
+		spec["starting_relationships"] = {}
+		candidates.append(spec)
+	return candidates
+
 
 func _default_classic_skill_profile(index: int) -> Dictionary:
 	var profiles := [
-		{"shooting": 4, "melee": 3, "construction": 5, "mining": 2, "cooking": 6, "plants": 9, "animals": 7, "crafting": 4, "artistic": 2, "medical": 3, "social": 6, "intellectual": 3},
-		{"shooting": 7, "melee": 5, "construction": 10, "mining": 8, "cooking": 2, "plants": 3, "animals": 2, "crafting": 8, "artistic": 4, "medical": 2, "social": 3, "intellectual": 5},
-		{"shooting": 3, "melee": 2, "construction": 3, "mining": 1, "cooking": 5, "plants": 4, "animals": 4, "crafting": 3, "artistic": 5, "medical": 10, "social": 7, "intellectual": 8}
+		{"shooting": 1, "melee": 1, "construction": 2, "mining": 0, "cooking": 2, "plants": 3, "animals": 2, "crafting": 1, "artistic": 0, "medical": 1, "social": 2, "intellectual": 1},
+		{"shooting": 2, "melee": 2, "construction": 3, "mining": 3, "cooking": 1, "plants": 1, "animals": 0, "crafting": 2, "artistic": 1, "medical": 0, "social": 1, "intellectual": 1},
+		{"shooting": 1, "melee": 0, "construction": 1, "mining": 0, "cooking": 1, "plants": 1, "animals": 1, "crafting": 1, "artistic": 2, "medical": 3, "social": 3, "intellectual": 2}
 	]
 	return (profiles[clampi(index, 0, profiles.size() - 1)] as Dictionary).duplicate(true)
 
 
 func _add_prepared_colonist() -> void:
-	if colonist_count >= 3:
-		_notice(_prep_local("A colony can start with at most three people.", "Bir koloni en fazla üç kişiyle başlayabilir.", "Kolonia może zacząć z najwyżej trzema osobami."))
+	if colonist_count >= 8:
+		_notice(_prep_local("A colony can start with at most eight people.", "Bir koloni en fazla sekiz kişiyle başlayabilir.", "Kolonia może zacząć z najwyżej ośmioma osobami."))
 		return
 	_save_character_inputs()
 	var new_spec := _default_prepared_spec(colonist_count)
-	var used_names: Array[String] = []
-	for spec in character_specs + world_character_specs:
-		used_names.append(str(spec.get("name", "")))
-	for candidate_name in ["Mara", "Robin", "Iris", "Tomas", "Elin", "Soren"]:
-		if not used_names.has(candidate_name):
-			new_spec["name"] = candidate_name
-			new_spec["first_name"] = candidate_name
-			new_spec["nickname"] = candidate_name
-			break
+	var identity := _pick_prepared_name(str(new_spec.get("sex", "female")))
+	new_spec["first_name"] = identity["first"]
+	new_spec["nickname"] = identity["nick"]
+	new_spec["name"] = identity["nick"]
+	new_spec["last_name"] = identity["last"]
 	character_specs.append(new_spec)
 	colonist_count += 1
 	_editing_character_index = colonist_count - 1
@@ -1884,10 +2630,23 @@ func _remove_prepared_colonist(index: int) -> void:
 	if colonist_count <= 1 or index < 0 or index >= colonist_count:
 		return
 	_save_character_inputs()
+	var previous_links: Array = []
+	for other_index in range(colonist_count):
+		if other_index == index:
+			continue
+		var relation_id := _preparation_family_relation(index, other_index)
+		if relation_id != "none":
+			previous_links.append({"other": other_index, "relation": relation_id})
+	var new_world_index := world_character_specs.size()
 	var removed: Dictionary = character_specs[index].duplicate(true)
 	removed["starting_relationships"] = {}
 	world_character_specs.append(removed)
 	character_specs.remove_at(index)
+	_remap_external_relationships_after_transfer("c", index, "w", new_world_index)
+	for previous_link in previous_links:
+		var old_other := int(previous_link["other"])
+		var new_other := old_other - 1 if old_other > index else old_other
+		external_relationships.append({"from": "w:%d" % new_world_index, "to": "c:%d" % new_other, "relation": str(previous_link["relation"])})
 	for new_index in character_specs.size():
 		var spec: Dictionary = character_specs[new_index]
 		var old_links: Dictionary = spec.get("starting_relationships", {})
@@ -1899,274 +2658,429 @@ func _remove_prepared_colonist(index: int) -> void:
 			new_links[str(target - 1 if target > index else target)] = old_links[old_target]
 		spec["starting_relationships"] = new_links
 	colonist_count = character_specs.size()
+	_external_source_index = new_world_index
+	_external_target_key = "c:0"
 	_editing_character_index = mini(_editing_character_index, colonist_count - 1)
 	_show_characters()
 
 
 func _restore_world_colonist(index: int) -> void:
-	if colonist_count >= 3 or index < 0 or index >= world_character_specs.size():
+	if colonist_count >= 8 or index < 0 or index >= world_character_specs.size():
 		return
 	_save_character_inputs()
+	var new_colonist_index := colonist_count
 	var restored: Dictionary = world_character_specs[index].duplicate(true)
 	restored["starting_relationships"] = {}
 	world_character_specs.remove_at(index)
 	character_specs.append(restored)
 	colonist_count = character_specs.size()
+	_remap_external_relationships_after_transfer("w", index, "c", new_colonist_index)
+	for bond_index in range(external_relationships.size() - 1, -1, -1):
+		var bond: Dictionary = external_relationships[bond_index]
+		var first_key := str(bond.get("from", ""))
+		var second_key := str(bond.get("to", ""))
+		if first_key.begins_with("c:") and second_key.begins_with("c:"):
+			if _set_starting_relation(int(first_key.substr(2)), int(second_key.substr(2)), str(bond.get("relation", "none"))):
+				external_relationships.remove_at(bond_index)
+	_external_source_index = 0
+	_external_target_key = "c:0"
 	_editing_character_index = colonist_count - 1
 	_show_characters()
 
 
+func _remap_external_relationships_after_transfer(from_kind: String, moved_index: int, to_kind: String, new_index: int) -> void:
+	for raw_bond in external_relationships:
+		if not raw_bond is Dictionary:
+			continue
+		var bond: Dictionary = raw_bond
+		for side in ["from", "to"]:
+			var key := str(bond.get(side, ""))
+			if not key.begins_with(from_kind + ":"):
+				continue
+			var old_index := int(key.substr(2))
+			if old_index == moved_index:
+				bond[side] = "%s:%d" % [to_kind, new_index]
+			elif old_index > moved_index:
+				bond[side] = "%s:%d" % [from_kind, old_index - 1]
+
+
 func _build_preparation_character(body: HBoxContainer) -> void:
+	_build_preparation_character_classic(body)
+
+
+func _preparation_classic_panel(width: float, height: float, fill := Color("#232526")) -> Panel:
+	var panel := Panel.new()
+	panel.custom_minimum_size = Vector2(width, height)
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", _style(fill, Color("#3b3d3f"), 0))
+	if _preparation_grain != null:
+		var grain_layer := PrepGrain.new()
+		grain_layer.grain = _preparation_grain
+		grain_layer.modulate = Color(1.0, 1.0, 1.0, 0.23)
+		grain_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		panel.add_child(grain_layer)
+	return panel
+
+
+func _preparation_place(parent: Control, child: Control, x: float, y: float, width: float, height: float) -> void:
+	parent.add_child(child)
+	child.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	child.position = Vector2(x, y)
+	child.size = Vector2(width, height)
+	child.custom_minimum_size = Vector2(width, height)
+
+
+func _preparation_classic_caption(parent: Control, caption: String, x: float, y: float, width: float, height: float, font_size := 12, color := MUTED) -> Label:
+	var label := _label(caption, font_size, color)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_preparation_place(parent, label, x, y, width, height)
+	return label
+
+
+func _preparation_classic_gold_button(caption: String, action: Callable, width: float, height: float) -> Button:
+	var button := _setup_button(caption, action, true, Vector2(width, height))
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	return button
+
+
+func _preparation_classic_bare_button(caption: String, action: Callable, width: float, height: float, font_size := 16) -> Button:
+	var button := Button.new()
+	button.text = caption
+	button.flat = true
+	button.custom_minimum_size = Vector2(width, height)
+	button.add_theme_font_size_override("font_size", font_size)
+	button.add_theme_color_override("font_color", Color("#babbb9"))
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	for state_name in ["normal", "hover", "pressed", "focus"]:
+		button.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+	button.pressed.connect(action)
+	return button
+
+
+func _preparation_classic_gold_menu(caption: String, width: float, height: float) -> MenuButton:
+	var menu := MenuButton.new()
+	menu.flat = false
+	menu.text = caption
+	menu.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	menu.custom_minimum_size = Vector2(width, height)
+	menu.add_theme_font_size_override("font_size", 13)
+	for state_name in ["normal", "hover", "pressed"]:
+		var fill := Color("#705633") if state_name == "normal" else Color("#82643b") if state_name == "hover" else Color("#594326")
+		var style := _style(fill, Color("#30251a"), 0)
+		style.border_width_left = 3
+		style.border_width_top = 2
+		style.border_width_right = 3
+		style.border_width_bottom = 3
+		style.content_margin_top = 1
+		style.content_margin_bottom = 1
+		menu.add_theme_stylebox_override(state_name, style)
+	menu.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	return menu
+
+
+func _preparation_classic_rgb_handle(color: Color) -> Texture2D:
+	var image_data := Image.create_empty(11, 10, false, Image.FORMAT_RGBA8)
+	image_data.fill(Color("#111112"))
+	for yy in range(1, 9):
+		for xx in range(1, 10):
+			image_data.set_pixel(xx, yy, color)
+	return ImageTexture.create_from_image(image_data)
+
+
+func _preparation_classic_rgb_slider(parent: Control, y: float, channel: int, initial_color: Color, update: Callable) -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value = 0
+	slider.max_value = 255
+	slider.step = 1
+	slider.value = [initial_color.r8, initial_color.g8, initial_color.b8][channel]
+	slider.custom_minimum_size = Vector2(135, 18)
+	var channel_dim: Color = [Color("#532727"), Color("#225330"), Color("#293c68")][channel]
+	var channel_bright: Color = [Color("#b8433c"), Color("#37a853"), Color("#456fc1")][channel]
+	var track_style := _style(channel_dim, Color("#0d0e0f"), 0)
+	track_style.content_margin_top = 2
+	track_style.content_margin_bottom = 2
+	slider.add_theme_stylebox_override("slider", track_style)
+	slider.add_theme_stylebox_override("grabber_area", _style(channel_bright, Color.TRANSPARENT, 0))
+	slider.add_theme_stylebox_override("grabber_area_highlight", _style(channel_bright.lightened(0.15), Color.TRANSPARENT, 0))
+	var handle_color: Color = [Color("#aa2527"), Color("#087e22"), Color("#152e8b")][channel]
+	var handle := _preparation_classic_rgb_handle(handle_color)
+	slider.add_theme_icon_override("grabber", handle)
+	slider.add_theme_icon_override("grabber_highlight", handle)
+	slider.value_changed.connect(func(_value: float): update.call())
+	_preparation_place(parent, slider, 75, y, 135, 18)
+	return slider
+
+
+func _build_preparation_character_classic(body: HBoxContainer) -> void:
 	_preparation_roster(body)
+	_preparation_migrate_legacy_injuries(_editing_character_index)
 	var old: Dictionary = character_specs[_editing_character_index]
-	var editor := _vbox(5)
+	var editor := _vbox(10)
+	editor.custom_minimum_size.x = 832
 	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(editor)
-	var name_row := _hbox(5)
-	editor.add_child(name_row)
-	var random_button := _preparation_dice_button(_randomize_prepared_colonist, _prep_local("Randomize this colonist", "Bu kolonisti rastgele oluştur", "Wylosuj tę postać"), Vector2(34, 31))
-	name_row.add_child(random_button)
-	var info_button := _setup_button("ⓘ", _show_prepared_character_info, false, Vector2(31, 31))
+
+	# The screenshot has a continuous, 65-pixel-high name strip above three inset columns.
+	var name_panel := _preparation_classic_panel(832, 65, Color("#252729"))
+	name_panel.name = "PreparationNames"
+	name_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	editor.add_child(name_panel)
+	_preparation_place(name_panel, _preparation_dice_button(_randomize_prepared_colonist, _prep_local("Randomize this colonist", "Bu kolonisti rastgele oluştur", "Wylosuj tę postać"), Vector2(26, 27), true), 16, 17, 26, 27)
+	var info_button := PrepInfoButton.new()
+	info_button.custom_minimum_size = Vector2(26, 27)
+	info_button.pressed.connect(_show_prepared_character_info)
 	info_button.tooltip_text = _prep_local("Character overview", "Karakter özeti", "Opis postaci")
-	name_row.add_child(info_button)
+	_preparation_place(name_panel, info_button, 46, 17, 26, 27)
 	var first_name_edit := LineEdit.new()
 	first_name_edit.text = str(old.get("first_name", old.get("name", "Colonist")))
-	first_name_edit.placeholder_text = _prep_local("First", "İlk ad", "Imię")
+	first_name_edit.placeholder_text = _prep_local("First Name", "İlk ad", "Imię")
 	first_name_edit.tooltip_text = _prep_local("First name", "İlk ad", "Imię")
-	first_name_edit.custom_minimum_size = Vector2(90, 31)
-	first_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_row.add_child(first_name_edit)
+	_preparation_name_input_style(first_name_edit)
+	_preparation_place(name_panel, first_name_edit, 76, 18, 118, 28)
 	var name_edit := LineEdit.new()
-	name_edit.text = str(old.get("nickname", old.get("name", "Colonist")))
+	name_edit.text = _normalize_prepared_nickname(str(old.get("nickname", old.get("name", "Colonist"))))
 	name_edit.placeholder_text = _prep_local("Nickname", "Takma ad", "Pseudonim")
 	name_edit.tooltip_text = _prep_local("Nickname shown above the colonist", "Kolonistin üzerinde görünen takma ad", "Pseudonim nad postacią")
-	name_edit.custom_minimum_size = Vector2(90, 31)
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_row.add_child(name_edit)
+	_preparation_name_input_style(name_edit)
+	name_edit.add_theme_font_size_override("font_size", 11 if name_edit.text.length() > 9 else 12)
+	name_edit.text_changed.connect(func(value: String):
+		name_edit.add_theme_font_size_override("font_size", 11 if value.length() > 9 else 12))
+	_preparation_place(name_panel, name_edit, 198, 18, 118, 28)
 	var last_name_edit := LineEdit.new()
 	last_name_edit.text = str(old.get("last_name", ""))
-	last_name_edit.placeholder_text = _prep_local("Last", "Soyad", "Nazwisko")
+	last_name_edit.placeholder_text = _prep_local("Last Name", "Soyad", "Nazwisko")
 	last_name_edit.tooltip_text = _prep_local("Last name", "Soyad", "Nazwisko")
-	last_name_edit.custom_minimum_size = Vector2(90, 31)
-	last_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_row.add_child(last_name_edit)
-	var random_name_button := _preparation_dice_button(_randomize_prepared_name, _prep_local("Randomize names", "Adları rastgele seç", "Wylosuj imiona"), Vector2(34, 31))
-	name_row.add_child(random_name_button)
-	var compact_name_actions := size.x < 1300.0
-	var character_actions := _preparation_panel(Vector2.ZERO)
-	name_row.add_child(character_actions)
-	var character_action_row := _hbox(4)
-	character_actions.add_child(character_action_row)
-	var load_character_button := _setup_button(_prep_local("Load", "Yükle", "Wczytaj") if compact_name_actions else _prep_local("Load character", "Karakter yükle", "Wczytaj postać"), _load_character_preset, true, Vector2(76 if compact_name_actions else 120, 31))
-	load_character_button.tooltip_text = _prep_local("Load character", "Karakter yükle", "Wczytaj postać")
-	character_action_row.add_child(load_character_button)
-	var save_character_button := _setup_button(_prep_local("Save", "Kaydet", "Zapisz") if compact_name_actions else _prep_local("Save character", "Karakter kaydet", "Zapisz postać"), _save_character_preset, true, Vector2(76 if compact_name_actions else 120, 31))
-	save_character_button.tooltip_text = _prep_local("Save character", "Karakter kaydet", "Zapisz postać")
-	character_action_row.add_child(save_character_button)
-	var columns := _hbox(5)
+	_preparation_name_input_style(last_name_edit)
+	_preparation_place(name_panel, last_name_edit, 320, 18, 138, 28)
+	_preparation_place(name_panel, _preparation_dice_button(_randomize_prepared_name, _prep_local("Randomize names", "Adları rastgele seç", "Wylosuj imiona"), Vector2(26, 27), true), 463, 17, 26, 27)
+	_preparation_place(name_panel, _preparation_classic_gold_button(_prep_local("Load Character", "Karakter Yükle", "Wczytaj postać"), _load_character_preset, 125, 37), 561, 13, 125, 37)
+	_preparation_place(name_panel, _preparation_classic_gold_button(_prep_local("Save Character", "Karakter Kaydet", "Zapisz postać"), _save_character_preset, 125, 37), 694, 13, 125, 37)
+
+	var columns := _hbox(11)
+	columns.custom_minimum_size = Vector2(832, 483)
 	columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	editor.add_child(columns)
-	var appearance_panel := _preparation_panel(Vector2(302, 0))
+	var appearance_panel := _preparation_classic_panel(226, 483)
 	appearance_panel.name = "PreparationAppearance"
-	appearance_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	columns.add_child(appearance_panel)
-	var appearance_fields := _vbox(5)
-	appearance_panel.add_child(appearance_fields)
-	appearance_fields.add_child(_label(_prep_local("Age", "Yaş", "Wiek"), 18, CREAM))
-	var age_row := _hbox(5)
-	appearance_fields.add_child(age_row)
-	age_row.add_child(_label(_prep_local("Biological", "Biyolojik", "Biologiczny"), 12, MUTED))
-	var age := PrepStepper.new(int(old.get("age", 25)), 18, 80, "inline")
+	_preparation_classic_caption(appearance_panel, _prep_local("Biological Age", "Biyolojik Yaş", "Wiek biologiczny"), 16, 10, 96, 18, 11, Color("#cacac8"))
+	_preparation_classic_caption(appearance_panel, _prep_local("Chronological Age", "Kronolojik Yaş", "Wiek chronologiczny"), 112, 10, 110, 18, 11, Color("#cacac8"))
+	var age := PrepStepper.new(int(old.get("age", 25)), 18, 80, "age")
 	age.changed.connect(func(_value: int): _refresh_character_editor())
-	age_row.add_child(age)
-	var chronological_row := _hbox(5)
-	appearance_fields.add_child(chronological_row)
-	chronological_row.add_child(_label(_prep_local("Chronological", "Kronolojik", "Chronologiczny"), 12, MUTED))
-	var chronological_age := PrepStepper.new(int(old.get("chronological_age", old.get("age", 25))), 18, 1200, "inline")
+	_preparation_place(appearance_panel, age, 16, 30, 82, 25)
+	var chronological_age := PrepStepper.new(int(old.get("chronological_age", old.get("age", 25))), 18, 1200, "age")
 	chronological_age.changed.connect(func(_value: int): _refresh_character_editor())
-	chronological_row.add_child(chronological_age)
-	appearance_fields.add_child(HSeparator.new())
-	var apparel_popup := PopupPanel.new()
-	apparel_popup.name = "PreparationApparelPopup"
-	editor.add_child(apparel_popup)
-	var appearance_header := _hbox(5)
-	appearance_fields.add_child(appearance_header)
-	appearance_header.add_child(_label(_prep_local("Appearance", "Görünüş", "Wygląd"), 18, CREAM))
-	var appearance_header_spacer := Control.new()
-	appearance_header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	appearance_header.add_child(appearance_header_spacer)
-	var apparel_edit_button := _setup_button(_prep_local("Apparel...", "Giysiler...", "Odzież..."), func(): apparel_popup.popup_centered(Vector2i(390, 410)), false, Vector2(88, 24))
-	apparel_edit_button.tooltip_text = _prep_local("Edit this colonist's apparel and weapon", "Bu kolonistin giysi ve silahını düzenle", "Edytuj odzież i broń postaci")
-	apparel_edit_button.add_theme_font_size_override("font_size", 11)
-	appearance_header.add_child(apparel_edit_button)
+	_preparation_place(appearance_panel, chronological_age, 112, 30, 82, 25)
 	var equipped_gear: Dictionary = old.get("starting_gear", {})
-	var hat_choice := MenuButton.new()
-	var hat_id := str(equipped_gear.get("hat", "none"))
-	hat_choice.text = _prep_local("Hat", "Şapka", "Kapelusz") + ": " + (_cargo_label(hat_id) if hat_id != "none" else _prep_local("None", "Yok", "Brak")) + " ▾"
-	hat_choice.custom_minimum_size = Vector2(277, 28)
-	hat_choice.get_popup().add_item(_prep_local("None", "Yok", "Brak"), 0)
-	hat_choice.get_popup().add_item(_cargo_label("cap"), 1)
-	hat_choice.get_popup().add_item(_cargo_label("brim_hat"), 2)
-	hat_choice.get_popup().id_pressed.connect(func(id: int): _set_starting_gear("hat", ["none", "cap", "brim_hat"][id]))
-	for hat_state in ["normal", "hover", "pressed"]:
-		hat_choice.add_theme_stylebox_override(hat_state, _style(Color("#765b37") if hat_state == "normal" else Color("#8a6c46"), Color("#a88b62"), 0))
-	appearance_fields.add_child(hat_choice)
-	var portrait_box := Control.new()
-	portrait_box.custom_minimum_size = Vector2(277, 190)
-	appearance_fields.add_child(portrait_box)
+	var appearance_categories := [_prep_local("Hat", "Şapka", "Kapelusz"), _prep_local("Hairstyle", "Saç modeli", "Fryzura"),
+		_prep_local("Body type", "Vücut tipi", "Typ sylwetki"), _prep_local("Head type", "Kafa tipi", "Typ głowy"),
+		_prep_local("Torso", "Gövde", "Tułów"), _prep_local("Legs", "Bacaklar", "Nogi"),
+		_prep_local("Apparel", "Dış giysi", "Odzież wierzchnia")]
+	var appearance_menu := _preparation_classic_gold_menu(appearance_categories[_preparation_appearance_category], 192, 27)
+	for category_index in appearance_categories.size():
+		appearance_menu.get_popup().add_item(appearance_categories[category_index], category_index)
+	appearance_menu.get_popup().id_pressed.connect(func(category_index: int):
+		_save_character_inputs()
+		_preparation_appearance_category = category_index
+		_show_characters())
+	_preparation_place(appearance_panel, appearance_menu, 17, 90, 192, 27)
+	_preparation_classic_caption(appearance_menu, "▾", 172, 1, 15, 23, 12, CREAM).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var portrait_box := Panel.new()
+	portrait_box.name = "PreparationPortrait"
+	portrait_box.add_theme_stylebox_override("panel", _style(Color("#16191b"), Color("#696c6e"), 0))
+	_preparation_place(appearance_panel, portrait_box, 16, 125, 194, 195)
 	var preview := PawnPreviewScript.new()
-	portrait_box.add_child(preview)
-	preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var portrait_controls := _hbox(1)
-	portrait_controls.position = Vector2(5, 3)
-	portrait_box.add_child(portrait_controls)
+	preview.classic_preparation_background = true
+	_preparation_place(portrait_box, preview, 1, 1, 192, 193)
 	var sex := {"index": 0 if str(old.get("sex", "female")) == "female" else 1, "row": portrait_box}
 	var female_button := PrepGenderButton.new()
 	female_button.selected = int(sex["index"]) == 0
 	female_button.pressed.connect(func(): sex["index"] = 0; _on_preparation_sex_changed())
 	female_button.tooltip_text = _prep_local("Female", "Kadın", "Kobieta")
-	portrait_controls.add_child(female_button)
+	_preparation_place(portrait_box, female_button, 7, 7, 20, 21)
 	var male_button := PrepGenderButton.new()
 	male_button.is_male = true
 	male_button.selected = int(sex["index"]) == 1
 	male_button.pressed.connect(func(): sex["index"] = 1; _on_preparation_sex_changed())
 	male_button.tooltip_text = _prep_local("Male", "Erkek", "Mężczyzna")
-	portrait_controls.add_child(male_button)
-	var appearance_die := _preparation_dice_button(_randomize_prepared_appearance, _prep_local("Randomize appearance", "Görünüşü rastgele seç", "Wylosuj wygląd"), Vector2(21, 21), true)
-	portrait_controls.add_child(appearance_die)
-	var hair := _arrow_choice_field(appearance_fields, _tr("characters.hair"), _hair_options_for_sex(str(old.get("sex", "female"))), clampi(int(old.get("hair_index", 0)), 0, 3), _refresh_character_editor, 75, 118)
-	var body_type := _arrow_choice_field(appearance_fields, _prep_local("Body", "Gövde", "Sylwetka"), [_prep_local("Type 1", "Tip 1", "Typ 1"), _prep_local("Type 2", "Tip 2", "Typ 2")], clampi(int(old.get("body_type", 0)), 0, 1), _refresh_character_editor, 75, 118)
-	var head_type := _arrow_choice_field(appearance_fields, _prep_local("Head", "Kafa", "Głowa"), [_prep_local("Type 1", "Tip 1", "Typ 1"), _prep_local("Type 2", "Tip 2", "Typ 2")], clampi(int(old.get("head_type", 0)), 0, 1), _refresh_character_editor, 75, 118)
-	var color_editor := _vbox(3)
-	appearance_fields.add_child(color_editor)
-	var hair_color := _preparation_color_field(color_editor, _tr("characters.hair_color"), str(old.get("hair_color", HAIR_COLOR_OPTIONS[clampi(int(old.get("hair_color_index", 1)), 0, HAIR_COLOR_OPTIONS.size() - 1)])), HAIR_COLOR_OPTIONS, _refresh_character_editor)
-	var skin := _preparation_color_field(color_editor, _tr("characters.skin"), str(old.get("skin_color", SKIN_OPTIONS[clampi(int(old.get("skin_index", 0)), 0, SKIN_OPTIONS.size() - 1)])), SKIN_OPTIONS, _refresh_character_editor)
-	var kit_panel := _preparation_panel(Vector2(370, 0))
-	kit_panel.name = "PreparationApparel"
-	apparel_popup.add_child(kit_panel)
-	var kit := _vbox(7)
-	kit_panel.add_child(kit)
-	kit.add_child(_label(_prep_local("Apparel", "Giysiler", "Odzież"), 18, CREAM))
-	for garment in [{"slot": "shirt", "id": "tshirt", "color": "shirt_color"}, {"slot": "pants", "id": "pants", "color": "pants_color"}, {"slot": "apparel", "id": "jacket", "color": "apparel_color"}]:
-		var garment_row := _hbox(7)
-		kit.add_child(garment_row)
-		var garment_id := str(garment["id"])
-		var default_item := "clothes" if str(garment["slot"]) == "apparel" else garment_id
-		var worn := str(equipped_gear.get(str(garment["slot"]), default_item)) == garment_id
-		var icon := ApparelIconScript.new()
-		icon.item_id = garment_id
-		icon.tint = Color(str(equipped_gear.get(str(garment["color"]), "#735f50" if garment_id == "jacket" else "#78928b"))) if worn else Color("#737777")
-		garment_row.add_child(icon)
-		var garment_label := _label(_cargo_label(garment_id) if worn else _prep_local("None", "Yok", "Brak"), 13)
-		garment_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		garment_row.add_child(garment_label)
-		_preparation_inline_color(garment_row, str(garment["color"]), str(equipped_gear.get(str(garment["color"]), "#735f50" if garment_id == "jacket" else "#78928b")), preview)
-		var garment_slot := str(garment["slot"])
-		var apparel_choice := MenuButton.new()
-		apparel_choice.text = _prep_local("Change", "Değiştir", "Zmień")
-		apparel_choice.custom_minimum_size = Vector2(68, 29)
-		for menu_state in ["normal", "hover", "pressed"]:
-			apparel_choice.add_theme_stylebox_override(menu_state, _style(Color("#343638") if menu_state == "normal" else Color("#484a4c"), Color("#626365"), 2))
-		var choice_popup := apparel_choice.get_popup()
-		choice_popup.add_item(_prep_local("Wear", "Giy", "Załóż"), 0)
-		choice_popup.add_item(_prep_local("Remove", "Çıkar", "Zdejmij"), 1)
-		choice_popup.id_pressed.connect(func(choice_id: int): _set_starting_gear(garment_slot, garment_id if choice_id == 0 else "none"))
-		garment_row.add_child(apparel_choice)
-	var weapon_row := _hbox(5)
-	kit.add_child(weapon_row)
-	weapon_row.add_child(_label(_prep_local("Weapon", "Silah", "Broń"), 12, MUTED))
-	var weapon_choice := MenuButton.new()
-	weapon_choice.text = _cargo_label("spear") if str(equipped_gear.get("weapon", "fists")) == "spear" else _prep_local("Unarmed", "Silahsız", "Bez broni")
-	weapon_choice.custom_minimum_size = Vector2(130, 29)
-	for menu_state in ["normal", "hover", "pressed"]:
-		weapon_choice.add_theme_stylebox_override(menu_state, _style(Color("#343638") if menu_state == "normal" else Color("#484a4c"), Color("#626365"), 2))
-	weapon_choice.get_popup().add_item(_prep_local("Unarmed", "Silahsız", "Bez broni"), 0)
-	weapon_choice.get_popup().add_item(_cargo_label("spear"), 1)
-	weapon_choice.get_popup().id_pressed.connect(func(choice_id: int): _set_starting_gear("weapon", "spear" if choice_id == 1 else "fists"))
-	weapon_row.add_child(weapon_choice)
-	var biography_stack := _vbox(7)
-	biography_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	biography_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	columns.add_child(biography_stack)
-	var history_panel := _preparation_panel(Vector2(282, 0))
+	_preparation_place(portrait_box, male_button, 27, 7, 20, 21)
+	_preparation_place(portrait_box, _preparation_dice_button(_randomize_prepared_appearance, _prep_local("Randomize appearance", "Görünüşü rastgele seç", "Wylosuj wygląd"), Vector2(21, 21), true), 160, 6, 22, 22)
+	var hair_ids := MALE_HAIR_IDS if str(old.get("sex", "female")) == "male" else FEMALE_HAIR_IDS
+	var hair := {"index": hair_ids.find(_preparation_hair_style(old))}
+	var body_type := {"index": clampi(int(old.get("body_type", 0)), 0, 1)}
+	var head_type := {"index": clampi(int(old.get("head_type", 0)), 0, 1)}
+	var hair_color: PrepColorButton = null
+	var skin: PrepColorButton = null
+	var first_choice: Dictionary = {}
+	var second_choice: Dictionary = {}
+	match _preparation_appearance_category:
+		0:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("No hat", "Şapka yok", "Bez kapelusza"), _prep_local("Bowler hat", "Melon şapka", "Melonik"), _cargo_label("cap")], 1 if str(equipped_gear.get("hat", "none")) == "brim_hat" else 2 if str(equipped_gear.get("hat", "none")) == "cap" else 0, func(value: int): _set_starting_gear("hat", ["none", "brim_hat", "cap"][value]), 0, 194)
+			if str(equipped_gear.get("hat", "none")) != "none":
+				second_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Cloth", "Kumaş", "Tkanina")], 0, func(_value: int): pass, 0, 194)
+		1:
+			first_choice = _arrow_choice_field(appearance_panel, "", _hair_options_for_sex(str(old.get("sex", "female"))), int(hair["index"]), func(value: int): hair["index"] = value; _refresh_character_editor(), 0, 194)
+			var hair_color_names := [_prep_local("Custom color", "Özel renk", "Własny kolor"), _prep_local("Black", "Siyah", "Czarny"), _prep_local("Dark brown", "Koyu kahve", "Ciemny brąz"), _prep_local("Brown", "Kahve", "Brąz"), _prep_local("Chestnut", "Kestane", "Kasztan"), _prep_local("Auburn", "Kızıl kahve", "Kasztanowy"), _prep_local("Copper", "Bakır", "Miedziany"), _prep_local("Blonde", "Sarı", "Blond"), _prep_local("Ash", "Kül", "Popielaty"), _prep_local("Mahogany", "Maun", "Mahoń"), _prep_local("Gray", "Gri", "Szary"), _prep_local("White", "Beyaz", "Biały"), _prep_local("Charcoal", "Kömür", "Grafit")]
+			var hair_preset := HAIR_COLOR_OPTIONS.find(str(old.get("hair_color", HAIR_COLOR_OPTIONS[1])))
+			second_choice = _arrow_choice_field(appearance_panel, "", hair_color_names, 0 if bool(old.get("hair_color_custom", false)) or hair_preset < 0 else hair_preset + 1, func(value: int):
+				if value > 0:
+					_set_prepared_color("hair_color", Color(str(HAIR_COLOR_OPTIONS[value - 1])), true, false), 0, 194, "", true)
+		2:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Normal", "Normal", "Normalna"), _prep_local("Broad", "Geniş", "Szeroka")], int(body_type["index"]), func(value: int): body_type["index"] = value; _refresh_character_editor(), 0, 194)
+			second_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Custom color", "Özel renk", "Własny kolor"), _prep_local("Light skin", "Açık ten", "Jasna skóra"), _prep_local("Medium skin", "Orta ten", "Średnia skóra"), _prep_local("Dark skin", "Koyu ten", "Ciemna skóra")], 0 if bool(old.get("skin_color_custom", false)) else _preparation_skin_group(str(old.get("skin_color", SKIN_OPTIONS[0]))) + 1, func(value: int):
+				if value > 0:
+					_set_prepared_color("skin_color", Color(str(SKIN_OPTIONS[(value - 1) * 4])), true, false), 0, 194, "", true)
+		3:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Oval", "Oval", "Owalna"), _prep_local("Round", "Yuvarlak", "Okrągła")], int(head_type["index"]), func(value: int): head_type["index"] = value; _refresh_character_editor(), 0, 194)
+		4:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("T-shirt", "Tişört", "Koszulka"), _prep_local("No torso clothing", "Gövde kıyafeti yok", "Bez ubrania na tułowiu")], 1 if str(equipped_gear.get("shirt", "tshirt")) == "none" else 0, func(value: int): _set_preparation_torso(value), 0, 194)
+			if str(equipped_gear.get("shirt", "tshirt")) != "none":
+				second_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Cloth", "Kumaş", "Tkanina")], 0, func(_value: int): pass, 0, 194)
+		5:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Pants", "Pantolon", "Spodnie"), _prep_local("No leg clothing", "Bacak kıyafeti yok", "Bez ubrania na nogach")], 1 if str(equipped_gear.get("pants", "pants")) == "none" else 0, func(value: int): _set_preparation_legs(value), 0, 194)
+			if str(equipped_gear.get("pants", "pants")) != "none":
+				second_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Cloth", "Kumaş", "Tkanina")], 0, func(_value: int): pass, 0, 194)
+		6:
+			first_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("No outer clothing", "Dış giysi yok", "Bez odzieży wierzchniej"), _prep_local("Coat", "Kaban", "Płaszcz")], 1 if str(equipped_gear.get("apparel", "none")) == "jacket" else 0, func(value: int): _set_preparation_apparel(value), 0, 194)
+			if str(equipped_gear.get("apparel", "none")) == "jacket":
+				second_choice = _arrow_choice_field(appearance_panel, "", [_prep_local("Cloth", "Kumaş", "Tkanina")], 0, func(_value: int): pass, 0, 194)
+	if _preparation_appearance_category == 1:
+		hair["row"] = first_choice["row"]
+	elif _preparation_appearance_category == 2:
+		body_type["row"] = first_choice["row"]
+	elif _preparation_appearance_category == 3:
+		head_type["row"] = first_choice["row"]
+	(first_choice["row"] as Control).position = Vector2(0, 326)
+	if not second_choice.is_empty():
+		(second_choice["row"] as Control).position = Vector2(0, 358)
+		# Leave room beside the color/material name for the copy and paste tools.
+		var color_value_menu := second_choice["value_menu"] as Button
+		color_value_menu.custom_minimum_size.x = 140
+		(color_value_menu.get_parent() as Control).custom_minimum_size.x = 140
+		(second_choice["row"] as Control).custom_minimum_size.x = 168
+	var color_key := _preparation_active_color_key(old)
+	if not color_key.is_empty():
+		var appearance_colors := _spec_appearance(old)
+		var appearance_key := "skin" if color_key == "skin_color" else color_key
+		var clothing_color := Color(str(appearance_colors.get(appearance_key, "#f1b92d")))
+		var swatch := PrepColorButton.new()
+		swatch.color = clothing_color
+		swatch.tooltip_text = _prep_local("Edit selected color", "Seçili rengi düzenle", "Edytuj wybrany kolor")
+		swatch.pressed.connect(func(): _open_preparation_color_dialog(swatch))
+		_preparation_place(appearance_panel, swatch, 18, 398, 50, 50)
+		var copy_color := PrepColorActionButton.new()
+		copy_color.action = "copy"
+		copy_color.pressed.connect(func():
+			_preparation_copied_color = "#" + swatch.color.to_html(false)
+			DisplayServer.clipboard_set(_preparation_copied_color))
+		copy_color.tooltip_text = _prep_local("Copy this color", "Bu rengi kopyala", "Kopiuj kolor")
+		_preparation_place(appearance_panel, copy_color, 169, 360, 25, 25)
+		var paste_color := PrepColorActionButton.new()
+		paste_color.action = "paste"
+		paste_color.pressed.connect(func():
+			if not _preparation_copied_color.is_empty():
+				swatch.set_picked_color(Color(_preparation_copied_color)))
+		paste_color.tooltip_text = _prep_local("Paste copied color onto this colonist", "Kopyalanan rengi bu koloniste uygula", "Wklej kolor")
+		_preparation_place(appearance_panel, paste_color, 197, 360, 25, 25)
+		var rgb_sliders: Array[HSlider] = []
+		for channel in range(3):
+			rgb_sliders.append(_preparation_classic_rgb_slider(appearance_panel, 392.0 + float(channel) * 20.0, channel, clothing_color, func():
+				var new_color := Color(float(rgb_sliders[0].value) / 255.0, float(rgb_sliders[1].value) / 255.0, float(rgb_sliders[2].value) / 255.0)
+				swatch.set_picked_color(new_color)))
+		swatch.color_changed.connect(func(next_color: Color):
+			for channel_index in range(3):
+				rgb_sliders[channel_index].set_value_no_signal(roundi(next_color[channel_index] * 255.0))
+			_set_prepared_color(color_key, next_color, false)
+			if color_key in ["hair_color", "skin_color"] and not second_choice.is_empty():
+				second_choice["index"] = 0
+				(second_choice["value_menu"] as Button).text = _prep_local("Custom color", "Özel renk", "Własny kolor")
+			preview.set_appearance(_spec_appearance(character_specs[_editing_character_index]))
+			if _editing_character_index < _roster_buttons.size():
+				var roster_portrait := _roster_buttons[_editing_character_index].get_node_or_null("RosterPortrait") as PawnPortrait
+				if roster_portrait != null:
+					roster_portrait.set_appearance(_spec_appearance(character_specs[_editing_character_index]))
+			_refresh_character_points())
+
+	var biography := _vbox(12)
+	biography.custom_minimum_size.x = 321
+	columns.add_child(biography)
+	var history_panel := _preparation_classic_panel(321, 121)
 	history_panel.name = "PreparationBackstory"
-	history_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	biography_stack.add_child(history_panel)
-	var history := _vbox(6)
-	history_panel.add_child(history)
-	history.add_child(_label(_prep_local("Backstory", "Geçmiş", "Przeszłość"), 18, CREAM))
-	var childhood_ids := ["rural_child", "town_child", "apprentice"]
-	var adulthood_ids := ["farmer", "builder", "medic", "scholar"]
-	var childhood := _arrow_choice_field(history, _prep_local("Childhood", "Çocukluk", "Dzieciństwo"), [_prep_local("Rural child", "Köy çocuğu", "Dziecko ze wsi"), _prep_local("Town child", "Kasaba çocuğu", "Dziecko z miasta"), _prep_local("Apprentice", "Çırak", "Uczeń")], maxi(0, childhood_ids.find(str(old.get("childhood", "rural_child")))), _refresh_character_editor, 95, 125)
-	var adulthood := _arrow_choice_field(history, _prep_local("Adulthood", "Yetişkinlik", "Dorosłość"), [_prep_local("Farmer", "Çiftçi", "Rolnik"), _prep_local("Builder", "İnşaatçı", "Budowniczy"), _prep_local("Medic", "Sağlıkçı", "Medyk"), _prep_local("Scholar", "Araştırmacı", "Badacz")], maxi(0, adulthood_ids.find(str(old.get("adulthood", "farmer")))), _refresh_character_editor, 95, 125)
-	var childhood_note := _setup_copy("", 12, MUTED)
-	history.add_child(childhood_note)
+	history_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	biography.add_child(history_panel)
+	_preparation_classic_caption(history_panel, _prep_local("Backstory", "Geçmiş", "Przeszłość"), 15, 6, 250, 31, 19, CREAM)
+	_preparation_place(history_panel, _preparation_dice_button(func(): _randomize_preparation_choices("backstory"), _prep_local("Randomize backstory", "Geçmişi rastgele seç", "Wylosuj przeszłość"), Vector2(22, 22), true), 286, 10, 22, 22)
+	var childhood := _arrow_choice_field(history_panel, _prep_local("Childhood", "Çocukluk", "Dzieciństwo"), [_prep_local("Rural child", "Köy çocuğu", "Dziecko ze wsi"), _prep_local("Town child", "Kasaba çocuğu", "Dziecko z miasta"), _prep_local("Apprentice", "Çırak", "Uczeń"), _prep_local("Vatgrown soldier", "Tankta yetişmiş asker", "Żołnierz z kadzi"), _prep_local("Unknown", "Bilinmiyor", "Nieznane")], maxi(0, CHILDHOOD_IDS.find(str(old.get("childhood", "rural_child")))), func(_value: int): _refresh_character_editor(), 74, 193, "childhood")
+	(childhood["row"] as Control).position = Vector2(15, 44)
+	var adulthood := _arrow_choice_field(history_panel, _prep_local("Adulthood", "Yetişkinlik", "Dorosłość"), [_prep_local("Farmer", "Çiftçi", "Rolnik"), _prep_local("Builder", "İnşaatçı", "Budowniczy"), _prep_local("Medic", "Sağlıkçı", "Medyk"), _prep_local("Scholar", "Araştırmacı", "Badacz"), _prep_local("Unknown", "Bilinmiyor", "Nieznane")], maxi(0, ADULTHOOD_IDS.find(str(old.get("adulthood", "farmer")))), func(_value: int): _refresh_character_editor(), 74, 193, "adulthood")
+	(adulthood["row"] as Control).position = Vector2(15, 78)
+	var childhood_note := _label("", 11, MUTED)
 	childhood_note.visible = false
-	var adulthood_note := _setup_copy("", 12, MUTED)
-	history.add_child(adulthood_note)
+	history_panel.add_child(childhood_note)
+	var adulthood_note := _label("", 11, MUTED)
 	adulthood_note.visible = false
-	var traits_panel := _preparation_panel(Vector2(282, 0))
+	history_panel.add_child(adulthood_note)
+	var traits_panel := _preparation_classic_panel(321, 157)
 	traits_panel.name = "PreparationTraitsHealth"
-	traits_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	traits_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	biography_stack.add_child(traits_panel)
-	var traits_column := _vbox(6)
-	traits_panel.add_child(traits_column)
-	var trait_header := _hbox(9)
-	traits_column.add_child(trait_header)
-	trait_header.add_child(_label(_prep_local("Traits", "Özellikler", "Cechy"), 18, CREAM))
-	var trait_header_fill := Control.new()
-	trait_header_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	trait_header.add_child(trait_header_fill)
+	traits_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	biography.add_child(traits_panel)
+	var trait_header := _hbox(3)
+	_preparation_place(traits_panel, trait_header, 15, 5, 295, 29)
+	trait_header.add_child(_label(_prep_local("Traits", "Özellikler", "Cechy"), 19, CREAM))
+	var trait_header_gap := Control.new()
+	trait_header_gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	trait_header.add_child(trait_header_gap)
 	var old_traits: Array = old.get("trait_ids", [TRAIT_IDS[clampi(int(old.get("trait_index", 0)) + 1, 1, TRAIT_IDS.size() - 1)]])
-	var trait_fields := _preparation_choice_chips(traits_column, TRAIT_IDS, _preparation_trait_names(), old_traits,
-		_prep_local("Add trait", "Özellik ekle", "Dodaj cechę"), trait_header)
-	var trait_die := _preparation_dice_button(func(): _randomize_preparation_choices("traits"), _prep_local("Randomize traits", "Özellikleri rastgele seç", "Wylosuj cechy"), Vector2(23, 23), true)
-	trait_header.add_child(trait_die)
-	traits_column.add_child(HSeparator.new())
-	var health_header := _hbox(9)
-	traits_column.add_child(health_header)
-	health_header.add_child(_label(_tr("characters.health"), 18, CREAM))
-	var health_header_fill := Control.new()
-	health_header_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	health_header.add_child(health_header_fill)
+	var trait_fields := _preparation_choice_chips(traits_panel, TRAIT_IDS, _preparation_trait_names(), old_traits, _prep_local("Add trait", "Özellik ekle", "Dodaj cechę"), trait_header, 38.0, true)
+	trait_header.add_child(_preparation_dice_button(func(): _randomize_preparation_choices("traits"), _prep_local("Randomize traits", "Özellikleri rastgele seç", "Wylosuj cechy"), Vector2(22, 22), true))
+	var health_panel := _preparation_classic_panel(321, 181)
+	health_panel.name = "PreparationHealth"
+	biography.add_child(health_panel)
+	var health_header := _hbox(3)
+	_preparation_place(health_panel, health_header, 15, 5, 295, 30)
+	health_header.add_child(_label(_prep_local("Health", "Sağlık", "Zdrowie"), 19, CREAM))
+	var health_header_gap := Control.new()
+	health_header_gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	health_header.add_child(health_header_gap)
 	var old_conditions: Array = old.get("condition_ids", [])
-	if old_conditions.is_empty():
-		traits_column.add_child(_label(_prep_local("No injuries, conditions or implants", "Yaralanma, rahatsızlık veya implant yok", "Brak obrażeń, schorzeń i implantów"), 12, MUTED))
-	var condition_fields := _preparation_choice_chips(traits_column, CONDITION_IDS, _preparation_condition_names(), old_conditions,
-		_prep_local("Add condition", "Sağlık durumu ekle", "Dodaj schorzenie"), health_header)
-	var health_die := _preparation_dice_button(func(): _randomize_preparation_choices("health"), _prep_local("Randomize health conditions", "Sağlık durumlarını rastgele seç", "Wylosuj stan zdrowia"), Vector2(23, 23), true)
-	health_header.add_child(health_die)
-	var skill_panel := _preparation_panel(Vector2(328, 0))
+	var condition_fields := _build_preparation_health_editor(health_panel, health_header, old_conditions, old.get("health_injuries", []))
+	var skill_stack := _vbox(8)
+	skill_stack.custom_minimum_size.x = 261
+	columns.add_child(skill_stack)
+	var skill_panel := _preparation_classic_panel(261, 367)
 	skill_panel.name = "PreparationSkills"
-	skill_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
-	columns.add_child(skill_panel)
-	var skill_column := _vbox(5)
-	skill_panel.add_child(skill_column)
-	var skill_header := _hbox(3)
-	skill_column.add_child(skill_header)
-	skill_header.add_child(_label(_prep_local("Skills", "Beceriler", "Umiejętności"), 18, CREAM))
-	var skill_header_fill := Control.new()
-	skill_header_fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	skill_header.add_child(skill_header_fill)
-	var skill_reset := _setup_button("↶", _reset_preparation_skills, false, Vector2(27, 27))
-	skill_reset.tooltip_text = _prep_local("Reset skills", "Becerileri sıfırla", "Zresetuj umiejętności")
-	skill_header.add_child(skill_reset)
-	var skill_die := _preparation_dice_button(_randomize_preparation_skills, _prep_local("Randomize skills", "Becerileri rastgele dağıt", "Wylosuj umiejętności"))
-	skill_header.add_child(skill_die)
+	skill_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	skill_stack.add_child(skill_panel)
+	_preparation_classic_caption(skill_panel, _prep_local("Skills", "Beceriler", "Umiejętności"), 14, 5, 140, 31, 19, CREAM)
+	var skill_clear := PrepResetButton.new()
+	skill_clear.custom_minimum_size = Vector2(25, 25)
+	skill_clear.pressed.connect(_reset_preparation_skills)
+	skill_clear.tooltip_text = _prep_local("Clear skills", "Becerileri temizle", "Wyczyść umiejętności")
+	_preparation_place(skill_panel, skill_clear, 190, 5, 25, 25)
+	var skill_random := _preparation_dice_button(_randomize_preparation_skills,
+		_prep_local("Randomize skills", "Becerileri rastgele dağıt", "Wylosuj umiejętności"), Vector2(25, 25), true)
+	_preparation_place(skill_panel, skill_random, 220, 5, 25, 25)
 	var skill_fields: Dictionary = {}
 	var old_skills: Dictionary = old.get("skills", {})
 	var old_passions: Dictionary = old.get("passions", {})
-	for skill in CLASSIC_SKILL_IDS:
-		var saved_level := clampi(int(old_skills.get(skill, _legacy_preparation_skill(old_skills, skill))), 0, 20)
-		var level := _preparation_skill_field(skill_column, _localized_skill(str(skill)), saved_level, _refresh_character_editor, int(old_passions.get(skill, 0)))
-		skill_fields[skill] = level
-	skill_column.add_child(HSeparator.new())
-	skill_column.add_child(_label(_prep_local("INCAPABLE OF", "YAPAMADIĞI İŞLER", "NIEZDOLNOŚCI"), 13, GOLD))
-	var incapable := _label(_prep_local("None", "Yok", "Brak"), 12, MUTED)
-	skill_column.add_child(incapable)
-	_character_inputs.append({"index": _editing_character_index, "name": name_edit, "first_name": first_name_edit, "last_name": last_name_edit, "age": age, "chronological_age": chronological_age, "childhood": childhood, "adulthood": adulthood, "childhood_note": childhood_note, "adulthood_note": adulthood_note, "sex": sex, "body_type": body_type, "head_type": head_type, "hair": hair, "hair_color": hair_color, "skin": skin, "traits": trait_fields, "conditions": condition_fields, "skills": skill_fields, "preview": preview})
+	var old_modifiers: Dictionary = PreparationRules.skill_modifiers(str(old.get("childhood", "rural_child")), str(old.get("adulthood", "farmer")), old_traits, old_conditions)
+	var old_incapable: Array = PreparationRules.incapable_of(str(old.get("childhood", "rural_child")), str(old.get("adulthood", "farmer")), old_traits, old_conditions)
+	for skill_index in range(CLASSIC_SKILL_IDS.size()):
+		var skill := str(CLASSIC_SKILL_IDS[skill_index])
+		var saved_level := clampi(int(old_skills.get(skill, _legacy_preparation_skill(old_skills, skill))) + int(old_modifiers.get(skill, 0)), 0, 20)
+		skill_fields[skill] = _preparation_skill_field(skill_panel, _localized_skill(skill), saved_level, _refresh_character_editor, int(old_passions.get(skill, 0)), 41.0 + float(skill_index) * 26.0)
+		_set_preparation_skill_disabled(skill_fields[skill], old_incapable.has(skill))
+	var incapable_panel := _preparation_classic_panel(261, 108)
+	incapable_panel.name = "PreparationIncapable"
+	skill_stack.add_child(incapable_panel)
+	_preparation_classic_caption(incapable_panel, _prep_local("Incapable of", "Yapamadığı işler", "Niezdolność"), 14, 4, 225, 32, 19, CREAM)
+	var incapable_text := _preparation_classic_caption(incapable_panel, "", 14, 33, 233, 64, 12, MUTED)
+	incapable_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_character_inputs.append({"index": _editing_character_index, "name": name_edit, "first_name": first_name_edit, "last_name": last_name_edit, "age": age, "chronological_age": chronological_age, "childhood": childhood, "adulthood": adulthood, "childhood_note": childhood_note, "adulthood_note": adulthood_note, "sex": sex, "body_type": body_type, "head_type": head_type, "hair": hair, "hair_color": hair_color, "skin": skin, "traits": trait_fields, "conditions": condition_fields, "skills": skill_fields, "modifiers": old_modifiers, "incapable_text": incapable_text, "preview": preview})
 	name_edit.text_changed.connect(func(_text: String): _refresh_character_editor())
 	first_name_edit.text_changed.connect(func(_text: String): _refresh_character_editor())
 	last_name_edit.text_changed.connect(func(_text: String): _refresh_character_editor())
@@ -2180,11 +3094,11 @@ func _localized_skill(skill: String) -> String:
 		"construction": return _prep_local("Construction", "İnşaat", "Budownictwo")
 		"mining": return _prep_local("Mining", "Madencilik", "Górnictwo")
 		"cooking": return _prep_local("Cooking", "Aşçılık", "Gotowanie")
-		"plants": return _prep_local("Plants", "Bitkiler", "Rośliny")
+		"plants": return _prep_local("Growing", "Yetiştirme", "Uprawa")
 		"animals": return _prep_local("Animals", "Hayvanlar", "Zwierzęta")
 		"crafting": return _prep_local("Crafting", "Üretim", "Rzemiosło")
 		"artistic": return _prep_local("Artistic", "Sanat", "Sztuka")
-		"medical": return _prep_local("Medical", "Tıp", "Medycyna")
+		"medical": return _prep_local("Medicine", "Tıp", "Medycyna")
 		"social": return _prep_local("Social", "Sosyal", "Relacje")
 		"intellectual": return _prep_local("Intellectual", "Entelektüel", "Intelekt")
 		"chop": return _prep_local("Chop", "Odunculuk", "Wycinka")
@@ -2198,172 +3112,435 @@ func _localized_skill(skill: String) -> String:
 		_: return skill.capitalize()
 
 
+func _preparation_incapable_name(work: String) -> String:
+	match work:
+		"medical": return _prep_local("Caring", "Bakım", "Opieka")
+		"firefighting": return _prep_local("Firefighting", "Yangın söndürme", "Gaszenie pożarów")
+		"haul": return _prep_local("Hauling", "Taşıma", "Transport")
+		_: return _localized_skill(work)
+
+
 func _legacy_preparation_skill(old_skills: Dictionary, skill: String) -> int:
 	match skill:
-		"shooting", "melee": return int(old_skills.get("combat", 5))
-		"construction": return int(old_skills.get("build", 5))
-		"mining": return int(old_skills.get("mine", 5))
-		"plants": return int(old_skills.get("harvest", old_skills.get("chop", 5)))
-		"medical": return int(old_skills.get("treat", 5))
-		"intellectual": return int(old_skills.get("research", 5))
-		_: return 5
+		"shooting", "melee": return int(old_skills.get("combat", 0))
+		"construction": return int(old_skills.get("build", 0))
+		"mining": return int(old_skills.get("mine", 0))
+		"plants": return int(old_skills.get("harvest", old_skills.get("chop", 0)))
+		"medical": return int(old_skills.get("treat", 0))
+		"intellectual": return int(old_skills.get("research", 0))
+		_: return 0
 
 
 func _derive_work_skills(classic: Dictionary) -> Dictionary:
 	var skills := classic.duplicate(true)
-	skills["chop"] = int(classic.get("plants", 5))
-	skills["harvest"] = int(classic.get("plants", 5))
-	skills["mine"] = int(classic.get("mining", 5))
-	skills["haul"] = 5
-	skills["build"] = int(classic.get("construction", 5))
-	skills["research"] = int(classic.get("intellectual", 5))
-	skills["treat"] = int(classic.get("medical", 5))
-	skills["combat"] = maxi(int(classic.get("shooting", 5)), int(classic.get("melee", 5)))
+	skills["chop"] = int(classic.get("plants", 0))
+	skills["harvest"] = int(classic.get("plants", 0))
+	skills["mine"] = int(classic.get("mining", 0))
+	skills["haul"] = 0
+	skills["build"] = int(classic.get("construction", 0))
+	skills["research"] = int(classic.get("intellectual", 0))
+	skills["treat"] = int(classic.get("medical", 0))
+	skills["combat"] = maxi(int(classic.get("shooting", 0)), int(classic.get("melee", 0)))
 	return skills
 
 
 func _spec_appearance(spec: Dictionary) -> Dictionary:
 	var sex := str(spec.get("sex", "female"))
 	var gear: Dictionary = spec.get("starting_gear", {})
-	var hair_ids := MALE_HAIR_IDS if sex == "male" else FEMALE_HAIR_IDS
 	return {"sex": sex, "body_type": clampi(int(spec.get("body_type", 0)), 0, 1),
 		"head_type": clampi(int(spec.get("head_type", 0)), 0, 1),
-		"hair": hair_ids[clampi(int(spec.get("hair_index", 0)), 0, 3)],
+		"hair": _preparation_hair_style(spec),
 		"hair_color": str(spec.get("hair_color", HAIR_COLOR_OPTIONS[clampi(int(spec.get("hair_color_index", 1)), 0, HAIR_COLOR_OPTIONS.size() - 1)])),
 		"skin": str(spec.get("skin_color", SKIN_OPTIONS[clampi(int(spec.get("skin_index", 0)), 0, SKIN_OPTIONS.size() - 1)])),
-		"apparel": str(gear.get("apparel", "clothes")),
+		"apparel": str(gear.get("apparel", "none")),
 		"hat": str(gear.get("hat", "none")),
+		"hat_color": str(gear.get("hat_color", "#bd8a11")),
 		"apparel_color": str(gear.get("apparel_color", "#735f50")),
-		"shirt": str(gear.get("shirt", "tshirt" if str(gear.get("apparel", "clothes")) != "none" else "none")),
-		"pants": str(gear.get("pants", "pants" if str(gear.get("apparel", "clothes")) != "none" else "none")),
+		"shirt": str(gear.get("shirt", "tshirt")),
+		"pants": str(gear.get("pants", "pants")),
 		"shirt_color": str(gear.get("shirt_color", OUTFIT_OPTIONS[clampi(int(spec.get("outfit_index", 0)), 0, OUTFIT_OPTIONS.size() - 1)])),
 		"pants_color": str(gear.get("pants_color", "#5f6768"))}
+
+
+func _preparation_active_color_key(spec: Dictionary) -> String:
+	var gear: Dictionary = spec.get("starting_gear", {})
+	match _preparation_appearance_category:
+		0: return "hat_color" if str(gear.get("hat", "none")) != "none" else ""
+		1: return "hair_color"
+		2: return "skin_color"
+		4: return "shirt_color" if str(gear.get("shirt", "tshirt")) != "none" else ""
+		5: return "pants_color" if str(gear.get("pants", "pants")) != "none" else ""
+		6: return "apparel_color" if str(gear.get("apparel", "none")) == "jacket" else ""
+	return ""
+
+
+func _preparation_skin_group(color_code: String) -> int:
+	var selected := Color.from_string(color_code, Color(SKIN_OPTIONS[0]))
+	var best_index := 0
+	var best_distance := INF
+	for group in range(3):
+		var reference := Color(str(SKIN_OPTIONS[group * 4]))
+		var distance := pow(selected.r - reference.r, 2) + pow(selected.g - reference.g, 2) + pow(selected.b - reference.b, 2)
+		if distance < best_distance:
+			best_distance = distance
+			best_index = group
+	return best_index
+
+
+func _set_prepared_color(key: String, next_color: Color, redraw := true, custom := true) -> void:
+	if key.is_empty() or _editing_character_index < 0 or _editing_character_index >= character_specs.size():
+		return
+	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+	var value := "#" + next_color.to_html(false)
+	if key in ["skin_color", "hair_color"]:
+		spec[key] = value
+		spec[key + "_custom"] = custom
+	else:
+		var gear: Dictionary = spec.get("starting_gear", {}).duplicate(true)
+		gear[key] = value
+		spec["starting_gear"] = gear
+	character_specs[_editing_character_index] = spec
+	if redraw:
+		_show_characters()
 
 
 func _build_preparation_relationships(body: HBoxContainer) -> void:
 	var panel := _preparation_panel(Vector2.ZERO)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var panel_style := _style(Color("#303234"), Color.TRANSPARENT, 0)
+	panel_style.set_content_margin_all(0)
+	panel.add_theme_stylebox_override("panel", panel_style)
 	body.add_child(panel)
-	var content := _vbox(6)
+	var content := _vbox(7)
 	panel.add_child(content)
-	content.add_child(_label(_prep_local("Parent/Child Relationships", "Ebeveyn ve çocuk ilişkileri", "Relacje rodzinne"), 18, CREAM))
-	var graph := FamilyGraph.new()
-	graph.name = "PreparationFamilyGraph"
-	graph.custom_minimum_size = Vector2(1260, 250)
-	content.add_child(graph)
-	_build_preparation_family_graph(graph)
-	var family_links := PackedStringArray()
-	for first_index in range(colonist_count):
-		for second_index in range(first_index + 1, colonist_count):
-			var relationships: Dictionary = character_specs[first_index].get("starting_relationships", {})
-			var relation := str(relationships.get(str(second_index), "none"))
-			if relation in ["parent", "child", "sibling"]:
-				var first_name := str(character_specs[first_index].get("name", "Colonist"))
-				var second_name := str(character_specs[second_index].get("name", "Colonist"))
-				var family_word := _prep_local("parent of", "ebeveyni", "rodzic") if relation == "parent" else _prep_local("child of", "çocuğu", "dziecko") if relation == "child" else _prep_local("sibling of", "kardeşi", "rodzeństwo")
-				family_links.append("%s  →  %s  %s" % [first_name, family_word, second_name])
-	content.add_child(_label("    ·    ".join(family_links) if not family_links.is_empty() else _prep_local("No family ties yet.", "Henüz aile bağı yok.", "Brak więzi rodzinnych."), 12, MUTED))
-	content.add_child(HSeparator.new())
-	content.add_child(_label(_prep_local("Other Relationships", "Diğer ilişkiler", "Pozostałe relacje"), 18, CREAM))
+	var family_section := _preparation_panel(Vector2(0, 355))
+	family_section.name = "PreparationColonyRelations"
+	family_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	family_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(family_section)
+	var family_content := _vbox(5)
+	family_section.add_child(family_content)
+	family_content.add_child(_label(_prep_local("Colony Relationships", "Koloni ilişkileri", "Relacje kolonii"), 21, CREAM))
+	family_content.add_child(_label(_prep_local("Click between two portraits to add or change their bond.", "Bağ eklemek veya değiştirmek için iki portrenin arasına tıkla.", "Kliknij między portretami, aby ustawić więź."), 12, MUTED))
+	_preparation_colony_relationship_editor(family_content)
+	var other_section := _preparation_panel(Vector2(0, 204))
+	other_section.name = "PreparationOtherRelations"
+	other_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	other_section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(other_section)
+	var other_content := _vbox(5)
+	other_section.add_child(other_content)
+	other_content.add_child(_label(_prep_local("World Relationships", "Dünya ilişkileri", "Relacje ze światem"), 21, CREAM))
+	if world_character_specs.is_empty():
+		other_content.add_child(_label(_prep_local("No people outside the colony.", "Koloni dışında kişi yok.", "Brak osób poza kolonią."), 12, MUTED))
+	else:
+		var world_columns := _hbox(13)
+		world_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		world_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		other_content.add_child(world_columns)
+		var world_editor := _vbox(4)
+		world_editor.custom_minimum_size.x = 480
+		world_columns.add_child(world_editor)
+		_preparation_other_relationship_editor(world_editor)
+		var world_ledger := _vbox(5)
+		world_ledger.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		world_columns.add_child(world_ledger)
+		_preparation_relationship_ledger(world_ledger, true)
+
+
+func _preparation_colony_relationship_editor(parent: VBoxContainer) -> void:
 	if colonist_count < 2:
-		content.add_child(_label(_prep_local("A second colonist is needed to create a relationship.", "İlişki kurmak için ikinci bir kolonist gerekir.", "Do utworzenia relacji potrzeba drugiego kolonisty."), 15))
-	var pair_grid := GridContainer.new()
-	pair_grid.columns = 2 if size.x >= 1180.0 else 1
-	pair_grid.add_theme_constant_override("h_separation", 8)
-	pair_grid.add_theme_constant_override("v_separation", 8)
-	content.add_child(pair_grid)
-	for i in range(colonist_count):
-		for j in range(i + 1, colonist_count):
-			var first: Dictionary = character_specs[i]
-			var second: Dictionary = character_specs[j]
-			var known: Dictionary = first.get("starting_relationships", {})
-			var relation_id := str(known.get(str(j), "none"))
-			if relation_id == "none":
-				continue
-			var row_panel := _preparation_panel(Vector2(390, 116))
-			row_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-			pair_grid.add_child(row_panel)
-			var row := _hbox(8)
-			row_panel.add_child(row)
-			var first_card := _vbox(2)
-			first_card.custom_minimum_size.x = 90
-			row.add_child(first_card)
-			var first_portrait := PawnPortrait.new()
-			first_portrait.custom_minimum_size = Vector2(54, 65)
-			first_portrait.appearance = _spec_appearance(first)
-			first_card.add_child(first_portrait)
-			first_card.add_child(_label(str(first.get("name", "Colonist")), 12, CREAM))
-			var link_column := _vbox(2)
-			link_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(link_column)
-			var relation_ids := ["none", "friend", "rival", "partner", "parent", "child", "sibling"]
-			var forward := _preparation_relation_label(relation_id, true)
-			var backward := _preparation_relation_label(relation_id, false)
-			if relation_id == "partner":
-				forward = _prep_local("Wife", "Eş", "Żona") if str(first.get("sex", "female")) == "female" else _prep_local("Husband", "Eş", "Mąż")
-				backward = _prep_local("Wife", "Eş", "Żona") if str(second.get("sex", "female")) == "female" else _prep_local("Husband", "Eş", "Mąż")
-			_preparation_relationship_arrow(link_column, forward, true, relation_ids, i, j)
-			_preparation_relationship_arrow(link_column, backward, false, relation_ids, i, j)
-			var second_card := _vbox(2)
-			second_card.custom_minimum_size.x = 90
-			row.add_child(second_card)
-			var second_portrait := PawnPortrait.new()
-			second_portrait.custom_minimum_size = Vector2(54, 65)
-			second_portrait.appearance = _spec_appearance(second)
-			second_card.add_child(second_portrait)
-			second_card.add_child(_label(str(second.get("name", "Colonist")), 12, CREAM))
-	var add_relationship := MenuButton.new()
-	add_relationship.text = ""
-	add_relationship.flat = false
-	add_relationship.tooltip_text = _prep_local("Add relationship", "İlişki ekle", "Dodaj relację")
-	add_relationship.custom_minimum_size = Vector2(92, 94)
-	for add_state in ["normal", "hover", "pressed"]:
-		add_relationship.add_theme_stylebox_override(add_state, _style(Color("#303133") if add_state == "normal" else Color("#3a3c3e"), Color("#555759"), 0))
-	_preparation_plus_placeholder(add_relationship, _prep_local("Add relation", "İlişki ekle", "Dodaj relację"))
-	var pair_options: Array = []
+		parent.add_child(_label(_prep_local("Add another colonist to create a relationship.", "İlişki kurmak için bir kolonist daha ekle.", "Dodaj kolejną postać, aby utworzyć relację."), 13, MUTED))
+		return
+	var scroll := ScrollContainer.new()
+	scroll.name = "PreparationColonyPairScroll"
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parent.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.name = "PreparationColonyPairGrid"
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	scroll.add_child(grid)
 	for first_index in range(colonist_count):
 		for second_index in range(first_index + 1, colonist_count):
-			if _preparation_family_relation(first_index, second_index) != "none":
-				continue
-			var first_name := str(character_specs[first_index].get("name", "Colonist"))
-			var second_name := str(character_specs[second_index].get("name", "Colonist"))
-			add_relationship.get_popup().add_item("%s  ↔  %s" % [first_name, second_name], pair_options.size())
-			pair_options.append([first_index, second_index])
-	add_relationship.disabled = pair_options.is_empty()
-	if add_relationship.disabled:
-		add_relationship.modulate.a = 0.5
-	add_relationship.get_popup().id_pressed.connect(func(choice_index: int):
-		var pair: Array = pair_options[choice_index]
-		_set_starting_relation(int(pair[0]), int(pair[1]), "friend")
+			var tile := _preparation_focused_relation("c:%d" % first_index, "c:%d" % second_index)
+			tile.name = "PreparationColonyPair_%d_%d" % [first_index, second_index]
+			tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			grid.add_child(tile)
+	# A final spacer keeps the last cell at half width when the pair count is odd.
+	if int(colonist_count * (colonist_count - 1) / 2) % 2 == 1:
+		var spacer := Control.new()
+		spacer.custom_minimum_size.x = 1
+		grid.add_child(spacer)
+
+
+func _preparation_other_relationship_editor(parent: VBoxContainer) -> void:
+	_external_source_index = clampi(_external_source_index, 0, world_character_specs.size() - 1)
+	var source_key := "w:%d" % _external_source_index
+	if not _preparation_endpoint_valid(_external_target_key) or _external_target_key == source_key:
+		_external_target_key = "c:0"
+	var selectors := _hbox(8)
+	parent.add_child(selectors)
+	var source_button := MenuButton.new()
+	source_button.flat = false
+	source_button.name = "PreparationWorldSource"
+	source_button.text = "%s  ▾" % _prepared_display_name(world_character_specs[_external_source_index])
+	source_button.custom_minimum_size = Vector2(190, 27)
+	_preparation_equipment_gold_style(source_button)
+	selectors.add_child(source_button)
+	for world_index in world_character_specs.size():
+		source_button.get_popup().add_item(_prepared_display_name(world_character_specs[world_index]), world_index)
+	source_button.get_popup().id_pressed.connect(func(world_index: int):
+		_external_source_index = world_index
+		if _external_target_key == "w:%d" % world_index:
+			_external_target_key = "c:0"
 		_show_characters())
-	pair_grid.add_child(add_relationship)
+	var target_button := MenuButton.new()
+	target_button.flat = false
+	target_button.name = "PreparationWorldTarget"
+	target_button.custom_minimum_size = Vector2(190, 27)
+	var spacer := Control.new()
+	spacer.custom_minimum_size.x = 38
+	selectors.add_child(spacer)
+	_preparation_equipment_gold_style(target_button)
+	selectors.add_child(target_button)
+	var targets: Array[String] = []
+	for colonist_index in range(colonist_count):
+		targets.append("c:%d" % colonist_index)
+	for world_index in world_character_specs.size():
+		if world_index != _external_source_index:
+			targets.append("w:%d" % world_index)
+	if not targets.has(_external_target_key):
+		_external_target_key = targets[0]
+	target_button.text = "%s  ▾" % _preparation_endpoint_name(_external_target_key)
+	for target_index in targets.size():
+		var target_key := targets[target_index]
+		var prefix := _prep_local("Colony", "Koloni", "Kolonia") if target_key.begins_with("c:") else _prep_local("World", "Dünya", "Świat")
+		target_button.get_popup().add_item("%s: %s" % [prefix, _preparation_endpoint_name(target_key)], target_index)
+	target_button.get_popup().id_pressed.connect(func(target_index: int):
+		_external_target_key = targets[target_index]
+		_show_characters())
+	parent.add_child(_preparation_focused_relation(source_key, _external_target_key))
 
 
-func _preparation_relationship_arrow(parent: VBoxContainer, title: String, forward: bool, relation_ids: Array, first_index: int, second_index: int) -> void:
+func _preparation_focused_relation(first_key: String, second_key: String) -> VBoxContainer:
+	var panel := _vbox(0)
+	panel.name = "PreparationFocusedBond_%s_%s" % [first_key.replace(":", "_"), second_key.replace(":", "_")]
+	var tile := PanelContainer.new()
+	tile.custom_minimum_size.y = 112
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tile_style := _style(Color("#292b2d"), Color("#414446"), 0)
+	tile_style.content_margin_left = 6
+	tile_style.content_margin_top = 5
+	tile_style.content_margin_right = 6
+	tile_style.content_margin_bottom = 5
+	tile.add_theme_stylebox_override("panel", tile_style)
+	panel.add_child(tile)
+	var relation_id := _preparation_relation_between(first_key, second_key)
+	var first_role := _preparation_endpoint_relation_label(first_key, relation_id)
+	var second_role := _preparation_endpoint_relation_label(second_key, _preparation_reverse_relation(relation_id))
+	var row := _hbox(5)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	tile.add_child(row)
+	row.add_child(_preparation_other_person_card(_preparation_endpoint_spec(first_key), first_role, first_key.begins_with("w:")))
+	var link_column := _vbox(2)
+	link_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	link_column.custom_minimum_size.x = 166
+	row.add_child(link_column)
+	if relation_id == "none":
+		var picker := MenuButton.new()
+		picker.flat = false
+		picker.name = "PreparationBondPicker_%s_%s" % [first_key.replace(":", "_"), second_key.replace(":", "_")]
+		picker.text = "+"
+		picker.tooltip_text = _prep_local("Set bond", "Bağ belirle", "Ustaw więź")
+		picker.custom_minimum_size = Vector2(34, 34)
+		picker.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		picker.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var color := Color("#303234") if state == "normal" else Color("#424547")
+			picker.add_theme_stylebox_override(state, _style(color, Color("#5d6162"), 0))
+		picker.add_theme_color_override("font_color", CREAM)
+		picker.add_theme_font_size_override("font_size", 20)
+		link_column.add_child(picker)
+		_preparation_relation_menu(picker, first_key, second_key, true)
+	else:
+		_preparation_relationship_arrow(link_column, first_role, true, first_key, second_key)
+		_preparation_relationship_arrow(link_column, second_role, false, first_key, second_key)
+	row.add_child(_preparation_other_person_card(_preparation_endpoint_spec(second_key), second_role, second_key.begins_with("w:")))
+	if relation_id != "none":
+		var first_copy := first_key
+		var second_copy := second_key
+		var remove := Button.new()
+		remove.name = "PreparationBondRemove_%s_%s" % [first_key.replace(":", "_"), second_key.replace(":", "_")]
+		_preparation_style_relation_remove(remove)
+		remove.tooltip_text = _prep_local("Remove this bond", "Bu bağı kaldır", "Usuń tę więź")
+		remove.pressed.connect(func():
+			_set_preparation_relation(first_copy, second_copy, "none")
+			_show_characters())
+		link_column.add_child(remove)
+	return panel
+
+
+func _preparation_relationship_ledger(parent: VBoxContainer, is_world: bool) -> void:
+	parent.add_child(_label(_prep_local("Current relationships", "Mevcut ilişkiler", "Obecne relacje"), 15, CREAM))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	parent.add_child(scroll)
+	var entries := _vbox(3)
+	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(entries)
+	var pairs: Array = []
+	if is_world:
+		for raw_bond in external_relationships:
+			if not raw_bond is Dictionary:
+				continue
+			var bond: Dictionary = raw_bond
+			var first_key := str(bond.get("from", ""))
+			var second_key := str(bond.get("to", ""))
+			if _preparation_endpoint_valid(first_key) and _preparation_endpoint_valid(second_key) and (first_key.begins_with("w:") or second_key.begins_with("w:")):
+				pairs.append({"first": first_key, "second": second_key, "relation": str(bond.get("relation", "none"))})
+	else:
+		for first_index in range(colonist_count):
+			for second_index in range(first_index + 1, colonist_count):
+				var relation_id := _preparation_family_relation(first_index, second_index)
+				if relation_id != "none":
+					pairs.append({"first": "c:%d" % first_index, "second": "c:%d" % second_index, "relation": relation_id})
+	for pair_index in pairs.size():
+		var pair: Dictionary = pairs[pair_index]
+		var first_key := str(pair["first"])
+		var second_key := str(pair["second"])
+		var relation_id := str(pair["relation"])
+		var row := _hbox(3)
+		row.name = ("PreparationWorldBond_" if is_world else "PreparationColonyBond_") + str(pair_index + 1)
+		entries.add_child(row)
+		var select := Button.new()
+		select.flat = false
+		select.text = _preparation_link_action_label(first_key, second_key, relation_id)
+		select.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		select.clip_text = true
+		select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		select.custom_minimum_size.y = 29
+		select.add_theme_font_size_override("font_size", 11)
+		for state in ["normal", "hover", "pressed"]:
+			select.add_theme_stylebox_override(state, _style(Color("#303234") if state == "normal" else Color("#424547"), Color.TRANSPARENT, 0))
+		row.add_child(select)
+		select.pressed.connect(func():
+			if is_world:
+				var world_key := first_key if first_key.begins_with("w:") else second_key
+				_external_source_index = int(world_key.substr(2))
+				_external_target_key = second_key if world_key == first_key else first_key
+			else:
+				_colony_relation_first_index = int(first_key.substr(2))
+				_colony_relation_second_index = int(second_key.substr(2))
+			_show_characters())
+		var remove := Button.new()
+		remove.name = "PreparationBondRemove_%s_%s" % [first_key.replace(":", "_"), second_key.replace(":", "_")]
+		_preparation_style_relation_remove(remove)
+		remove.tooltip_text = _prep_local("Remove relationship", "İlişkiyi kaldır", "Usuń relację")
+		remove.pressed.connect(func():
+			_set_preparation_relation(first_key, second_key, "none")
+			_show_characters())
+		row.add_child(remove)
+	if pairs.is_empty():
+		entries.add_child(_label(_prep_local("No relationships yet.", "Henüz ilişki yok.", "Brak relacji."), 12, MUTED))
+
+
+func _preparation_style_relation_remove(remove: Button) -> void:
+	remove.text = "×"
+	remove.flat = false
+	remove.custom_minimum_size = Vector2(30, 28)
+	remove.size_flags_horizontal = Control.SIZE_SHRINK_END
+	remove.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	remove.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	remove.add_theme_font_size_override("font_size", 22)
+	remove.add_theme_color_override("font_color", CREAM)
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var remove_style := _style(Color("#353839") if state == "normal" else Color("#4b5051"), Color("#697071"), 0)
+		remove_style.set_content_margin_all(0)
+		remove.add_theme_stylebox_override(state, remove_style)
+
+
+func _preparation_other_person_card(spec: Dictionary, role_text: String, is_world: bool) -> Panel:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(110, 100)
+	card.add_theme_stylebox_override("panel", _style(Color("#181a1b") if is_world else Color("#3a3c3e"), Color.TRANSPARENT, 0))
+	var portrait := PawnPortrait.new()
+	portrait.classic_preparation = true
+	portrait.position = Vector2(20, 2)
+	portrait.size = Vector2(70, 64)
+	portrait.appearance = _spec_appearance(spec)
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(portrait)
+	var person_name := _label(_prepared_display_name(spec), 14, CREAM)
+	person_name.position = Vector2(2, 65)
+	person_name.size = Vector2(106, 17)
+	person_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	person_name.clip_text = true
+	card.add_child(person_name)
+	var role := _label(role_text, 14, CREAM)
+	role.position = Vector2(2, 81)
+	role.size = Vector2(106, 18)
+	role.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	role.clip_text = true
+	card.add_child(role)
+	return card
+
+
+func _preparation_relationship_arrow(parent: VBoxContainer, title: String, forward: bool, first_key: String, second_key: String) -> void:
 	var picker := MenuButton.new()
 	picker.name = "PreparationRelationshipPickerForward" if forward else "PreparationRelationshipPickerReverse"
 	picker.text = ""
 	picker.flat = true
 	picker.tooltip_text = _prep_local("Change relationship", "İlişkiyi değiştir", "Zmień relację")
 	picker.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	picker.custom_minimum_size = Vector2(164, 27)
+	picker.custom_minimum_size = Vector2(160, 30)
 	parent.add_child(picker)
 	var arrow := RelationshipArrow.new()
 	arrow.forward = forward
 	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	picker.add_child(arrow)
 	arrow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var caption := _label(title, 11, CREAM)
+	var caption := _label(title, 14, CREAM)
 	arrow.add_child(caption)
 	caption.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_preparation_relation_menu(picker, first_key, second_key, forward)
+
+
+func _preparation_relation_menu(picker: MenuButton, first_key: String, second_key: String, forward: bool) -> void:
+	var relation_ids := ["parent", "child", "grandparent", "grandchild", "partner", "sibling", "friend", "rival"]
+	if _preparation_relation_between(first_key, second_key) != "none":
+		relation_ids.push_front("none")
 	for option_index in relation_ids.size():
-		picker.get_popup().add_item(_preparation_relation_label(str(relation_ids[option_index]), forward), option_index)
+		var relation_id := str(relation_ids[option_index])
+		var first := first_key if forward else second_key
+		var second := second_key if forward else first_key
+		var display := _prep_local("Remove relationship", "İlişkiyi kaldır", "Usuń relację") if relation_id == "none" else _preparation_link_action_label(first, second, relation_id)
+		picker.get_popup().add_item(display, option_index)
+		if not _can_set_preparation_relation(first, second, relation_id):
+			picker.get_popup().set_item_disabled(option_index, true)
 	picker.get_popup().id_pressed.connect(func(choice_index: int):
-		_set_starting_relation(first_index, second_index, str(relation_ids[choice_index]))
-		_show_characters())
+		var first := first_key if forward else second_key
+		var second := second_key if forward else first_key
+		if _set_preparation_relation(first, second, str(relation_ids[choice_index])):
+			_show_characters())
+
+
+func _preparation_picker_relation(relation_id: String, forward: bool, display_swapped: bool) -> String:
+	if forward == display_swapped:
+		if relation_id == "parent": return "child"
+		if relation_id == "child": return "parent"
+		if relation_id == "grandparent": return "grandchild"
+		if relation_id == "grandchild": return "grandparent"
+	return relation_id
 
 
 func _preparation_plus_placeholder(button: MenuButton, caption: String) -> void:
@@ -2384,19 +3561,327 @@ func _preparation_relation_label(relation_id: String, forward: bool) -> String:
 		"partner": return _prep_local("Partner", "Partner", "Partner")
 		"parent": return _prep_local("Parent", "Ebeveyn", "Rodzic") if forward else _prep_local("Child", "Çocuk", "Dziecko")
 		"child": return _prep_local("Child", "Çocuk", "Dziecko") if forward else _prep_local("Parent", "Ebeveyn", "Rodzic")
+		"grandparent": return _prep_local("Grandparent", "Büyük ebeveyn", "Dziadek/babcia") if forward else _prep_local("Grandchild", "Torun", "Wnuk/wnuczka")
+		"grandchild": return _prep_local("Grandchild", "Torun", "Wnuk/wnuczka") if forward else _prep_local("Grandparent", "Büyük ebeveyn", "Dziadek/babcia")
 		"sibling": return _prep_local("Sibling", "Kardeş", "Rodzeństwo")
 		_: return _prep_local("No relation", "İlişki yok", "Brak relacji")
 
 
-func _set_starting_relation(first_index: int, second_index: int, relation_id: String) -> void:
-	var spec: Dictionary = character_specs[first_index].duplicate(true)
-	var relationships: Dictionary = spec.get("starting_relationships", {})
+func _preparation_kinship_label(person_index: int, relation_id: String) -> String:
+	var female := str(character_specs[person_index].get("sex", "female")) == "female"
+	match relation_id:
+		"parent": return _prep_local("Mother", "Anne", "Matka") if female else _prep_local("Father", "Baba", "Ojciec")
+		"child": return _prep_local("Daughter", "Kız", "Córka") if female else _prep_local("Son", "Oğul", "Syn")
+		"grandparent": return _prep_local("Grandmother", "Büyükanne", "Babcia") if female else _prep_local("Grandfather", "Büyükbaba", "Dziadek")
+		"grandchild": return _prep_local("Granddaughter", "Kız torun", "Wnuczka") if female else _prep_local("Grandson", "Erkek torun", "Wnuk")
+		"sibling": return _prep_local("Sister", "Kız kardeş", "Siostra") if female else _prep_local("Brother", "Erkek kardeş", "Brat")
+		_: return _preparation_roster_role(character_specs[person_index])
+
+
+func _preparation_reverse_relation(relation_id: String) -> String:
+	match relation_id:
+		"parent": return "child"
+		"child": return "parent"
+		"grandparent": return "grandchild"
+		"grandchild": return "grandparent"
+		_: return relation_id
+
+
+func _preparation_personal_relation_label(person_index: int, relation_id: String) -> String:
+	if relation_id in ["parent", "child", "grandparent", "grandchild", "sibling"]:
+		return _preparation_kinship_label(person_index, relation_id)
+	if relation_id == "partner":
+		return _prep_local("Wife", "Eş", "Żona") if str(character_specs[person_index].get("sex", "female")) == "female" else _prep_local("Husband", "Koca", "Mąż")
+	return _preparation_relation_label(relation_id, true)
+
+
+func _preparation_endpoint_valid(key: String) -> bool:
+	if key.length() < 3 or key.substr(1, 1) != ":" or not key.substr(2).is_valid_int():
+		return false
+	var index := int(key.substr(2))
+	if key.begins_with("c:"):
+		return index >= 0 and index < colonist_count
+	if key.begins_with("w:"):
+		return index >= 0 and index < world_character_specs.size()
+	return false
+
+
+func _preparation_endpoint_spec(key: String) -> Dictionary:
+	if not _preparation_endpoint_valid(key):
+		return {}
+	return character_specs[int(key.substr(2))] if key.begins_with("c:") else world_character_specs[int(key.substr(2))]
+
+
+func _preparation_endpoint_name(key: String) -> String:
+	return _prepared_display_name(_preparation_endpoint_spec(key))
+
+
+func _preparation_endpoint_relation_label(key: String, relation_id: String) -> String:
 	if relation_id == "none":
-		relationships.erase(str(second_index))
-	else:
-		relationships[str(second_index)] = relation_id
-	spec["starting_relationships"] = relationships
-	character_specs[first_index] = spec
+		return _prep_local("Colonist", "Kolonist", "Kolonista") if key.begins_with("c:") else _prep_local("World", "Dünya", "Świat")
+	var female := str(_preparation_endpoint_spec(key).get("sex", "female")) == "female"
+	match relation_id:
+		"parent": return _prep_local("Mother", "Anne", "Matka") if female else _prep_local("Father", "Baba", "Ojciec")
+		"child": return _prep_local("Daughter", "Kız", "Córka") if female else _prep_local("Son", "Oğul", "Syn")
+		"grandparent": return _prep_local("Grandmother", "Büyükanne", "Babcia") if female else _prep_local("Grandfather", "Büyükbaba", "Dziadek")
+		"grandchild": return _prep_local("Granddaughter", "Kız torun", "Wnuczka") if female else _prep_local("Grandson", "Erkek torun", "Wnuk")
+		"sibling": return _prep_local("Sister", "Kız kardeş", "Siostra") if female else _prep_local("Brother", "Erkek kardeş", "Brat")
+		"partner": return _prep_local("Wife", "Eş", "Żona") if female else _prep_local("Husband", "Koca", "Mąż")
+		_: return _preparation_relation_label(relation_id, true)
+
+
+func _preparation_link_action_label(first_key: String, second_key: String, relation_id: String) -> String:
+	var first_name := _preparation_endpoint_name(first_key)
+	var second_name := _preparation_endpoint_name(second_key)
+	var first_role := _preparation_endpoint_relation_label(first_key, relation_id)
+	var second_role := _preparation_endpoint_relation_label(second_key, _preparation_reverse_relation(relation_id))
+	if relation_id in ["parent", "grandparent"]:
+		return "%s: %s  →  %s: %s" % [first_role, first_name, second_role, second_name]
+	if relation_id in ["child", "grandchild"]:
+		return "%s: %s  →  %s: %s" % [second_role, second_name, first_role, first_name]
+	return "%s: %s  ↔  %s: %s" % [first_role, first_name, second_role, second_name]
+
+
+func _preparation_relation_between(first_key: String, second_key: String) -> String:
+	if not _preparation_endpoint_valid(first_key) or not _preparation_endpoint_valid(second_key) or first_key == second_key:
+		return "none"
+	if first_key.begins_with("c:") and second_key.begins_with("c:"):
+		return _preparation_family_relation(int(first_key.substr(2)), int(second_key.substr(2)))
+	for raw_bond in external_relationships:
+		if not raw_bond is Dictionary:
+			continue
+		var bond: Dictionary = raw_bond
+		if str(bond.get("from", "")) == first_key and str(bond.get("to", "")) == second_key:
+			return str(bond.get("relation", "none"))
+		if str(bond.get("from", "")) == second_key and str(bond.get("to", "")) == first_key:
+			return _preparation_reverse_relation(str(bond.get("relation", "none")))
+	return "none"
+
+
+func _preparation_all_endpoint_keys() -> Array[String]:
+	var keys: Array[String] = []
+	for index in range(colonist_count):
+		keys.append("c:%d" % index)
+	for index in world_character_specs.size():
+		keys.append("w:%d" % index)
+	return keys
+
+
+func _preparation_is_ancestor_key(older_key: String, younger_key: String, ignore_first := "", ignore_second := "") -> bool:
+	var pending: Array[String] = [older_key]
+	var seen: Dictionary = {}
+	while not pending.is_empty():
+		var current: String = pending.pop_back()
+		if seen.has(current):
+			continue
+		seen[current] = true
+		for next_key in _preparation_all_endpoint_keys():
+			if next_key == current or (current == ignore_first and next_key == ignore_second) or (current == ignore_second and next_key == ignore_first):
+				continue
+			if _preparation_relation_between(current, next_key) in ["parent", "grandparent"]:
+				if next_key == younger_key:
+					return true
+				pending.append(next_key)
+	return false
+
+
+func _can_set_preparation_relation(first_key: String, second_key: String, relation_id: String) -> bool:
+	if not _preparation_endpoint_valid(first_key) or not _preparation_endpoint_valid(second_key) or first_key == second_key:
+		return false
+	if first_key.begins_with("c:") and second_key.begins_with("c:"):
+		return _can_set_starting_relation(int(first_key.substr(2)), int(second_key.substr(2)), relation_id)
+	if relation_id == "none":
+		return true
+	if relation_id not in ["friend", "rival", "partner", "parent", "child", "sibling", "grandparent", "grandchild"]:
+		return false
+	if relation_id in ["partner", "sibling"]:
+		if _preparation_is_ancestor_key(first_key, second_key, first_key, second_key) or _preparation_is_ancestor_key(second_key, first_key, first_key, second_key):
+			return false
+	if relation_id == "partner":
+		for key in [first_key, second_key]:
+			for other_key in _preparation_all_endpoint_keys():
+				if other_key != first_key and other_key != second_key and _preparation_relation_between(key, other_key) == "partner":
+					return false
+	if relation_id not in ["parent", "child", "grandparent", "grandchild"]:
+		return true
+	var older_key := first_key if relation_id in ["parent", "grandparent"] else second_key
+	var younger_key := second_key if relation_id in ["parent", "grandparent"] else first_key
+	if _preparation_is_ancestor_key(younger_key, older_key, first_key, second_key):
+		return false
+	var wanted := "parent" if relation_id in ["parent", "child"] else "grandparent"
+	var count := 0
+	var same_sex := 0
+	for other_key in _preparation_all_endpoint_keys():
+		if other_key == older_key:
+			continue
+		if _preparation_relation_between(other_key, younger_key) == wanted:
+			count += 1
+			if str(_preparation_endpoint_spec(other_key).get("sex", "female")) == str(_preparation_endpoint_spec(older_key).get("sex", "female")):
+				same_sex += 1
+	if count >= (2 if wanted == "parent" else 4) or same_sex >= (1 if wanted == "parent" else 2):
+		return false
+	return true
+
+
+func _set_preparation_relation(first_key: String, second_key: String, relation_id: String) -> bool:
+	if not _can_set_preparation_relation(first_key, second_key, relation_id):
+		return false
+	if first_key.begins_with("c:") and second_key.begins_with("c:"):
+		return _set_starting_relation(int(first_key.substr(2)), int(second_key.substr(2)), relation_id)
+	return _set_external_relation(first_key, second_key, relation_id)
+
+
+func _set_external_relation(first_key: String, second_key: String, relation_id: String) -> bool:
+	if not _can_set_preparation_relation(first_key, second_key, relation_id):
+		return false
+	if relation_id in ["parent", "child", "grandparent", "grandchild"]:
+		var older_key := first_key if relation_id in ["parent", "grandparent"] else second_key
+		var younger_key := second_key if relation_id in ["parent", "grandparent"] else first_key
+		var older_spec := _preparation_endpoint_spec(older_key).duplicate(true)
+		var younger_spec := _preparation_endpoint_spec(younger_key)
+		var gap := 32 if relation_id in ["grandparent", "grandchild"] else 16
+		older_spec["chronological_age"] = maxi(int(older_spec.get("chronological_age", older_spec.get("age", 25))), int(younger_spec.get("chronological_age", younger_spec.get("age", 25))) + gap)
+		if older_key.begins_with("c:"):
+			character_specs[int(older_key.substr(2))] = older_spec
+		else:
+			world_character_specs[int(older_key.substr(2))] = older_spec
+	for bond_index in range(external_relationships.size() - 1, -1, -1):
+		var bond: Dictionary = external_relationships[bond_index]
+		if (str(bond.get("from", "")) == first_key and str(bond.get("to", "")) == second_key) or (str(bond.get("from", "")) == second_key and str(bond.get("to", "")) == first_key):
+			external_relationships.remove_at(bond_index)
+	if relation_id != "none":
+		external_relationships.append({"from": first_key, "to": second_key, "relation": relation_id})
+	return true
+
+
+func _preparation_pair_action_label(first_index: int, second_index: int, relation_id: String) -> String:
+	var first_name := _prepared_display_name(character_specs[first_index])
+	var second_name := _prepared_display_name(character_specs[second_index])
+	match relation_id:
+		"parent": return _prep_local("Parent: %s → Child: %s", "Ebeveyn: %s → Çocuk: %s", "Rodzic: %s → Dziecko: %s") % [first_name, second_name]
+		"child": return _prep_local("Parent: %s → Child: %s", "Ebeveyn: %s → Çocuk: %s", "Rodzic: %s → Dziecko: %s") % [second_name, first_name]
+		"grandparent": return _prep_local("Grandparent: %s → Grandchild: %s", "Büyük ebeveyn: %s → Torun: %s", "Dziadek/babcia: %s → Wnuk/wnuczka: %s") % [first_name, second_name]
+		"grandchild": return _prep_local("Grandparent: %s → Grandchild: %s", "Büyük ebeveyn: %s → Torun: %s", "Dziadek/babcia: %s → Wnuk/wnuczka: %s") % [second_name, first_name]
+		"partner": return _prep_local("Spouses: %s ↔ %s", "Eşler: %s ↔ %s", "Małżonkowie: %s ↔ %s") % [first_name, second_name]
+		"sibling": return _prep_local("Siblings: %s ↔ %s", "Kardeşler: %s ↔ %s", "Rodzeństwo: %s ↔ %s") % [first_name, second_name]
+		"friend": return _prep_local("Friends: %s ↔ %s", "Arkadaşlar: %s ↔ %s", "Przyjaciele: %s ↔ %s") % [first_name, second_name]
+		"rival": return _prep_local("Rivals: %s ↔ %s", "Rakipler: %s ↔ %s", "Rywale: %s ↔ %s") % [first_name, second_name]
+		_: return ""
+
+
+func _can_set_starting_relation(first_index: int, second_index: int, relation_id: String) -> bool:
+	if first_index < 0 or second_index < 0 or first_index >= colonist_count or second_index >= colonist_count or first_index == second_index:
+		return false
+	if relation_id == "none":
+		return true
+	if relation_id not in ["friend", "rival", "partner", "parent", "child", "sibling", "grandparent", "grandchild"]:
+		return false
+	if relation_id in ["partner", "sibling"]:
+		if _preparation_is_ancestor_key("c:%d" % first_index, "c:%d" % second_index, "c:%d" % first_index, "c:%d" % second_index) or _preparation_is_ancestor_key("c:%d" % second_index, "c:%d" % first_index, "c:%d" % second_index, "c:%d" % first_index):
+			return false
+	if relation_id == "partner":
+		for person_index in [first_index, second_index]:
+			for other_index in range(colonist_count):
+				if other_index != first_index and other_index != second_index and _preparation_family_relation(person_index, other_index) == "partner":
+					return false
+			for world_index in world_character_specs.size():
+				if _preparation_relation_between("c:%d" % person_index, "w:%d" % world_index) == "partner":
+					return false
+	if relation_id not in ["parent", "child", "grandparent", "grandchild"]:
+		return true
+	var older_index := first_index if relation_id in ["parent", "grandparent"] else second_index
+	var younger_index := second_index if relation_id in ["parent", "grandparent"] else first_index
+	if _preparation_is_ancestor_key("c:%d" % younger_index, "c:%d" % older_index, "c:%d" % first_index, "c:%d" % second_index):
+		return false
+	var parent_count := 0
+	var same_sex_count := 0
+	for other_index in range(colonist_count):
+		if other_index == older_index:
+			continue
+		var related_as := _preparation_family_relation(other_index, younger_index)
+		if related_as == ("parent" if relation_id in ["parent", "child"] else "grandparent"):
+			parent_count += 1
+			if str(character_specs[other_index].get("sex", "female")) == str(character_specs[older_index].get("sex", "female")):
+				same_sex_count += 1
+	for world_index in world_character_specs.size():
+		if _preparation_relation_between("w:%d" % world_index, "c:%d" % younger_index) == ("parent" if relation_id in ["parent", "child"] else "grandparent"):
+			parent_count += 1
+			if str(world_character_specs[world_index].get("sex", "female")) == str(character_specs[older_index].get("sex", "female")):
+				same_sex_count += 1
+	if parent_count >= (2 if relation_id in ["parent", "child"] else 4):
+		return false
+	if same_sex_count >= (1 if relation_id in ["parent", "child"] else 2):
+		return false
+	return true
+
+
+func _preparation_is_ancestor(older_index: int, younger_index: int) -> bool:
+	var descendants: Array = [older_index]
+	var seen: Dictionary = {}
+	while not descendants.is_empty():
+		var next_index := int(descendants.pop_back())
+		if seen.has(next_index):
+			continue
+		seen[next_index] = true
+		for other_index in range(colonist_count):
+			if _preparation_family_relation(next_index, other_index) in ["parent", "grandparent"]:
+				if other_index == younger_index:
+					return true
+				descendants.append(other_index)
+	return false
+
+
+func _set_starting_relation(first_index: int, second_index: int, relation_id: String) -> bool:
+	if not _can_set_starting_relation(first_index, second_index, relation_id):
+		return false
+	if relation_id in ["parent", "child", "grandparent", "grandchild"]:
+		var parent_index := first_index if relation_id in ["parent", "grandparent"] else second_index
+		var child_index := second_index if relation_id in ["parent", "grandparent"] else first_index
+		var parent_spec: Dictionary = character_specs[parent_index].duplicate(true)
+		var child_spec: Dictionary = character_specs[child_index]
+		var minimum_parent_age := int(child_spec.get("chronological_age", child_spec.get("age", 25))) + (32 if relation_id in ["grandparent", "grandchild"] else 16)
+		parent_spec["chronological_age"] = maxi(int(parent_spec.get("chronological_age", parent_spec.get("age", 25))), minimum_parent_age)
+		character_specs[parent_index] = parent_spec
+	var lower := mini(first_index, second_index)
+	var higher := maxi(first_index, second_index)
+	var normalized_relation := relation_id
+	if first_index > second_index:
+		if relation_id == "parent": normalized_relation = "child"
+		elif relation_id == "child": normalized_relation = "parent"
+		elif relation_id == "grandparent": normalized_relation = "grandchild"
+		elif relation_id == "grandchild": normalized_relation = "grandparent"
+	for pair_index in [lower, higher]:
+		var spec: Dictionary = character_specs[pair_index].duplicate(true)
+		var relationships: Dictionary = spec.get("starting_relationships", {}).duplicate(true)
+		relationships.erase(str(higher if pair_index == lower else lower))
+		if pair_index == lower and normalized_relation != "none":
+			relationships[str(higher)] = normalized_relation
+		spec["starting_relationships"] = relationships
+		character_specs[pair_index] = spec
+	_normalize_preparation_relation_ages()
+	return true
+
+
+func _normalize_preparation_relation_ages() -> void:
+	# Editing a direct link can raise a child's age. Propagate that change up
+	# every existing ancestor chain so the entire crew remains a valid setup.
+	for pass_index in range(colonist_count):
+		var changed := false
+		for older_index in range(colonist_count):
+			for younger_index in range(colonist_count):
+				var relation := _preparation_family_relation(older_index, younger_index)
+				if relation not in ["parent", "grandparent"]:
+					continue
+				var younger: Dictionary = character_specs[younger_index]
+				var older: Dictionary = character_specs[older_index]
+				var minimum_age := int(younger.get("chronological_age", younger.get("age", 25))) + (32 if relation == "grandparent" else 16)
+				if int(older.get("chronological_age", older.get("age", 25))) < minimum_age:
+					var updated: Dictionary = older.duplicate(true)
+					updated["chronological_age"] = minimum_age
+					character_specs[older_index] = updated
+					changed = true
+		if not changed:
+			break
 
 
 func _preparation_family_relation(first_index: int, second_index: int) -> String:
@@ -2406,88 +3891,143 @@ func _preparation_family_relation(first_index: int, second_index: int) -> String
 	var higher := maxi(first_index, second_index)
 	var known: Dictionary = character_specs[lower].get("starting_relationships", {})
 	var relation := str(known.get(str(higher), "none"))
+	if relation == "none":
+		var reverse_known: Dictionary = character_specs[higher].get("starting_relationships", {})
+		relation = str(reverse_known.get(str(lower), "none"))
+		if relation == "parent": relation = "child"
+		elif relation == "child": relation = "parent"
+		elif relation == "grandparent": relation = "grandchild"
+		elif relation == "grandchild": relation = "grandparent"
 	if first_index > second_index:
 		if relation == "parent":
 			return "child"
 		if relation == "child":
 			return "parent"
+		if relation == "grandparent":
+			return "grandchild"
+		if relation == "grandchild":
+			return "grandparent"
 	return relation
 
 
-func _preparation_family_components() -> Array:
-	var components: Array = []
-	var seen: Dictionary = {}
-	for person_index in range(colonist_count):
-		if seen.has(person_index):
-			continue
-		var members: Array = [person_index]
-		seen[person_index] = true
-		var cursor := 0
-		while cursor < members.size():
-			var current := int(members[cursor])
-			cursor += 1
-			for other_index in range(colonist_count):
-				if seen.has(other_index):
-					continue
-				if _preparation_family_relation(current, other_index) in ["parent", "child", "sibling"]:
-					seen[other_index] = true
-					members.append(other_index)
-		components.append(members)
-	return components
-
-
-func _preparation_family_person_card(graph: FamilyGraph, position: Vector2, person_index: int) -> void:
+func _preparation_family_person_card(graph: FamilyGraph, position: Vector2, person_index: int, kinship := "") -> void:
 	var spec: Dictionary = character_specs[person_index]
 	var card := PanelContainer.new()
+	card.name = "PreparationRelationshipPerson_%d" % person_index
 	card.position = position
-	card.custom_minimum_size = Vector2(110, 94)
-	card.size = Vector2(110, 94)
-	var style := _style(Color("#343537"), Color("#57595a"), 1)
-	style.set_content_margin_all(3)
+	card.custom_minimum_size = Vector2(76, 76)
+	card.size = Vector2(76, 76)
+	var style := _style(Color("#393b3d") if position.y < 90.0 or kinship.is_empty() else Color("#171819"), Color.TRANSPARENT, 0)
+	style.set_content_margin_all(0)
 	card.add_theme_stylebox_override("panel", style)
 	graph.add_child(card)
-	var content := _vbox(0)
-	card.add_child(content)
+	# PanelContainer positions its direct children. This canvas keeps the remove
+	# control on the portrait instead of stretching it across the graph.
+	var canvas := Control.new()
+	canvas.custom_minimum_size = Vector2(76, 76)
+	card.add_child(canvas)
 	var portrait := PawnPortrait.new()
-	portrait.custom_minimum_size = Vector2(45, 50)
+	portrait.classic_preparation = true
+	portrait.position = Vector2(3, 0)
+	portrait.size = Vector2(70, 47)
 	portrait.appearance = _spec_appearance(spec)
-	content.add_child(portrait)
-	var name_label := _label(str(spec.get("name", "Colonist")), 12, CREAM)
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(portrait)
+	var name_label := _label(_prepared_display_name(spec), 11, CREAM)
+	name_label.position = Vector2(2, 47)
+	name_label.size = Vector2(72, 15)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(name_label)
-	var role := _display_background(str(spec.get("adulthood", "farmer")))
-	var role_label := _label(role, 10, MUTED)
+	name_label.clip_text = true
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(name_label)
+	var role := _preparation_kinship_label(person_index, kinship) if not kinship.is_empty() else _prep_local("Colonist", "Kolonist", "Kolonista")
+	var role_label := _label(role, 9, MUTED)
+	role_label.position = Vector2(2, 61)
+	role_label.size = Vector2(72, 13)
 	role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(role_label)
+	role_label.clip_text = true
+	role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(role_label)
+	var remove_actions: Array = []
+	for other_index in range(colonist_count):
+		if other_index == person_index:
+			continue
+		var relation_id := _preparation_family_relation(person_index, other_index)
+		if relation_id == "none":
+			continue
+		remove_actions.append(other_index)
+	if not remove_actions.is_empty():
+		var remove_menu := MenuButton.new()
+		remove_menu.name = "PreparationRelationshipRemove_%d" % person_index
+		remove_menu.text = "×"
+		remove_menu.flat = true
+		remove_menu.position = Vector2(58, 1)
+		remove_menu.size = Vector2(17, 18)
+		remove_menu.tooltip_text = _prep_local("Remove a relationship", "İlişkiyi kaldır", "Usuń relację")
+		remove_menu.add_theme_font_size_override("font_size", 16)
+		remove_menu.add_theme_color_override("font_color", Color("#dedbd4"))
+		for state in ["normal", "hover", "pressed", "focus"]:
+			remove_menu.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		canvas.add_child(remove_menu)
+		for action_index in remove_actions.size():
+			var other_index := int(remove_actions[action_index])
+			var other_name := _prepared_display_name(character_specs[other_index])
+			var relation_id := _preparation_family_relation(person_index, other_index)
+			remove_menu.get_popup().add_item(_prep_local("Remove %s: %s", "%s ilişkisini kaldır: %s", "Usuń %s: %s") % [_preparation_personal_relation_label(person_index, relation_id), other_name], action_index)
+		remove_menu.get_popup().id_pressed.connect(func(choice_index: int):
+			if _set_starting_relation(person_index, int(remove_actions[choice_index]), "none"):
+				_show_characters())
 
 
 func _preparation_family_add_slot(graph: FamilyGraph, position: Vector2, anchor_index: int, slot_role: String) -> void:
 	var add := MenuButton.new()
 	add.position = position
-	add.custom_minimum_size = Vector2(110, 94)
-	add.size = Vector2(110, 94)
+	add.custom_minimum_size = Vector2(90, 92)
+	add.size = Vector2(90, 92)
 	add.flat = false
 	add.text = ""
 	add.tooltip_text = _prep_local("Add parent", "Ebeveyn ekle", "Dodaj rodzica") if slot_role == "parent" else _prep_local("Add bond", "Bağ ekle", "Dodaj więź")
 	add.add_theme_font_size_override("font_size", 12)
 	add.add_theme_color_override("font_color", MUTED)
 	for state in ["normal", "hover", "pressed"]:
-		var style := _style(Color("#2c2d2f") if state == "normal" else Color("#383a3b"), Color("#555759"), 1)
-		style.set_content_margin_all(3)
+		var style := _style(Color("#303234") if position.y < 100.0 else Color("#202123") if state == "normal" else Color("#3b3d3f"), Color.TRANSPARENT, 0)
+		style.set_content_margin_all(2)
 		add.add_theme_stylebox_override(state, style)
 	graph.add_child(add)
-	_preparation_plus_placeholder(add, _prep_local("Add parent", "Ebeveyn ekle", "Dodaj rodzica") if slot_role == "parent" else _prep_local("Add bond", "Bağ ekle", "Dodaj więź"))
+	var add_icon_bg := Panel.new()
+	add_icon_bg.position = Vector2(77, 6)
+	add_icon_bg.size = Vector2(11, 11)
+	add_icon_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon_style := _style(Color("#b8bab9"), Color.TRANSPARENT, 0)
+	icon_style.set_content_margin_all(0)
+	add_icon_bg.add_theme_stylebox_override("panel", icon_style)
+	add.add_child(add_icon_bg)
+	var add_icon := _label("+", 12, Color("#26282a"))
+	add_icon.position = Vector2(0, -4)
+	add_icon.size = Vector2(11, 15)
+	add_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_icon_bg.add_child(add_icon)
 	var actions: Array = []
 	var popup := add.get_popup()
+	var anchor_name := _prepared_display_name(character_specs[anchor_index])
 	for other_index in range(colonist_count):
 		if other_index == anchor_index or _preparation_family_relation(anchor_index, other_index) in ["parent", "child", "sibling"]:
 			continue
-		var other_name := str(character_specs[other_index].get("name", "Colonist"))
-		var roles := ["parent"] if slot_role == "parent" else ["child", "sibling"]
+		var other_name := _prepared_display_name(character_specs[other_index])
+		var roles := ["parent"] if slot_role == "parent" else ["child", "sibling"] if slot_role == "child" else ["child", "parent", "sibling"]
 		for role in roles:
 			var relation_from_anchor := "child" if role == "parent" else "parent" if role == "child" else "sibling"
-			var relation_label := _prep_local("parent", "ebeveyn", "rodzic") if role == "parent" else _prep_local("child", "çocuk", "dziecko") if role == "child" else _prep_local("sibling", "kardeş", "rodzeństwo")
-			popup.add_item(_prep_local("%s as %s", "%s: %s", "%s jako %s") % [other_name, relation_label], actions.size())
+			if not _can_set_starting_relation(anchor_index, other_index, relation_from_anchor):
+				continue
+			var relation_label := ""
+			if role == "sibling":
+				relation_label = _prep_local("Siblings: %s  ↔  %s", "Kardeşler: %s  ↔  %s", "Rodzeństwo: %s  ↔  %s") % [anchor_name, other_name]
+			else:
+				var parent_name := other_name if role == "parent" else anchor_name
+				var child_name := anchor_name if role == "parent" else other_name
+				relation_label = _prep_local("Parent: %s  →  Child: %s", "Ebeveyn: %s  →  Çocuk: %s", "Rodzic: %s  →  Dziecko: %s") % [parent_name, child_name]
+			popup.add_item(relation_label, actions.size())
 			actions.append({"other": other_index, "relation": relation_from_anchor})
 	if actions.is_empty():
 		popup.add_item(_prep_local("No available colonist", "Uygun kolonist yok", "Brak dostępnej postaci"))
@@ -2497,206 +4037,462 @@ func _preparation_family_add_slot(graph: FamilyGraph, position: Vector2, anchor_
 			var action: Dictionary = actions[id]
 			var other := int(action["other"])
 			var relation := str(action["relation"])
-			var lower := mini(anchor_index, other)
-			var higher := maxi(anchor_index, other)
-			if anchor_index > other:
-				if relation == "parent": relation = "child"
-				elif relation == "child": relation = "parent"
-			_set_starting_relation(lower, higher, relation)
+			_set_starting_relation(anchor_index, other, relation)
 			_show_characters())
 
 
 func _build_preparation_family_graph(graph: FamilyGraph) -> void:
-	var components := _preparation_family_components()
-	for component_index in range(components.size()):
-		var members: Array = components[component_index]
-		var cluster_x := float(component_index * 420)
-		graph.clusters.append(Rect2(cluster_x, 0, 410, 245))
+	graph.clusters.clear()
+	graph.edges.clear()
+	graph.families.clear()
+	var layers: Array[int] = []
+	for person_index in range(colonist_count):
+		layers.append(0)
+	# The same colonist must occupy exactly one card, even when they have more
+	# than one parent, child, or grandchild connection.
+	for pass_index in range(colonist_count):
+		var changed := false
+		for older_index in range(colonist_count):
+			for younger_index in range(colonist_count):
+				var relation := _preparation_family_relation(older_index, younger_index)
+				var depth := 2 if relation == "grandparent" else 1 if relation == "parent" else 0
+				if depth > 0 and layers[younger_index] < layers[older_index] + depth:
+					layers[younger_index] = layers[older_index] + depth
+					changed = true
+		if not changed:
+			break
+	var max_layer := 0
+	for layer in layers:
+		max_layer = maxi(max_layer, layer)
+	var rows: Array = []
+	for layer in range(max_layer + 1):
+		rows.append([])
+	for person_index in range(colonist_count):
+		(rows[layers[person_index]] as Array).append(person_index)
+	var widest := 1
+	for row in rows:
+		widest = maxi(widest, (row as Array).size())
+	var positions: Dictionary = {}
+	var graph_height := maxf(172.0, float(max_layer * 94 + 84))
+	graph.custom_minimum_size = Vector2(maxf(0.0, float(widest * 86 + 12)), graph_height)
+	graph.clusters.append(Rect2(0, 0, graph.custom_minimum_size.x, graph_height))
+	for layer in rows.size():
+		var people: Array = rows[layer]
+		for slot in people.size():
+			var person_index := int(people[slot])
+			var position := Vector2(8.0 + float(widest - people.size()) * 43.0 + float(slot) * 86.0, (float(layer) * 94.0 + 8.0) if max_layer > 0 else 48.0)
+			positions[person_index] = position
+			var role := ""
+			for other_index in range(colonist_count):
+				if _preparation_family_relation(person_index, other_index) == "parent":
+					role = "parent"
+					break
+				if _preparation_family_relation(person_index, other_index) == "grandparent":
+					role = "grandparent"
+				elif _preparation_family_relation(person_index, other_index) == "child" and role.is_empty():
+					role = "child"
+			_preparation_family_person_card(graph, position, person_index, role)
+	var children_by_parents: Dictionary = {}
+	for child_index in range(colonist_count):
 		var parents: Array = []
-		for member in members:
-			for other in members:
-				if _preparation_family_relation(int(member), int(other)) == "parent" and not parents.has(member):
-					parents.append(member)
-		var top: Array = []
-		var bottom: Array = []
-		if parents.is_empty() and members.size() == 1:
-			top.append(members[0])
-		elif parents.is_empty():
-			bottom = members.duplicate()
-		else:
-			for member in parents:
-				if top.size() < 2:
-					top.append(member)
-			for member in members:
-				if not top.has(member):
-					bottom.append(member)
-			if bottom.is_empty():
-				bottom.append(top.pop_back())
-		var positions: Dictionary = {}
-		for slot in range(mini(2, top.size())):
-			var person_index := int(top[slot])
-			var position := Vector2(cluster_x + 62.0 + 140.0 * slot, 12)
-			positions[person_index] = position
-			_preparation_family_person_card(graph, position, person_index)
-		for slot in range(mini(2, bottom.size())):
-			var person_index := int(bottom[slot])
-			var position := Vector2(cluster_x + 62.0 + 140.0 * slot, 142)
-			positions[person_index] = position
-			_preparation_family_person_card(graph, position, person_index)
-		for first in members:
-			for second in members:
-				if int(first) >= int(second):
-					continue
-				var relation := _preparation_family_relation(int(first), int(second))
-				if relation not in ["parent", "child", "sibling"] or not positions.has(first) or not positions.has(second):
-					continue
-				if relation == "sibling":
-					var a: Vector2 = positions[first]
-					var b: Vector2 = positions[second]
-					if a.x > b.x:
-						var swap := a
-						a = b
-						b = swap
-					graph.edges.append({"start": a + Vector2(110, 47), "finish": b + Vector2(0, 47), "active": true, "kind": "sibling"})
-				else:
-					var parent_index := int(first) if relation == "parent" else int(second)
-					var child_index := int(second) if relation == "parent" else int(first)
-					graph.edges.append({"start": (positions[parent_index] as Vector2) + Vector2(55, 94), "finish": (positions[child_index] as Vector2) + Vector2(55, 0), "active": true})
-		for slot in range(top.size(), 2):
-			var position := Vector2(cluster_x + 62.0 + 140.0 * slot, 12)
-			var anchor := int(bottom[0]) if not bottom.is_empty() else int(members[0])
-			_preparation_family_add_slot(graph, position, anchor, "parent")
-			if not bottom.is_empty():
-				graph.edges.append({"start": position + Vector2(55, 94), "finish": (positions[bottom[0]] as Vector2) + Vector2(55, 0), "active": false})
-		for slot in range(bottom.size(), 2):
-			var position := Vector2(cluster_x + 62.0 + 140.0 * slot, 142)
-			var anchor := int(top[0]) if not top.is_empty() else int(members[0])
-			_preparation_family_add_slot(graph, position, anchor, "child")
-			if not top.is_empty():
-				graph.edges.append({"start": (positions[top[0]] as Vector2) + Vector2(55, 94), "finish": position + Vector2(55, 0), "active": false})
+		for parent_index in range(colonist_count):
+			if _preparation_family_relation(parent_index, child_index) == "parent":
+				parents.append(parent_index)
+		if parents.is_empty():
+			continue
+		parents.sort()
+		var key := str(parents)
+		if not children_by_parents.has(key):
+			children_by_parents[key] = {"parents": parents, "children": []}
+		(children_by_parents[key]["children"] as Array).append(child_index)
+	for group in children_by_parents.values():
+		var parent_centers: Array = []
+		var child_centers: Array = []
+		for person_index in group["parents"]:
+			parent_centers.append((positions[person_index] as Vector2) + Vector2(38, 76))
+		for person_index in group["children"]:
+			child_centers.append((positions[person_index] as Vector2) + Vector2(38, 0))
+		graph.families.append({"parents": parent_centers, "children": child_centers})
+	for first_index in range(colonist_count):
+		for second_index in range(first_index + 1, colonist_count):
+			var relation := _preparation_family_relation(first_index, second_index)
+			if relation in ["grandparent", "grandchild"]:
+				var older_index := first_index if relation == "grandparent" else second_index
+				var younger_index := second_index if relation == "grandparent" else first_index
+				graph.edges.append({"start": (positions[older_index] as Vector2) + Vector2(38, 76), "finish": (positions[younger_index] as Vector2) + Vector2(38, 0), "active": true, "kind": "grandparent"})
+			elif relation == "sibling" and layers[first_index] == layers[second_index]:
+				graph.edges.append({"start": (positions[first_index] as Vector2) + Vector2(76, 38), "finish": (positions[second_index] as Vector2) + Vector2(0, 38), "active": true, "kind": "sibling"})
 	graph.queue_redraw()
 
 
 func _build_preparation_equipment(body: HBoxContainer) -> void:
-	var gear_columns: BoxContainer = _hbox(5)
+	var gear_columns := _hbox(12)
 	gear_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gear_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(gear_columns)
 	if starting_cargo.is_empty():
 		starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
-	var available_panel := _preparation_panel(Vector2(500, 0))
+	var available_panel := _preparation_equipment_panel()
 	available_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	available_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	gear_columns.add_child(available_panel)
-	var available := _vbox(4)
+	var available := _vbox(0)
 	available_panel.add_child(available)
-	var filters := _hbox(6)
+	var filters := _hbox(10)
 	available.add_child(filters)
-	var category := OptionButton.new()
-	for category_label in [
+	var category_labels := [
 		_prep_local("All categories", "Tüm kategoriler", "Wszystkie kategorie"),
 		_prep_local("Resources", "Kaynaklar", "Surowce"),
 		_prep_local("Apparel", "Giysiler", "Odzież"),
 		_prep_local("Weapons", "Silahlar", "Broń")
-	]: category.add_item(category_label)
-	category.custom_minimum_size = Vector2(190, 29)
-	category.select(_equipment_category_filter)
+	]
+	var category := MenuButton.new()
+	category.flat = false
+	category.name = "PreparationCategoryFilter"
+	category.text = "%s  ▾" % category_labels[clampi(_equipment_category_filter, 0, category_labels.size() - 1)]
+	category.custom_minimum_size = Vector2(140, 28)
+	_preparation_equipment_gold_style(category)
+	for index in category_labels.size():
+		category.get_popup().add_item(str(category_labels[index]), index)
 	filters.add_child(category)
-	var material := OptionButton.new()
-	for material_label in [
+	var material_labels := [
 		_prep_local("All materials", "Tüm malzemeler", "Wszystkie materiały"),
 		_prep_local("Wood", "Ahşap", "Drewno"),
 		_prep_local("Stone", "Taş", "Kamień"),
 		_prep_local("Cloth", "Kumaş", "Tkanina"),
 		_prep_local("Metal", "Metal", "Metal"),
 		_prep_local("Organic", "Organik", "Organiczne")
-	]: material.add_item(material_label)
-	material.custom_minimum_size = Vector2(190, 29)
-	material.select(_equipment_material_filter)
+	]
+	var material := MenuButton.new()
+	material.flat = false
+	material.name = "PreparationMaterialFilter"
+	material.text = "%s  ▾" % material_labels[clampi(_equipment_material_filter, 0, material_labels.size() - 1)]
+	material.custom_minimum_size = Vector2(160, 28)
+	_preparation_equipment_gold_style(material)
+	for index in material_labels.size():
+		material.get_popup().add_item(str(material_labels[index]), index)
 	filters.add_child(material)
-	available.add_child(HSeparator.new())
-	var catalog_header := _hbox(5)
+	available.add_child(_preparation_equipment_gap(13))
+	var catalog_header := PanelContainer.new()
+	catalog_header.custom_minimum_size.y = 19
+	var header_style := _style(Color("#1f2022"), Color.TRANSPARENT, 0)
+	header_style.content_margin_left = 63
+	header_style.content_margin_right = 12
+	header_style.content_margin_top = 0
+	header_style.content_margin_bottom = 0
+	catalog_header.add_theme_stylebox_override("panel", header_style)
 	available.add_child(catalog_header)
-	var item_header := _label(_prep_local("Name", "Ad", "Nazwa"), 12, MUTED)
+	var header_contents := _hbox(0)
+	catalog_header.add_child(header_contents)
+	var item_header := _label(_prep_local("Name⌄", "Ad⌄", "Nazwa⌄"), 11, Color("#b5b5b5"))
 	item_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	catalog_header.add_child(item_header)
-	catalog_header.add_child(_label(_prep_local("Cost", "Maliyet", "Koszt"), 12, MUTED))
-	var catalog_rows := _vbox(2)
-	available.add_child(catalog_rows)
-	for item_id in ["wood", "stone", "food", "medicine", "silver", "spear", "tshirt", "pants", "jacket", "cap", "brim_hat"]:
+	header_contents.add_child(item_header)
+	var cost_header := _label(_prep_local("Cost", "Maliyet", "Koszt"), 11, Color("#b5b5b5"))
+	cost_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cost_header.custom_minimum_size.x = 43
+	header_contents.add_child(cost_header)
+	var catalog_back := _preparation_equipment_list_back()
+	catalog_back.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	available.add_child(catalog_back)
+	var catalog_scroll := _preparation_equipment_scroll()
+	catalog_back.add_child(catalog_scroll)
+	var catalog_rows := _vbox(0)
+	catalog_rows.custom_minimum_size.x = 446
+	catalog_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	catalog_scroll.add_child(catalog_rows)
+	# Only offer items that the current simulation can actually use as cargo.
+	var catalog_ids: Array = GameModel.PREPARATION_CARGO_IDS
+	var visible_catalog: Array[String] = []
+	for item_id in catalog_ids:
+		if _equipment_item_visible(item_id, _equipment_category_filter, _equipment_material_filter):
+			visible_catalog.append(item_id)
+	if not visible_catalog.is_empty() and _selected_equipment_catalog_id not in visible_catalog:
+		_selected_equipment_catalog_id = visible_catalog[0]
+	for item_id in visible_catalog:
 		var chosen_id: String = item_id
-		var available_row := _hbox(5)
-		catalog_rows.add_child(available_row)
-		available_row.visible = _equipment_item_visible(chosen_id, _equipment_category_filter, _equipment_material_filter)
-		if chosen_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"]:
-			var icon := ApparelIconScript.new()
-			icon.item_id = chosen_id
-			icon.tint = Color("#78928b" if chosen_id == "tshirt" else "#5f6768" if chosen_id == "pants" else "#735f50")
-			available_row.add_child(icon)
-		var button := _preparation_tab_button(_cargo_label(chosen_id), func():
-			_selected_equipment_catalog_id = chosen_id
-			_show_characters(), chosen_id == _selected_equipment_catalog_id)
-		button.custom_minimum_size.y = 30
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		available_row.add_child(button)
-		available_row.add_child(_label(str(ITEM_PRICES.get(chosen_id, 1)), 12, MUTED))
-	category.item_selected.connect(func(index: int):
+		catalog_rows.add_child(_preparation_equipment_catalog_row(chosen_id, catalog_rows.get_child_count() % 2, chosen_id == _selected_equipment_catalog_id))
+	category.get_popup().id_pressed.connect(func(index: int):
 		_equipment_category_filter = index
 		_show_characters())
-	material.item_selected.connect(func(index: int):
+	material.get_popup().id_pressed.connect(func(index: int):
 		_equipment_material_filter = index
 		_show_characters())
-	available.add_child(_spacer())
-	var add_equipment := _setup_button(_prep_local("Add Equipment", "Ekipman Ekle", "Dodaj wyposażenie"), func(): _adjust_starting_cargo(_selected_equipment_catalog_id, 1), true, Vector2(168, 31))
+	available.add_child(_preparation_equipment_gap(13))
+	var add_equipment := _setup_button(_prep_local("Add Equipment", "Ekipman Ekle", "Dodaj wyposażenie"), func(): _adjust_starting_cargo(_selected_equipment_catalog_id, 1), true, Vector2(160, 35))
+	_preparation_equipment_gold_style(add_equipment)
 	add_equipment.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	available.add_child(add_equipment)
-	var selected_panel := _preparation_panel(Vector2(500, 0))
+	var selected_panel := _preparation_equipment_panel()
 	selected_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selected_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	gear_columns.add_child(selected_panel)
-	var selected := _vbox(2)
+	var selected := _vbox(0)
 	selected_panel.add_child(selected)
-	selected.add_child(_label(_prep_local("Start with", "Başlangıç yükü", "Ładunek początkowy"), 18, CREAM))
-	selected.add_child(HSeparator.new())
-	for item_id in ["wood", "stone", "food", "medicine", "silver", "spear", "tshirt", "pants", "jacket", "cap", "brim_hat"]:
-		var chosen_id: String = item_id
+	var selected_back := _preparation_equipment_list_back()
+	selected_back.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	selected.add_child(selected_back)
+	var selected_scroll := _preparation_equipment_scroll()
+	selected_back.add_child(selected_scroll)
+	var selected_rows := _vbox(0)
+	selected_rows.custom_minimum_size.x = 446
+	selected_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selected_scroll.add_child(selected_rows)
+	for cargo_id in starting_cargo.keys():
+		var chosen_id := str(cargo_id)
+		if not GameModel.PREPARATION_CARGO_IDS.has(chosen_id):
+			continue
 		var quantity := int(starting_cargo.get(chosen_id, 0))
 		if quantity <= 0:
 			continue
-		var row := _hbox(5)
-		selected.add_child(row)
-		if chosen_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"]:
-			var icon := ApparelIconScript.new()
-			icon.item_id = chosen_id
-			icon.tint = Color("#78928b" if chosen_id == "tshirt" else "#5f6768" if chosen_id == "pants" else "#735f50")
-			row.add_child(icon)
-		var item_label := _label(_cargo_label(chosen_id), 13)
-		item_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(item_label)
-		var count := PrepStepper.new(quantity, 0, 999)
-		count.changed.connect(func(value: int):
-			starting_cargo[chosen_id] = value
-			if value == 0:
-				_show_characters())
-		row.add_child(count)
-	selected.add_child(_spacer())
-	var remove_all := _setup_button(_prep_local("Remove All", "Tümünü Kaldır", "Usuń wszystko"), _clear_starting_cargo, true, Vector2(150, 32))
+		selected_rows.add_child(_preparation_equipment_selected_row(chosen_id, quantity, selected_rows.get_child_count() % 2))
+	selected.add_child(_preparation_equipment_gap(13))
+	var remove_all := _setup_button(_prep_local("Remove All", "Tümünü Kaldır", "Usuń wszystko"), _clear_starting_cargo, true, Vector2(160, 35))
+	_preparation_equipment_gold_style(remove_all)
 	remove_all.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	selected.add_child(remove_all)
 
 
+func _preparation_equipment_panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(470, 567)
+	var style := _style(Color("#232526"), Color("#3b3d3f"), 0)
+	style.content_margin_left = 12
+	style.content_margin_top = 12
+	style.content_margin_right = 12
+	style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", style)
+	if _preparation_grain != null:
+		var grain_layer := PrepGrain.new()
+		grain_layer.grain = _preparation_grain
+		grain_layer.modulate.a = 0.23
+		panel.add_child(grain_layer)
+	return panel
+
+
+func _preparation_equipment_list_back() -> PanelContainer:
+	var back := PanelContainer.new()
+	var style := _style(Color("#18181c"), Color.TRANSPARENT, 0)
+	style.content_margin_left = 0
+	style.content_margin_top = 0
+	style.content_margin_right = 0
+	style.content_margin_bottom = 0
+	back.add_theme_stylebox_override("panel", style)
+	return back
+
+
+func _preparation_equipment_scroll() -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	return scroll
+
+
+func _preparation_equipment_gap(height: float) -> Control:
+	var gap := Control.new()
+	gap.custom_minimum_size.y = height
+	return gap
+
+
+func _preparation_equipment_gold_style(button: Button) -> void:
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_color_override("font_color", Color("#efe8da"))
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color("#efe8da"))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for state in ["normal", "hover", "pressed"]:
+		var fill := Color("#6a522f") if state == "normal" else Color("#80633a") if state == "hover" else Color("#574328")
+		var style := _style(fill, Color("#392a1b"), 0)
+		style.border_width_left = 3
+		style.border_width_right = 3
+		style.border_width_top = 2
+		style.border_width_bottom = 3
+		style.content_margin_left = 8
+		style.content_margin_right = 8
+		style.content_margin_top = 2
+		style.content_margin_bottom = 2
+		button.add_theme_stylebox_override(state, style)
+
+
+func _preparation_equipment_catalog_row(item_id: String, row_index: int, selected: bool) -> Button:
+	var row := Button.new()
+	row.name = "PreparationCatalogRow_%s" % item_id
+	row.custom_minimum_size.y = 42
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.focus_mode = Control.FOCUS_NONE
+	for state in ["normal", "hover", "pressed"]:
+		var fill := Color("#0c0c0c") if selected else Color("#313133") if row_index % 2 == 0 else Color("#36383a")
+		if state == "hover" and not selected:
+			fill = Color("#414345")
+		var style := _style(fill, Color.TRANSPARENT, 0)
+		style.content_margin_left = 0
+		style.content_margin_top = 0
+		style.content_margin_right = 0
+		style.content_margin_bottom = 0
+		row.add_theme_stylebox_override(state, style)
+	row.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	row.pressed.connect(func():
+		_selected_equipment_catalog_id = item_id
+		for sibling in row.get_parent().get_children():
+			if sibling is Button and str(sibling.name).begins_with("PreparationCatalogRow_"):
+				var row_selected := sibling == row
+				for style_name in ["normal", "hover", "pressed"]:
+					var fill := Color("#0c0c0c") if row_selected else Color("#313133") if sibling.get_index() % 2 == 0 else Color("#36383a")
+					var selection_style := _style(fill, Color.TRANSPARENT, 0)
+					selection_style.set_content_margin_all(0)
+					sibling.add_theme_stylebox_override(style_name, selection_style))
+	row.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton:
+			var click := event as InputEventMouseButton
+			if click.pressed and click.button_index == MOUSE_BUTTON_LEFT and click.double_click:
+				row.accept_event()
+				_selected_equipment_catalog_id = item_id
+				_adjust_starting_cargo(item_id, 1))
+	var contents := _hbox(16)
+	contents.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(contents)
+	contents.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	contents.offset_left = 12
+	contents.offset_top = 3
+	contents.offset_right = -12
+	contents.offset_bottom = -3
+	contents.add_child(_preparation_equipment_icon(item_id))
+	var name_label := _label(_cargo_label(item_id), 14, Color("#c7c7c7"))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	contents.add_child(name_label)
+	var cost := _label(_preparation_equipment_display_cost(item_id), 14, Color("#c7c7c7"))
+	cost.custom_minimum_size.x = 46
+	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	contents.add_child(cost)
+	return row
+
+
+func _preparation_equipment_selected_row(item_id: String, quantity: int, row_index: int) -> PanelContainer:
+	var row := PanelContainer.new()
+	row.name = "PreparationCargoRow_%s" % item_id
+	row.custom_minimum_size.y = 42
+	var fill := Color("#313133") if row_index % 2 == 0 else Color("#36383a")
+	var style := _style(fill, Color.TRANSPARENT, 0)
+	style.content_margin_left = 14
+	style.content_margin_top = 3
+	style.content_margin_right = 28
+	style.content_margin_bottom = 3
+	row.add_theme_stylebox_override("panel", style)
+	var contents := _hbox(12)
+	row.add_child(contents)
+	contents.add_child(_preparation_equipment_icon(item_id))
+	var name_label := _label(_cargo_label(item_id), 14, Color("#c7c7c7"))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	contents.add_child(name_label)
+	var stepper := _hbox(0)
+	contents.add_child(stepper)
+	var previous := Button.new()
+	var next := Button.new()
+	var field := LineEdit.new()
+	stepper.add_child(previous)
+	stepper.add_child(field)
+	stepper.add_child(next)
+	previous.text = "◀"
+	next.text = "▶"
+	for arrow in [previous, next]:
+		arrow.custom_minimum_size = Vector2(10, 28)
+		arrow.flat = true
+		arrow.add_theme_font_size_override("font_size", 12)
+		arrow.add_theme_color_override("font_color", Color("#a3a4a4"))
+		arrow.add_theme_color_override("font_hover_color", Color("#e0e0e0"))
+		arrow.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	previous.pressed.connect(func(): _adjust_starting_cargo(item_id, -1))
+	next.pressed.connect(func(): _adjust_starting_cargo(item_id, 1))
+	field.text = str(quantity)
+	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field.custom_minimum_size = Vector2(60, 28)
+	field.add_theme_color_override("font_color", Color("#dbdbdb"))
+	field.add_theme_font_size_override("font_size", 14)
+	field.text_submitted.connect(func(_text: String): _preparation_equipment_commit_quantity(item_id, field))
+	field.focus_exited.connect(func(): _preparation_equipment_commit_quantity(item_id, field))
+	for field_state in ["normal", "focus", "read_only"]:
+		var field_style := _style(Color("#121416"), Color("#202224"), 0)
+		field_style.content_margin_left = 0
+		field_style.content_margin_right = 0
+		field_style.content_margin_top = 2
+		field_style.content_margin_bottom = 2
+		field.add_theme_stylebox_override(field_state, field_style)
+	return row
+
+
+func _preparation_equipment_commit_quantity(item_id: String, field: LineEdit) -> void:
+	if not is_instance_valid(field):
+		return
+	var previous := int(starting_cargo.get(item_id, 0))
+	var quantity := clampi(int(field.text) if field.text.is_valid_int() else previous, 0, 999)
+	field.text = str(quantity)
+	if quantity == previous:
+		return
+	starting_cargo[item_id] = quantity
+	if quantity == 0:
+		call_deferred("_show_characters")
+	else:
+		_refresh_character_points()
+
+
+func _preparation_equipment_display_cost(item_id: String) -> String:
+	if GameModel.PREPARATION_DISPLAY_COSTS.has(item_id):
+		var value := float(GameModel.PREPARATION_DISPLAY_COSTS[item_id])
+		return str(int(value)) if is_equal_approx(value, floorf(value)) else str(value)
+	return str(ITEM_PRICES.get(item_id, 1))
+
+
+func _preparation_equipment_icon(item_id: String) -> Control:
+	var apparel_id := item_id
+	if apparel_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"]:
+		var apparel := ApparelIconScript.new()
+		apparel.item_id = apparel_id
+		apparel.tint = Color("#798c87")
+		apparel.custom_minimum_size = Vector2(36, 36)
+		return apparel
+	var texture_path := ""
+	match item_id:
+		"wood": texture_path = "res://assets/item_wood.svg"
+		"stone", "steel": texture_path = "res://assets/item_stone.svg"
+		"silver": texture_path = "res://assets/item_silver.svg"
+		"food": texture_path = "res://assets/item_food.svg"
+	if texture_path != "":
+		var texture_icon := TextureRect.new()
+		texture_icon.texture = load(texture_path)
+		texture_icon.custom_minimum_size = Vector2(36, 36)
+		texture_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		texture_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		texture_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if item_id == "steel":
+			texture_icon.modulate = Color("#b1a8a0")
+		return texture_icon
+	var icon := PrepCargoIcon.new()
+	icon.item_id = item_id
+	return icon
+
+
 func _equipment_item_visible(item_id: String, category: int, material: int) -> bool:
+	var is_apparel := item_id.begins_with("polarbearskin_") or item_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"]
+	var is_weapon := item_id in ["spear", "pistol", "assault_rifle", "sniper_rifle"]
 	var category_visible := true
 	match category:
-		1: category_visible = item_id in ["wood", "stone", "food", "medicine", "silver"]
-		2: category_visible = item_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"]
-		3: category_visible = item_id == "spear"
+		1: category_visible = not is_apparel and not is_weapon
+		2: category_visible = is_apparel
+		3: category_visible = is_weapon
 	if not category_visible:
 		return false
-	var item_material := "wood" if item_id == "wood" or item_id == "spear" else "stone" if item_id == "stone" else "cloth" if item_id in ["tshirt", "pants", "jacket", "cap", "brim_hat"] else "metal" if item_id == "silver" else "organic"
-	return material == 0 or item_material == ["", "wood", "stone", "cloth", "metal", "organic"][material]
+	var item_material := "polarbearskin" if item_id.begins_with("polarbearskin_") else "wood" if item_id in ["wood", "spear"] else "stone" if item_id == "stone" else "cloth" if is_apparel else "metal" if item_id in ["silver", "steel", "component", "pistol", "assault_rifle", "sniper_rifle"] else "organic"
+	var material_ids := ["", "wood", "stone", "cloth", "metal", "organic", "polarbearskin"]
+	return material == 0 or item_material == material_ids[clampi(material, 0, material_ids.size() - 1)]
 
 
 func _clear_starting_cargo() -> void:
-	for item_id in ["wood", "stone", "food", "medicine", "silver", "spear", "tshirt", "pants", "jacket", "cap", "brim_hat"]:
+	for item_id in starting_cargo.keys():
 		starting_cargo[item_id] = 0
 	_show_characters()
 
@@ -2726,9 +4522,26 @@ func _cargo_label(item_id: String) -> String:
 		"spear": return _prep_local("Spear", "Mızrak", "Włócznia")
 		"tshirt": return _prep_local("T-shirt", "Tişört", "Koszulka")
 		"pants": return _prep_local("Pants", "Pantolon", "Spodnie")
-		"jacket": return _prep_local("Jacket", "Ceket", "Kurtka")
+		"jacket": return _prep_local("Coat", "Kaban", "Płaszcz")
 		"cap": return _prep_local("Cap", "Kep", "Czapka")
 		"brim_hat": return _prep_local("Brimmed hat", "Siperli şapka", "Kapelusz z rondem")
+		"packaged_survival_meal": return _prep_local("Packaged survival meal", "Paketlenmiş hayatta kalma yemeği", "Pakowany posiłek przetrwania")
+		"component": return _prep_local("Component", "Bileşen", "Komponent")
+		"pistol": return _prep_local("Pistol", "Tabanca", "Pistolet")
+		"steel": return _prep_local("Steel", "Çelik", "Stal")
+		"assault_rifle": return _prep_local("Assault rifle", "Taarruz tüfeği", "Karabin szturmowy")
+		"sniper_rifle": return _prep_local("Sniper rifle", "Keskin nişancı tüfeği", "Karabin snajperski")
+		"chemfuel": return _prep_local("Chemfuel", "Kimyasal yakıt", "Paliwo chemiczne")
+		"female_elephant": return _prep_local("Female elephant", "Dişi fil", "Samica słonia")
+		"polarbearskin_bowler_hat": return _prep_local("Polarbearskin bowler hat", "Kutup ayısı derisi melon şapka", "Melonik ze skóry niedźwiedzia polarnego")
+		"polarbearskin_button_down_shirt": return _prep_local("Polarbearskin button-down shirt", "Kutup ayısı derisi düğmeli gömlek", "Koszula ze skóry niedźwiedzia polarnego")
+		"polarbearskin_cowboy_hat": return _prep_local("Polarbearskin cowboy hat", "Kutup ayısı derisi kovboy şapkası", "Kapelusz kowbojski ze skóry niedźwiedzia polarnego")
+		"polarbearskin_duster": return _prep_local("Polarbearskin duster", "Kutup ayısı derisi uzun ceket", "Płaszcz ze skóry niedźwiedzia polarnego")
+		"polarbearskin_jacket": return _prep_local("Polarbearskin coat", "Kutup ayısı derisi kaban", "Płaszcz ze skóry niedźwiedzia polarnego")
+		"polarbearskin_pants": return _prep_local("Polarbearskin pants", "Kutup ayısı derisi pantolon", "Spodnie ze skóry niedźwiedzia polarnego")
+		"polarbearskin_parka": return _prep_local("Polarbearskin parka", "Kutup ayısı derisi parka", "Parka ze skóry niedźwiedzia polarnego")
+		"polarbearskin_tribalwear": return _prep_local("Polarbearskin tribalwear", "Kutup ayısı derisi kabile giysisi", "Strój plemienny ze skóry niedźwiedzia polarnego")
+		"polarbearskin_tshirt": return _prep_local("Polarbearskin T-shirt", "Kutup ayısı derisi tişört", "T-shirt ze skóry niedźwiedzia polarnego")
 	return item_id.capitalize()
 
 
@@ -2751,14 +4564,19 @@ func _display_trait(trait_id: String) -> String:
 		"timid": return _prep_local("Timid", "Çekingen", "Nieśmiały")
 		"abrasive": return _prep_local("Abrasive", "Geçimsiz", "Kłótliwy")
 		"lazy": return _prep_local("Lazy", "Tembel", "Leniwy")
+		"pyromaniac": return _prep_local("Pyromaniac", "Piroman", "Piroman")
+		"fast_walker": return _prep_local("Fast walker", "Hızlı yürür", "Szybki chód")
+		"ugly": return _prep_local("Ugly", "Çirkin", "Brzydki")
 		_: return trait_id.replace("_", " ").capitalize()
 
 
 func _display_background(background_id: String) -> String:
 	match background_id:
+		"unknown": return _prep_local("Unknown", "Bilinmiyor", "Nieznane")
 		"rural_child": return _prep_local("Rural child", "Köy çocuğu", "Dziecko ze wsi")
 		"town_child": return _prep_local("Town child", "Kasaba çocuğu", "Dziecko z miasta")
 		"apprentice": return _prep_local("Apprentice", "Çırak", "Uczeń")
+		"vatgrown_soldier": return _prep_local("Vatgrown soldier", "Tankta yetişmiş asker", "Żołnierz z kadzi")
 		"farmer": return _prep_local("Farmer", "Çiftçi", "Rolnik")
 		"builder": return _prep_local("Builder", "İnşaatçı", "Budowniczy")
 		"medic": return _prep_local("Medic", "Sağlıkçı", "Medyk")
@@ -2789,7 +4607,15 @@ func _display_site_kind(kind: String) -> String:
 
 
 func _adjust_starting_cargo(item_id: String, delta: int) -> void:
-	starting_cargo[item_id] = clampi(int(starting_cargo.get(item_id, 0)) + delta, 0, 999)
+	if not GameModel.PREPARATION_CARGO_IDS.has(item_id):
+		return
+	var previous := int(starting_cargo.get(item_id, 0))
+	var quantity := clampi(previous + delta, 0, 999)
+	# Dictionary insertion order is the visible right-hand order. Re-added items
+	# belong after the existing items instead of jumping to a fixed top slot.
+	if previous == 0 and quantity > 0:
+		starting_cargo.erase(item_id)
+	starting_cargo[item_id] = quantity
 	_show_characters()
 
 
@@ -2803,37 +4629,102 @@ func _set_starting_gear(slot_id: String, item_id: String) -> void:
 	_show_characters()
 
 
+func _set_preparation_torso(choice: int) -> void:
+	_save_character_inputs()
+	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+	var gear: Dictionary = spec.get("starting_gear", {}).duplicate(true)
+	gear["shirt"] = "none" if choice == 1 else "tshirt"
+	spec["starting_gear"] = gear
+	character_specs[_editing_character_index] = spec
+	_show_characters()
+
+
+func _set_preparation_apparel(choice: int) -> void:
+	_save_character_inputs()
+	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+	var gear: Dictionary = spec.get("starting_gear", {}).duplicate(true)
+	gear["apparel"] = "jacket" if choice == 1 else "none"
+	spec["starting_gear"] = gear
+	character_specs[_editing_character_index] = spec
+	_show_characters()
+
+
+func _set_preparation_legs(choice: int) -> void:
+	_save_character_inputs()
+	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+	var gear: Dictionary = spec.get("starting_gear", {}).duplicate(true)
+	gear["pants"] = "none" if choice == 1 else "pants"
+	spec["starting_gear"] = gear
+	character_specs[_editing_character_index] = spec
+	_show_characters()
+
+
+func _set_preparation_clothing(choice: int) -> void:
+	# Support older saved UI actions while the visible editor uses two slots.
+	_set_preparation_torso(1 if choice == 2 else 0)
+	_set_preparation_apparel(1 if choice == 1 else 0)
+	if choice == 2:
+		_set_preparation_legs(1)
+	else:
+		_set_preparation_legs(0)
+
+
 func _randomize_prepared_colonist() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
-	var names := ["Robin", "Mara", "Elin", "Soren", "Iris", "Tomas", "Nadia", "Leon"]
-	spec["name"] = names[randi() % names.size()]
-	spec["first_name"] = spec["name"]
-	spec["nickname"] = spec["name"]
-	spec["last_name"] = ""
 	spec["sex"] = "female" if randi() % 2 == 0 else "male"
+	var identity := _pick_prepared_name(str(spec["sex"]))
+	spec["first_name"] = identity["first"]
+	spec["nickname"] = identity["nick"]
+	spec["name"] = identity["nick"]
+	spec["last_name"] = identity["last"]
 	spec["body_type"] = randi() % 2
 	spec["head_type"] = randi() % 2
 	spec["age"] = randi_range(19, 61)
-	spec["chronological_age"] = spec["age"]
+	spec["chronological_age"] = int(spec["age"]) + randi_range(0, 80)
 	spec["favorite_color"] = OUTFIT_OPTIONS[randi() % OUTFIT_OPTIONS.size()]
-	spec["hair_index"] = randi() % 4
+	var random_hair_ids := MALE_HAIR_IDS if str(spec["sex"]) == "male" else FEMALE_HAIR_IDS
+	spec["hair_index"] = randi() % random_hair_ids.size()
+	spec["hair_style"] = random_hair_ids[int(spec["hair_index"])]
 	spec["hair_color"] = HAIR_COLOR_OPTIONS[randi() % HAIR_COLOR_OPTIONS.size()]
 	spec["skin_color"] = SKIN_OPTIONS[randi() % SKIN_OPTIONS.size()]
 	var randomized_gear: Dictionary = spec.get("starting_gear", {}).duplicate(true)
 	randomized_gear["shirt_color"] = OUTFIT_OPTIONS[randi() % OUTFIT_OPTIONS.size()]
 	spec["starting_gear"] = randomized_gear
-	spec["childhood"] = ["rural_child", "town_child", "apprentice"][randi() % 3]
-	spec["adulthood"] = ["farmer", "builder", "medic", "scholar"][randi() % 4]
-	spec["trait_ids"] = [["hardworking"], ["calm", "curious"], ["quick", "kind"], ["night_owl", "timid"]][randi() % 4].duplicate()
+	for attempt in range(96):
+		var candidate := spec.duplicate(true)
+		candidate["childhood"] = CHILDHOOD_IDS[randi() % CHILDHOOD_IDS.size()]
+		candidate["adulthood"] = ADULTHOOD_IDS[randi() % ADULTHOOD_IDS.size()]
+		var trait_pool := TRAIT_IDS.slice(1)
+		trait_pool.shuffle()
+		candidate["trait_ids"] = trait_pool.slice(0, randi_range(0, 2))
+		candidate["condition_ids"] = []
+		candidate["health_injuries"] = []
+		var randomized_skills: Dictionary = {}
+		var randomized_passions: Dictionary = {}
+		for skill in CLASSIC_SKILL_IDS:
+			randomized_skills[skill] = randi_range(0, 5)
+			randomized_passions[skill] = 2 if randi() % 12 == 0 else 1 if randi() % 4 == 0 else 0
+		candidate["skills"] = _derive_work_skills(randomized_skills)
+		candidate["passions"] = randomized_passions
+		if _preparation_random_candidate_fits(candidate):
+			character_specs[_editing_character_index] = candidate
+			_show_characters()
+			return
+	# If the rest of the crew has used nearly every point, choose the least
+	# expensive valid character rather than silently generating an over-limit one.
+	spec["childhood"] = "unknown"
+	spec["adulthood"] = "unknown"
+	spec["trait_ids"] = []
 	spec["condition_ids"] = []
-	var randomized_skills: Dictionary = {}
-	for skill in CLASSIC_SKILL_IDS: randomized_skills[skill] = randi_range(2, 5)
-	spec["skills"] = _derive_work_skills(randomized_skills)
-	var randomized_passions: Dictionary = {}
-	for skill in CLASSIC_SKILL_IDS: randomized_passions[skill] = randi() % 3
-	spec["passions"] = randomized_passions
-	character_specs[_editing_character_index] = spec
+	spec["health_injuries"] = []
+	var empty_skills := {}
+	for skill in CLASSIC_SKILL_IDS:
+		empty_skills[skill] = 0
+	spec["skills"] = _derive_work_skills(empty_skills)
+	spec["passions"] = {}
+	if _preparation_random_candidate_fits(spec):
+		character_specs[_editing_character_index] = spec
 	_show_characters()
 
 
@@ -2843,7 +4734,9 @@ func _randomize_prepared_appearance() -> void:
 	spec["sex"] = "female" if randi() % 2 == 0 else "male"
 	spec["body_type"] = randi() % 2
 	spec["head_type"] = randi() % 2
-	spec["hair_index"] = randi() % 4
+	var random_hair_ids := MALE_HAIR_IDS if str(spec["sex"]) == "male" else FEMALE_HAIR_IDS
+	spec["hair_index"] = randi() % random_hair_ids.size()
+	spec["hair_style"] = random_hair_ids[int(spec["hair_index"])]
 	spec["hair_color"] = HAIR_COLOR_OPTIONS[randi() % HAIR_COLOR_OPTIONS.size()]
 	spec["skin_color"] = SKIN_OPTIONS[randi() % SKIN_OPTIONS.size()]
 	character_specs[_editing_character_index] = spec
@@ -2853,22 +4746,47 @@ func _randomize_prepared_appearance() -> void:
 func _randomize_preparation_choices(kind: String) -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+	for attempt in range(64):
+		var candidate := spec.duplicate(true)
+		if kind == "traits":
+			var trait_choices := TRAIT_IDS.slice(1)
+			trait_choices.shuffle()
+			candidate["trait_ids"] = trait_choices.slice(0, randi_range(1, 3))
+		elif kind == "backstory":
+			candidate["childhood"] = CHILDHOOD_IDS[randi() % CHILDHOOD_IDS.size()]
+			candidate["adulthood"] = ADULTHOOD_IDS[randi() % ADULTHOOD_IDS.size()]
+		else:
+			var condition_choices := CHRONIC_CONDITION_IDS.slice(1)
+			condition_choices.shuffle()
+			candidate["condition_ids"] = condition_choices.slice(0, randi_range(0, 2))
+			candidate["health_injuries"] = []
+			if randi() % 2 == 0:
+				candidate["health_injuries"] = [{"kind": INJURY_KIND_IDS[randi() % INJURY_KIND_IDS.size()],
+					"body_part": INJURY_BODY_PART_IDS[randi() % INJURY_BODY_PART_IDS.size()], "count": 1}]
+		if _preparation_random_candidate_fits(candidate):
+			character_specs[_editing_character_index] = candidate
+			_show_characters()
+			return
 	if kind == "traits":
-		var choices := TRAIT_IDS.slice(1)
-		choices.shuffle()
-		spec["trait_ids"] = choices.slice(0, randi_range(1, 3))
+		spec["trait_ids"] = []
+	elif kind == "backstory":
+		spec["childhood"] = "unknown"
+		spec["adulthood"] = "unknown"
 	else:
-		var choices := CONDITION_IDS.slice(1)
-		choices.shuffle()
-		spec["condition_ids"] = choices.slice(0, randi_range(0, 2))
-	character_specs[_editing_character_index] = spec
+		spec["condition_ids"] = []
+		spec["health_injuries"] = []
+	if _preparation_random_candidate_fits(spec):
+		character_specs[_editing_character_index] = spec
 	_show_characters()
 
 
 func _reset_preparation_skills() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
-	spec["skills"] = _derive_work_skills(_default_classic_skill_profile(_editing_character_index))
+	var empty_skills := {}
+	for skill in CLASSIC_SKILL_IDS:
+		empty_skills[skill] = 0
+	spec["skills"] = _derive_work_skills(empty_skills)
 	spec["passions"] = {}
 	character_specs[_editing_character_index] = spec
 	_show_characters()
@@ -2877,29 +4795,149 @@ func _reset_preparation_skills() -> void:
 func _randomize_preparation_skills() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
-	var skills := {}
-	var passions := {}
+	for attempt in range(96):
+		var candidate := spec.duplicate(true)
+		var skills := {}
+		var passions := {}
+		for skill in CLASSIC_SKILL_IDS:
+			skills[skill] = randi_range(0, 8)
+			passions[skill] = randi_range(0, 2)
+		candidate["skills"] = _derive_work_skills(skills)
+		candidate["passions"] = passions
+		if _preparation_random_candidate_fits(candidate):
+			character_specs[_editing_character_index] = candidate
+			_show_characters()
+			return
+	var empty_skills := {}
 	for skill in CLASSIC_SKILL_IDS:
-		skills[skill] = randi_range(0, 12)
-		passions[skill] = randi_range(0, 2)
-	spec["skills"] = _derive_work_skills(skills)
-	spec["passions"] = passions
-	character_specs[_editing_character_index] = spec
+		empty_skills[skill] = 0
+	spec["skills"] = _derive_work_skills(empty_skills)
+	spec["passions"] = {}
+	if _preparation_random_candidate_fits(spec):
+		character_specs[_editing_character_index] = spec
 	_show_characters()
 
 
 func _randomize_prepared_name() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
-	var first_names := ["Mara", "Robin", "Iris", "Tomas", "Elin", "Soren", "Nadia", "Leon"]
-	var last_names := ["Vale", "Hale", "Mercer", "Arden", "Rowan", "Ward", "Reed", "Fen"]
-	var first_name := str(first_names[randi() % first_names.size()])
-	spec["first_name"] = first_name
-	spec["nickname"] = first_name
-	spec["name"] = first_name
-	spec["last_name"] = str(last_names[randi() % last_names.size()])
+	var identity := _pick_prepared_name(str(spec.get("sex", "female")))
+	spec["first_name"] = identity["first"]
+	spec["nickname"] = identity["nick"]
+	spec["name"] = identity["nick"]
+	spec["last_name"] = identity["last"]
 	character_specs[_editing_character_index] = spec
 	_show_characters()
+
+
+func _prepared_display_name(spec: Dictionary) -> String:
+	var nickname := _normalize_prepared_nickname(str(spec.get("nickname", "")))
+	if not nickname.is_empty():
+		return nickname
+	return str(spec.get("first_name", spec.get("name", ""))).strip_edges()
+
+
+func _normalize_prepared_nickname(raw_nickname: String) -> String:
+	var nickname := raw_nickname.strip_edges()
+	# Earlier versions generated PascalCase pairs such as NewBramble.
+	# Split only a known generated prefix and a known nickname root.
+	for turkish in [false, true]:
+		var prefixes := (PREPARATION_TURKISH_NICKNAME_PREFIXES if turkish else PREPARATION_INTERNATIONAL_NICKNAME_PREFIXES).split(",")
+		var roots := (PREPARATION_TURKISH_NICKNAMES if turkish else PREPARATION_INTERNATIONAL_NICKNAMES).split(",")
+		for prefix in prefixes:
+			if not nickname.begins_with(str(prefix)) or nickname.length() <= str(prefix).length():
+				continue
+			var suffix := nickname.substr(str(prefix).length())
+			if roots.has(suffix):
+				return "%s %s" % [prefix, suffix]
+	return nickname
+
+
+func _pick_prepared_name(sex: String) -> Dictionary:
+	var given_names := PreparationNamePool.MALE_NAMES if sex == "male" else PreparationNamePool.FEMALE_NAMES
+	var turkish_names := (PREPARATION_TURKISH_MALE_NAMES if sex == "male" else PREPARATION_TURKISH_FEMALE_NAMES).split(",")
+	var international_names := given_names.split(",")
+	var turkish_surnames := PREPARATION_TURKISH_SURNAMES.split(",")
+	var international_surnames := PREPARATION_INTERNATIONAL_SURNAMES.split(",")
+	var occupied := {}
+	var occupied_first := {}
+	for person in character_specs + world_character_specs:
+		if person is Dictionary:
+			var current_first := str(person.get("first_name", person.get("name", "")))
+			occupied[(current_first + "|" + str(person.get("last_name", ""))).to_lower()] = true
+			occupied_first[current_first.to_lower()] = true
+	for attempt in range(700):
+		var turkish := randi() % 4 == 0
+		var first_names := turkish_names if turkish else international_names
+		var last_names := turkish_surnames if turkish else international_surnames
+		var first := str(first_names[randi() % first_names.size()])
+		var last := str(last_names[randi() % last_names.size()])
+		var key := (first + "|" + last).to_lower()
+		if not occupied.has(key) and not occupied_first.has(first.to_lower()) and not _used_prepared_first_names.has(first.to_lower()) and not _used_prepared_full_names.has(key):
+			_used_prepared_full_names[key] = true
+			_used_prepared_first_names[first.to_lower()] = true
+			return {"first": first, "nick": _pick_prepared_nickname(first, turkish), "last": last, "culture": "tr" if turkish else "international"}
+	for first in international_names:
+		if occupied_first.has(str(first).to_lower()) or _used_prepared_first_names.has(str(first).to_lower()):
+			continue
+		for last in international_surnames:
+			var key := (str(first) + "|" + str(last)).to_lower()
+			if not occupied.has(key) and not _used_prepared_full_names.has(key):
+				_used_prepared_full_names[key] = true
+				_used_prepared_first_names[str(first).to_lower()] = true
+				return {"first": str(first), "nick": _pick_prepared_nickname(str(first), false), "last": str(last), "culture": "international"}
+	var serial := _used_prepared_full_names.size() + 1
+	var fallback_first := str(international_names[serial % international_names.size()])
+	return {"first": fallback_first, "nick": _pick_prepared_nickname(fallback_first, false), "last": "%s %d" % [str(international_surnames[serial % international_surnames.size()]), serial], "culture": "international"}
+
+
+func _pick_prepared_nickname(first: String, turkish: bool) -> String:
+	var nicknames := (PREPARATION_TURKISH_NICKNAMES if turkish else PREPARATION_INTERNATIONAL_NICKNAMES).split(",")
+	nicknames.append_array((PREPARATION_EXTRA_TURKISH_NICKNAMES if turkish else PREPARATION_EXTRA_INTERNATIONAL_NICKNAMES).split(","))
+	var prefixes := (PREPARATION_TURKISH_NICKNAME_PREFIXES if turkish else PREPARATION_INTERNATIONAL_NICKNAME_PREFIXES).split(",")
+	var simple: Array[String] = []
+	var spaced: Array[String] = []
+	for nickname in nicknames + prefixes:
+		if str(nickname).length() <= 9 and not simple.has(str(nickname)):
+			simple.append(str(nickname))
+	for prefix in prefixes:
+		for nickname in nicknames:
+			if str(prefix).to_lower() == str(nickname).to_lower():
+				continue
+			var pair := "%s %s" % [prefix, nickname]
+			if pair.length() <= 10:
+				spaced.append(pair)
+	var occupied := {}
+	for person in character_specs + world_character_specs:
+		if person is Dictionary:
+			occupied[str(person.get("nickname", "")).strip_edges().to_lower()] = true
+	for attempt in range(400):
+		var roll := randi() % 100
+		var pool := simple if roll < 85 else spaced
+		if pool.is_empty():
+			continue
+		var candidate: String = pool[randi() % pool.size()]
+		var key := candidate.to_lower()
+		if key != first.to_lower() and not occupied.has(key) and not _used_prepared_nicknames.has(key):
+			_used_prepared_nicknames[key] = true
+			return candidate
+	for pool in [simple, spaced]:
+		for candidate in pool:
+			var key := str(candidate).to_lower()
+			if key != first.to_lower() and not occupied.has(key) and not _used_prepared_nicknames.has(key):
+				_used_prepared_nicknames[key] = true
+				return candidate
+	# A compact compound supplies further names after the ordinary pool is used.
+	for prefix in prefixes:
+		for nickname in nicknames:
+			var candidate := "%s %s" % [prefix, nickname]
+			if candidate.length() > 12:
+				continue
+			var key := candidate.to_lower()
+			if key != first.to_lower() and not occupied.has(key) and not _used_prepared_nicknames.has(key):
+				_used_prepared_nicknames[key] = true
+				return candidate
+	return first
 
 
 func _show_prepared_character_info() -> void:
@@ -2908,11 +4946,14 @@ func _show_prepared_character_info() -> void:
 	var dialog := AcceptDialog.new()
 	dialog.title = "%s %s" % [str(spec.get("first_name", spec.get("name", "Colonist"))), str(spec.get("last_name", ""))]
 	var traits: Array = spec.get("trait_ids", [])
+	var trait_names: Array[String] = []
+	for trait_id in traits:
+		trait_names.append(_display_trait(str(trait_id)))
 	dialog.dialog_text = "%s: %s\n%s: %s\n%s: %s\n%s: %s" % [
 		_prep_local("Nickname", "Takma ad", "Pseudonim"), str(spec.get("name", "")),
 		_prep_local("Age", "Yaş", "Wiek"), str(spec.get("age", 25)),
 		_prep_local("Backstory", "Geçmiş", "Przeszłość"), _display_background(str(spec.get("adulthood", "farmer"))),
-		_prep_local("Traits", "Özellikler", "Cechy"), ", ".join(traits) if not traits.is_empty() else _prep_local("None", "Yok", "Brak")]
+		_prep_local("Traits", "Özellikler", "Cechy"), ", ".join(trait_names) if not trait_names.is_empty() else _prep_local("None", "Yok", "Brak")]
 	add_child(dialog)
 	dialog.popup_centered(Vector2i(410, 230))
 	dialog.confirmed.connect(dialog.queue_free)
@@ -2920,56 +4961,143 @@ func _show_prepared_character_info() -> void:
 
 func _save_character_preset() -> void:
 	_save_character_inputs()
-	var file := FileAccess.open("user://prepared_character.json", FileAccess.WRITE)
-	if file == null:
-		_notice(_prep_local("Could not save character.", "Karakter kaydedilemedi.", "Nie można zapisać postaci."))
-		return
-	file.store_string(JSON.stringify(character_specs[_editing_character_index]))
-	_notice(_prep_local("Character saved for later starts.", "Karakter sonraki oyunlar için kaydedildi.", "Postać zapisana na przyszłość."))
+	_open_preparation_library("character", true)
 
 
 func _load_character_preset() -> void:
-	if not FileAccess.file_exists("user://prepared_character.json"):
-		_notice(_prep_local("No saved character yet.", "Henüz kayıtlı karakter yok.", "Brak zapisanej postaci."))
-		return
-	var loaded: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://prepared_character.json"))
-	if not loaded is Dictionary or not (loaded as Dictionary).has("name"):
-		_notice(_prep_local("Character preset is invalid.", "Karakter kaydı geçersiz.", "Zapis postaci jest nieprawidłowy."))
-		return
-	character_specs[_editing_character_index] = (loaded as Dictionary).duplicate(true)
-	_show_characters()
+	_open_preparation_library("character", false)
 
 
 func _save_preparation_preset() -> void:
 	_save_character_inputs()
-	var file := FileAccess.open("user://preparation_preset.json", FileAccess.WRITE)
-	if file == null:
-		_notice(_prep_local("Could not save preset.", "Hazır ayar kaydedilemedi.", "Nie można zapisać zestawu."))
-		return
-	file.store_string(JSON.stringify({"colonist_count": colonist_count, "point_limit_enabled": point_limit_enabled, "characters": character_specs, "world_characters": world_character_specs, "starting_cargo": starting_cargo}))
-	_notice(_prep_local("Starting crew saved as a preset.", "Başlangıç ekibi hazır ayar olarak kaydedildi.", "Załoga zapisana jako zestaw."))
+	_open_preparation_library("crew", true)
 
 
 func _load_preparation_preset() -> void:
-	if not FileAccess.file_exists("user://preparation_preset.json"):
-		_notice(_prep_local("No saved preset yet.", "Henüz kayıtlı hazır ayar yok.", "Brak zapisanego zestawu."))
-		return
-	var loaded: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://preparation_preset.json"))
-	if not loaded is Dictionary or not (loaded as Dictionary).get("characters", null) is Array:
-		_notice(_prep_local("Preset is invalid.", "Hazır ayar geçersiz.", "Zestaw jest nieprawidłowy."))
-		return
-	var data: Dictionary = loaded
-	colonist_count = clampi(int(data.get("colonist_count", (data["characters"] as Array).size())), 1, 3)
-	point_limit_enabled = bool(data.get("point_limit_enabled", true))
-	character_specs = (data["characters"] as Array).duplicate(true)
-	world_character_specs = (data.get("world_characters", []) as Array).duplicate(true)
-	if data.get("starting_cargo", null) is Dictionary:
-		starting_cargo = (data["starting_cargo"] as Dictionary).duplicate(true)
+	_open_preparation_library("crew", false)
+
+
+func _preparation_library_data(kind: String) -> Dictionary:
+	if kind == "character":
+		return (character_specs[_editing_character_index] as Dictionary).duplicate(true)
+	return {"colonist_count": colonist_count, "point_limit_enabled": point_limit_enabled,
+		"characters": character_specs.duplicate(true), "world_characters": world_character_specs.duplicate(true),
+		"external_relationships": external_relationships.duplicate(true),
+		"starting_cargo": starting_cargo.duplicate(true)}
+
+
+func _open_preparation_library(kind: String, save_mode: bool) -> void:
+	var popup := PopupPanel.new()
+	popup.add_theme_stylebox_override("panel", _style(PANEL, GOLD, 0))
+	add_child(popup)
+	var content := _vbox(8)
+	content.custom_minimum_size.x = 470
+	popup.add_child(content)
+	var title := _prep_local("Saved characters", "Kayıtlı karakterler", "Zapisane postacie") if kind == "character" else _prep_local("Crew presets", "Ekip hazır ayarları", "Zestawy załogi")
+	content.add_child(_label(title, 21, GOLD))
+	var name_edit: LineEdit = null
+	if save_mode:
+		name_edit = LineEdit.new()
+		name_edit.placeholder_text = _prep_local("Save name", "Kayıt adı", "Nazwa zapisu")
+		name_edit.text = str(character_specs[_editing_character_index].get("name", "Character")) if kind == "character" else "Crew %s" % Time.get_date_string_from_system()
+		content.add_child(name_edit)
+		var save_button := _button(_prep_local("Create new save", "Yeni kayıt oluştur", "Utwórz nowy zapis"), func():
+			var id := PreparationPresetStore.safe_id(name_edit.text)
+			if id.is_empty():
+				_notice(_prep_local("Enter a save name.", "Kayıt adı gir.", "Podaj nazwę zapisu."))
+				return
+			if not PreparationPresetStore.load_slot(kind, id).is_empty():
+				_confirm_preparation_overwrite(kind, name_edit.text, popup)
+			else:
+				_store_preparation_slot(kind, name_edit.text, popup), true)
+		content.add_child(save_button)
+	var slots: Array = PreparationPresetStore.list_slots(kind)
+	if slots.is_empty():
+		content.add_child(_label(_prep_local("No saved entries yet", "Henüz kayıt yok", "Brak zapisów"), 13, MUTED))
 	else:
-		starting_cargo = SetupCatalog.find_by_id(SetupCatalog.SCENARIOS, scenario_id).get("inventory", {}).duplicate(true)
-	_editing_character_index = 0
-	preparation_tab = "characters"
+		var scroll := ScrollContainer.new()
+		scroll.custom_minimum_size = Vector2(470, minf(310.0, float(slots.size()) * 43.0))
+		content.add_child(scroll)
+		var rows := _vbox(4)
+		scroll.add_child(rows)
+		for slot in slots:
+			var slot_id := str(slot["id"])
+			var slot_name := str(slot["name"])
+			var row := _hbox(5)
+			rows.add_child(row)
+			row.add_child(_button((_prep_local("Overwrite", "Üzerine yaz", "Nadpisz") if save_mode else _prep_local("Load", "Yükle", "Wczytaj")) + "  " + slot_name,
+				func():
+					if save_mode:
+						_confirm_preparation_overwrite(kind, slot_name, popup)
+					else:
+						_load_preparation_slot(kind, slot_id, popup), false, Vector2(390, 32)))
+			row.add_child(_button(_prep_local("Delete", "Sil", "Usuń"), func(): _confirm_preparation_delete(kind, slot_id, popup, save_mode), false, Vector2(65, 32)))
+	content.add_child(_button(_tr("common.close"), popup.hide))
+	popup.popup_hide.connect(popup.queue_free)
+	popup.popup_centered(Vector2i(510, 480))
+
+
+func _store_preparation_slot(kind: String, name: String, popup: PopupPanel) -> void:
+	var saved: bool = PreparationPresetStore.save_slot(kind, name, _preparation_library_data(kind))
+	_notice(_prep_local("Saved.", "Kaydedildi.", "Zapisano.") if saved else _prep_local("Could not save.", "Kaydedilemedi.", "Nie udało się zapisać."))
+	if saved and is_instance_valid(popup):
+		popup.hide()
+
+
+func _load_preparation_slot(kind: String, id: String, popup: PopupPanel) -> void:
+	var record: Dictionary = PreparationPresetStore.load_slot(kind, id)
+	var data: Dictionary = record.get("data", {})
+	if kind == "character":
+		if not data.has("name"):
+			_notice(_prep_local("Invalid character save.", "Karakter kaydı geçersiz.", "Nieprawidłowy zapis postaci."))
+			return
+		character_specs[_editing_character_index] = data.duplicate(true)
+	else:
+		if not data.get("characters", null) is Array:
+			_notice(_prep_local("Invalid crew save.", "Ekip kaydı geçersiz.", "Nieprawidłowy zapis załogi."))
+			return
+		colonist_count = clampi(int(data.get("colonist_count", (data["characters"] as Array).size())), 1, 8)
+		point_limit_enabled = bool(data.get("point_limit_enabled", true))
+		character_specs = (data["characters"] as Array).duplicate(true)
+		world_character_specs = (data.get("world_characters", []) as Array).duplicate(true)
+		external_relationships = (data.get("external_relationships", []) as Array).duplicate(true)
+		_external_source_index = 0
+		_external_target_key = "c:0"
+		starting_cargo = {}
+		if data.get("starting_cargo", null) is Dictionary:
+			for item_id in (data["starting_cargo"] as Dictionary):
+				if GameModel.PREPARATION_CARGO_IDS.has(str(item_id)):
+					starting_cargo[str(item_id)] = clampi(int(data["starting_cargo"][item_id]), 0, 999)
+		_editing_character_index = 0
+		preparation_tab = "characters"
+	if is_instance_valid(popup):
+		popup.hide()
 	_show_characters()
+
+
+func _confirm_preparation_overwrite(kind: String, name: String, popup: PopupPanel) -> void:
+	var confirmation := ConfirmationDialog.new()
+	confirmation.title = _prep_local("Overwrite save", "Kaydın üzerine yaz", "Nadpisz zapis")
+	confirmation.dialog_text = _prep_local("Replace '%s'?", "'%s' kaydının üzerine yazılsın mı?", "Zastąpić '%s'?") % name
+	add_child(confirmation)
+	confirmation.confirmed.connect(func(): _store_preparation_slot(kind, name, popup))
+	confirmation.visibility_changed.connect(func(): if not confirmation.visible: confirmation.queue_free())
+	confirmation.popup_centered()
+
+
+func _confirm_preparation_delete(kind: String, id: String, popup: PopupPanel, save_mode: bool) -> void:
+	var confirmation := ConfirmationDialog.new()
+	confirmation.title = _prep_local("Delete save", "Kaydı sil", "Usuń zapis")
+	confirmation.dialog_text = _prep_local("Delete '%s' permanently?", "'%s' kaydı kalıcı silinsin mi?", "Usunąć '%s' na stałe?") % id
+	add_child(confirmation)
+	confirmation.confirmed.connect(func():
+		if PreparationPresetStore.delete_slot(kind, id):
+			if is_instance_valid(popup): popup.hide()
+			_open_preparation_library(kind, save_mode)
+		else:
+			_notice(_prep_local("Could not delete save.", "Kayıt silinemedi.", "Nie udało się usunąć zapisu.")))
+	confirmation.visibility_changed.connect(func(): if not confirmation.visible: confirmation.queue_free())
+	confirmation.popup_centered()
 
 
 func _cycle_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, value_width := 170) -> Dictionary:
@@ -3029,73 +5157,423 @@ func _choice_field(parent: Control, title: String, values: Array, initial_index:
 	return state
 
 
-func _arrow_choice_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, _value_width := 150) -> Dictionary:
+func _arrow_choice_field(parent: Control, title: String, values: Array, initial_index: int, changed: Callable, label_width := 112, _value_width := 150, chooser_kind := "", nonselectable_first := false) -> Dictionary:
 	var state := {"index": clampi(initial_index, 0, values.size() - 1)}
 	var row := _hbox(0)
+	row.custom_minimum_size = Vector2(label_width + 14 + _value_width + 14, 29)
 	parent.add_child(row)
 	var caption := _label(title, 12, MUTED)
 	caption.custom_minimum_size.x = label_width
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(caption)
-	var value_label := _label(str(values[int(state["index"])]), 12, CREAM)
-	value_label.custom_minimum_size.y = 27
-	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var previous := _setup_button("◀", func():
+	var value_menu: Button = Button.new() if not chooser_kind.is_empty() else MenuButton.new()
+	value_menu.text = str(values[int(state["index"])])
+	value_menu.custom_minimum_size = Vector2(_value_width, 29)
+	value_menu.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_menu.add_theme_font_size_override("font_size", 12)
+	value_menu.add_theme_color_override("font_color", CREAM)
+	for menu_style in ["normal", "hover", "pressed"]:
+		value_menu.add_theme_stylebox_override(menu_style, StyleBoxEmpty.new())
+	if chooser_kind.is_empty():
+		for option_index in values.size():
+			(value_menu as MenuButton).get_popup().add_item(str(values[option_index]), option_index)
+		if nonselectable_first:
+			(value_menu as MenuButton).get_popup().set_item_disabled(0, true)
+		(value_menu as MenuButton).get_popup().id_pressed.connect(func(option_index: int):
+			if nonselectable_first and option_index == 0:
+				return
+			state["index"] = option_index
+			value_menu.text = str(values[option_index])
+			changed.call(option_index))
+	else:
+		var backstory_ids := CHILDHOOD_IDS if chooser_kind == "childhood" else ADULTHOOD_IDS
+		value_menu.mouse_entered.connect(func():
+			if get_node_or_null("PreparationOptionDialog") == null:
+				_show_preparation_entry_hover(value_menu, _preparation_option_detail(chooser_kind, str(backstory_ids[int(state["index"])]), str(values[int(state["index"])]))))
+		value_menu.mouse_exited.connect(_hide_preparation_entry_hover)
+		value_menu.pressed.connect(func():
+			var ids := backstory_ids
+			_open_preparation_option_dialog(chooser_kind, ids, values, str(ids[int(state["index"])]), func(id: String):
+				var option_index := ids.find(id)
+				if option_index >= 0:
+					state["index"] = option_index
+					value_menu.text = str(values[option_index])
+					changed.call(option_index)))
+	var previous := _preparation_classic_bare_button("<", func():
 		state["index"] = posmod(int(state["index"]) - 1, values.size())
-		value_label.text = str(values[int(state["index"])] )
-		changed.call(), false, Vector2(17, 27))
-	previous.flat = true
-	for state_name in ["normal", "hover", "pressed", "focus"]:
-		previous.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+		if nonselectable_first and int(state["index"]) == 0:
+			state["index"] = values.size() - 1
+		value_menu.text = str(values[int(state["index"])] )
+		changed.call(int(state["index"])), 14, 29, 17)
 	row.add_child(previous)
-	row.add_child(value_label)
-	var next := _setup_button("▶", func():
+	var bar := PanelContainer.new()
+	bar.custom_minimum_size = Vector2(_value_width, 29)
+	var bar_style := _style(Color("#17191b"), Color("#292b2d"), 0)
+	bar_style.set_content_margin_all(0)
+	bar.add_theme_stylebox_override("panel", bar_style)
+	bar.add_child(value_menu)
+	row.add_child(bar)
+	var next := _preparation_classic_bare_button(">", func():
 		state["index"] = posmod(int(state["index"]) + 1, values.size())
-		value_label.text = str(values[int(state["index"])])
-		changed.call(), false, Vector2(17, 27))
-	next.flat = true
-	for state_name in ["normal", "hover", "pressed", "focus"]:
-		next.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+		if nonselectable_first and int(state["index"]) == 0:
+			state["index"] = 1
+		value_menu.text = str(values[int(state["index"])] )
+		changed.call(int(state["index"])), 14, 29, 17)
 	row.add_child(next)
 	state["row"] = row
+	state["value_menu"] = value_menu
 	return state
 
 
-func _preparation_choice_chips(parent: Control, ids: Array, names: Array, selected_ids: Array, add_caption: String, header: HBoxContainer = null) -> Array:
+func _preparation_option_filters(kind: String) -> Array:
+	var result: Array = [{"id": "all", "label": _prep_local("All", "Tümü", "Wszystkie")}]
+	if kind in ["childhood", "adulthood"]:
+		result.append({"id": "no_restrictions", "label": _prep_local("No work restrictions", "İş kısıtlaması yok", "Bez ograniczeń pracy")})
+		result.append({"id": "no_penalties", "label": _prep_local("No skill penalties", "Beceri eksisi yok", "Bez kar umiejętności")})
+		for skill in CLASSIC_SKILL_IDS:
+			result.append({"id": "skill:" + str(skill), "label": _localized_skill(str(skill)) + " +"})
+	elif kind == "trait":
+		result.append({"id": "positive", "label": _prep_local("Positive", "Olumlu", "Pozytywne")})
+		result.append({"id": "negative", "label": _prep_local("Negative", "Olumsuz", "Negatywne")})
+		result.append({"id": "work_restriction", "label": _prep_local("Work restriction", "İş kısıtlaması", "Ograniczenie pracy")})
+		result.append({"id": "mood_effect", "label": _prep_local("Mood effect", "Ruh hali etkisi", "Wpływ na nastrój")})
+		result.append({"id": "movement_effect", "label": _prep_local("Movement effect", "Hareket etkisi", "Wpływ na ruch")})
+		result.append({"id": "work_speed_effect", "label": _prep_local("Work speed effect", "İş hızı etkisi", "Wpływ na szybkość pracy")})
+		result.append({"id": "social_effect", "label": _prep_local("Social effect", "Sosyal etki", "Wpływ społeczny")})
+	elif kind == "health":
+		result.append({"id": "capacity", "label": _prep_local("Capacity effects", "Kapasite etkileri", "Wpływ na zdolność")})
+		result.append({"id": "injury", "label": _prep_local("Injuries", "Yaralanmalar", "Obrażenia")})
+		result.append({"id": "pain", "label": _prep_local("Pain", "Acı", "Ból")})
+	return result
+
+
+func _preparation_option_matches(kind: String, option_id: String, filter_id: String) -> bool:
+	if filter_id == "all": return true
+	if kind in ["childhood", "adulthood"]:
+		var adjustments: Dictionary = PreparationRules.BACKSTORY_SKILLS.get(option_id, {})
+		if filter_id == "no_restrictions":
+			return PreparationRules.incapable_of(option_id if kind == "childhood" else "", option_id if kind == "adulthood" else "", [], []).is_empty()
+		if filter_id == "no_penalties":
+			for skill in adjustments:
+				if int(adjustments[skill]) < 0: return false
+			return true
+		if filter_id.begins_with("skill:"):
+			return int(adjustments.get(filter_id.trim_prefix("skill:"), 0)) > 0
+	if kind == "trait":
+		var trait_cost := int(GameModel.TRAIT_COSTS.get(option_id, 0))
+		match filter_id:
+			"positive": return trait_cost > 0
+			"negative": return trait_cost < 0
+			"work_restriction": return not PreparationRules.incapable_of("", "", [option_id], []).is_empty()
+			"mood_effect": return option_id in ["calm", "night_owl", "kind"]
+			"movement_effect": return option_id in ["quick", "fast_walker"]
+			"work_speed_effect": return option_id in ["hardworking", "lazy", "curious"]
+			"social_effect": return option_id in ["kind", "abrasive", "ugly"]
+		return false
+	if kind == "health":
+		if filter_id == "capacity": return option_id in ["asthma", "bad_back"]
+		if filter_id == "injury": return PreparationRules.CONDITION_INJURIES.has(option_id)
+		if filter_id == "pain": return option_id == "scar" or PreparationRules.CONDITION_INJURIES.has(option_id)
+		return false
+	return true
+
+
+func _preparation_option_description(kind: String, option_id: String) -> String:
+	if kind in ["childhood", "adulthood"]:
+		match option_id:
+			"unknown": return _prep_local("No known background; no skill or work effects.", "Bilinen geçmişi yok; beceriye veya işe etkisi yok.", "Brak znanej przeszłości; bez wpływu na umiejętności i pracę.")
+			"rural_child": return _prep_local("Raised near fields and livestock; learned practical outdoor work.", "Tarlalar ve hayvanlar arasında büyüdü; temel açık hava işlerini öğrendi.", "Dorastał na wsi i poznał pracę w polu.")
+			"town_child": return _prep_local("Grew up among traders and workshops.", "Esnaf ve atölyeler arasında büyüdü.", "Dorastał wśród warsztatów i kupców.")
+			"apprentice": return _prep_local("Worked with a craftsperson from an early age.", "Küçük yaştan itibaren bir ustanın yanında çalıştı.", "Od dziecka uczył się rzemiosła.")
+			"vatgrown_soldier": return _prep_local("Trained for combat in a vatgrown program; lost everyday social and care skills.", "Tankta yetiştirme programında savaş için eğitildi; sosyal ve bakım işlerinden uzak kaldı.", "Wychowany do walki; bez praktyki społecznej.")
+			"farmer": return _prep_local("Worked on crop fields. Improves growing, not animal handling.", "Ekin tarlalarında çalıştı. Hayvancılık yerine yetiştirmeyi geliştirir.", "Pracował na polach uprawnych.")
+			"builder": return _prep_local("Built shelters and structures.", "Barınaklar ve yapılar inşa etti.", "Budował schronienia i konstrukcje.")
+			"medic": return _prep_local("Treated illnesses and injuries.", "Hastalık ve yaralanmaları tedavi etti.", "Leczył choroby i urazy.")
+			"scholar": return _prep_local("Spent years studying; avoids carrying loads.", "Yıllarını araştırmaya ayırdı; yük taşımaktan kaçınır.", "Lata spędził na badaniach.")
+	elif kind == "trait":
+		match option_id:
+			"hardworking": return _prep_local("Completes work 20% faster.", "İşleri %20 daha hızlı tamamlar.", "Pracuje o 20% szybciej.")
+			"calm": return _prep_local("Mood target increases by 8.", "Hedef ruh hali 8 artar.", "Nastrój wzrasta o 8.")
+			"quick": return _prep_local("Can take an extra step every second tick.", "Her ikinci zaman adımında ek bir kare ilerleyebilir.", "Dodatkowy krok co drugi takt.")
+			"curious": return _prep_local("Researches 30% faster.", "Araştırması %30 hızlanır.", "Badania +30%.")
+			"kind":
+				var effects := PreparationRules.trait_effects("kind")
+				return _prep_local("Every sixth pleasant conversation can give the other person +%d mood and +%d opinion. Ignores Ugly first-impression penalties.", "Her altıncı olumlu konuşmada karşısındakine +%d ruh hali ve +%d görüş verebilir. Çirkin özelliğinin ilk izlenim cezasını yok sayar.", "Co szósta miła rozmowa: +%d nastroju i +%d opinii; ignoruje brzydotę.") % [int(effects.get("kind_words_mood", 0)), int(effects.get("kind_words_opinion", 0))]
+			"night_owl": return _prep_local("Mood +16 from 23:00 to 06:00; −10 from 11:00 to 18:00.", "23.00–06.00 arası ruh hali +16; 11.00–18.00 arası −10.", "Nastrój +16 nocą (23–06), −10 w dzień (11–18).")
+			"timid": return _prep_local("Deals 25% less combat damage.", "Savaşta %25 daha az hasar verir.", "Zadaje o 25% mniej obrażeń.")
+			"abrasive": return _prep_local("Every third conversation with another colonist becomes an argument.", "Başka bir kolonistle her üçüncü konuşması tartışmaya dönüşür.", "Co trzecia rozmowa staje się kłótnią.")
+			"lazy": return _prep_local("Completes work 20% slower.", "İşleri %20 daha yavaş tamamlar.", "Pracuje o 20% wolniej.")
+			"pyromaniac": return _prep_local("Cannot fight fires.", "Yangın söndürme işini yapamaz.", "Nie gasi pożarów.")
+			"fast_walker": return _prep_local("Can take an extra step every second tick.", "Her ikinci zaman adımında ek bir kare ilerleyebilir.", "Dodatkowy krok co drugi takt.")
+			"ugly": return _prep_local("Other colonists start with −20 opinion on first meeting, except Kind colonists.", "İlk tanışmada diğer kolonistlerin görüşü −20 olur; İyi kalpliler etkilenmez.", "Pierwsze wrażenie: −20 opinii, z wyjątkiem życzliwych.")
+	elif kind == "health":
+		match option_id:
+			"asthma": return _prep_local("Work speed −13%.", "İş hızı %13 azalır.", "Praca −13%.")
+			"bad_back": return _prep_local("Starts with 92 health; mining, hauling and building speed −24%.", "92 canla başlar; madencilik, taşıma ve inşaat hızı %24 azalır.", "92 zdrowia; praca fizyczna wolniejsza.")
+			"scar": return _prep_local("Permanent tissue damage; severity reduces the part's capacity. Scars do not bleed.", "Kalıcı doku hasarı; şiddet, bölgenin kapasitesini düşürür. Yara izi kanamaz.", "Trwałe uszkodzenie tkanki; nasilenie zmniejsza sprawność części ciała. Blizna nie krwawi.")
+			"cut_light": return _prep_local("A cut causes 1.25% pain per severity and bleeding. It heals over time.", "Kesik, her şiddet puanı için %1,25 acı ve kanamaya yol açar. Zamanla iyileşir.", "Skaleczenie powoduje ból i krwawienie; goi się z czasem.")
+			"cut_deep": return _prep_local("A deeper cut causes 1.25% pain per severity and bleeding. It heals over time.", "Derin kesik, her şiddet puanı için %1,25 acı ve kanamaya yol açar. Zamanla iyileşir.", "Głębokie skaleczenie powoduje ból i krwawienie; goi się z czasem.")
+			"bruise": return _prep_local("A blunt injury causes 1.25% pain per severity, without bleeding.", "Künt darbe, her şiddet puanı için %1,25 acıya yol açar; kanamaz.", "Stłuczenie powoduje ból bez krwawienia.")
+			"burn": return _prep_local("A burn causes 1.875% pain per severity, without bleeding.", "Yanık, her şiddet puanı için %1,875 acıya yol açar; kanamaz.", "Oparzenie powoduje ból bez krwawienia.")
+			"scratch": return _prep_local("An animal scratch causes 1.25% pain per severity and bleeding.", "Hayvan çiziği, her şiddet puanı için %1,25 acı ve kanamaya yol açar.", "Zadrapanie zwierzęcia powoduje ból i krwawienie.")
+	return ""
+
+
+func _preparation_option_detail(kind: String, option_id: String, display_name: String) -> String:
+	var lines: Array[String] = [display_name, "", _preparation_option_description(kind, option_id)]
+	var changes: Dictionary = PreparationRules.BACKSTORY_SKILLS.get(option_id, {}) if kind in ["childhood", "adulthood"] else PreparationRules.TRAIT_SKILLS.get(option_id, {}) if kind == "trait" else PreparationRules.CONDITION_SKILLS.get(option_id, {})
+	if not changes.is_empty():
+		lines.append("")
+		lines.append(_prep_local("Skill changes", "Beceri değişimleri", "Zmiany umiejętności"))
+		for skill in changes:
+			lines.append("%s  %+d" % [_localized_skill(str(skill)), int(changes[skill])])
+	var incapable := PreparationRules.incapable_of(option_id if kind == "childhood" else "", option_id if kind == "adulthood" else "", [option_id] if kind == "trait" else [], [])
+	if not incapable.is_empty():
+		lines.append("")
+		lines.append(_prep_local("Incapable of", "Yapamadığı işler", "Niezdolność") + ": " + ", ".join(incapable.map(func(work: Variant): return _preparation_incapable_name(str(work)))))
+	if kind == "trait":
+		lines.append("")
+		lines.append(_prep_local("Preparation points", "Hazırlık puanı", "Punkty przygotowania") + ": %+d" % (int(GameModel.TRAIT_COSTS.get(option_id, 0)) * 20))
+	elif kind == "health":
+		lines.append("")
+		lines.append(_prep_local("Preparation points", "Hazırlık puanı", "Punkty przygotowania") + ": %+d" % (int(GameModel.HEALTH_CONDITION_COSTS.get(option_id, 0)) * 20))
+	return "\n".join(lines)
+
+
+func _show_preparation_entry_hover(source: Control, detail: String) -> void:
+	_hide_preparation_entry_hover()
+	var popup := PanelContainer.new()
+	popup.name = "PreparationEntryHover"
+	popup.z_index = 80
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.custom_minimum_size = Vector2(320, 0)
+	var popup_style := _style(Color("#202224"), Color("#b29a69"), 2)
+	popup_style.set_content_margin_all(12)
+	popup.add_theme_stylebox_override("panel", popup_style)
+	add_child(popup)
+	var description := _label(detail, 13, CREAM)
+	description.name = "PreparationEntryHoverText"
+	description.custom_minimum_size.x = 296
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.add_child(description)
+	popup.reset_size()
+	var source_rect := source.get_global_rect()
+	var viewport_size := get_viewport_rect().size
+	var popup_size := popup.get_combined_minimum_size()
+	var hover_x := source_rect.end.x + 8.0
+	if hover_x + popup_size.x > viewport_size.x - 8.0:
+		hover_x = source_rect.position.x - popup_size.x - 8.0
+	var hover_y := clampf(source_rect.position.y, 8.0, maxf(8.0, viewport_size.y - popup_size.y - 8.0))
+	popup.position = Vector2(maxf(8.0, hover_x), hover_y) - global_position
+
+
+func _hide_preparation_entry_hover() -> void:
+	var popup := get_node_or_null("PreparationEntryHover")
+	if popup != null:
+		remove_child(popup)
+		popup.queue_free()
+
+
+func _remove_preparation_dialog_filter(active_filters: Array[String], filter_id: String, refresh_state: Dictionary) -> void:
+	active_filters.erase(filter_id)
+	var refresh: Callable = refresh_state.get("call", Callable())
+	if refresh.is_valid():
+		refresh.call()
+
+
+func _open_preparation_option_dialog(kind: String, ids: Array, names: Array, current_id: String, selected: Callable, unavailable: Array = []) -> void:
+	_hide_preparation_entry_hover()
+	var previous := get_node_or_null("PreparationOptionDialog")
+	if previous != null:
+		previous.queue_free()
+	var dialog := PanelContainer.new()
+	dialog.name = "PreparationOptionDialog"
+	dialog.z_index = 40
+	dialog.position = Vector2(maxf(8.0, (size.x - 610.0) * 0.5), maxf(8.0, (size.y - 410.0) * 0.5))
+	dialog.custom_minimum_size = Vector2(610, 410)
+	dialog.size = Vector2(610, 410)
+	var frame := _style(Color("#242628"), Color("#72716c"), 0)
+	frame.set_content_margin_all(10)
+	dialog.add_theme_stylebox_override("panel", frame)
+	add_child(dialog)
+	var content := _vbox(8)
+	dialog.add_child(content)
+	var header := _hbox(5)
+	content.add_child(header)
+	var heading := _prep_local("Backstory", "Geçmiş", "Przeszłość") if kind in ["childhood", "adulthood"] else _prep_local("Traits", "Özellikler", "Cechy") if kind == "trait" else _prep_local("Health", "Sağlık", "Zdrowie")
+	header.add_child(_label(heading, 19, CREAM))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(spacer)
+	header.add_child(_preparation_classic_bare_button("×", dialog.queue_free, 24, 24, 19))
+	var tools_row := _hbox(8)
+	content.add_child(tools_row)
+	var filters := _preparation_option_filters(kind)
+	var active_filters: Array[String] = []
+	var filter_button := _preparation_classic_gold_menu(_prep_local("Add filter", "Filtre ekle", "Dodaj filtr"), 170, 27)
+	filter_button.name = "PreparationChoiceFilter"
+	tools_row.add_child(filter_button)
+	for filter_index in filters.size():
+		filter_button.get_popup().add_item(str(filters[filter_index]["label"]), filter_index)
+	var search := LineEdit.new()
+	search.name = "PreparationChoiceSearch"
+	search.placeholder_text = _prep_local("Search", "Ara", "Szukaj")
+	search.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	search.add_theme_stylebox_override("normal", _style(Color("#161819"), Color("#4a4c4d"), 0))
+	search.add_theme_stylebox_override("focus", _style(Color("#161819"), GOLD, 0))
+	tools_row.add_child(search)
+	var filter_chips := _hbox(5)
+	filter_chips.name = "PreparationActiveFilters"
+	filter_chips.custom_minimum_size.y = 20
+	content.add_child(filter_chips)
+	var columns := _hbox(8)
+	columns.custom_minimum_size.y = 290
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	var list_back := PanelContainer.new()
+	list_back.custom_minimum_size.x = 270
+	list_back.add_theme_stylebox_override("panel", _style(Color("#17191b"), Color("#3c3f41"), 0))
+	columns.add_child(list_back)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	list_back.add_child(scroll)
+	var option_rows := _vbox(1)
+	option_rows.name = "PreparationChoiceRows"
+	option_rows.custom_minimum_size.x = 260
+	scroll.add_child(option_rows)
+	var detail_back := PanelContainer.new()
+	detail_back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_style := _style(Color("#1b1d1f"), Color("#3c3f41"), 0)
+	detail_style.set_content_margin_all(10)
+	detail_back.add_theme_stylebox_override("panel", detail_style)
+	columns.add_child(detail_back)
+	var details := _label("", 13, CREAM)
+	details.name = "PreparationChoiceDetails"
+	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail_back.add_child(details)
+	var current_index := ids.find(current_id)
+	if current_index >= 0:
+		details.text = _preparation_option_detail(kind, current_id, str(names[current_index]))
+	var refresh_state := {"call": Callable()}
+	var refresh: Callable
+	refresh = func():
+		for old_chip in filter_chips.get_children():
+			filter_chips.remove_child(old_chip)
+			old_chip.queue_free()
+		for filter_entry in filters:
+			var chip_id := str(filter_entry["id"])
+			if not active_filters.has(chip_id): continue
+			var chip := PanelContainer.new()
+			chip.add_theme_stylebox_override("panel", _style(Color("#35383a"), Color("#646360"), 0))
+			var chip_content := _hbox(2)
+			chip.add_child(chip_content)
+			chip_content.add_child(_label(str(filter_entry["label"]), 11, CREAM))
+			var remove_filter := _preparation_classic_bare_button("×", _remove_preparation_dialog_filter.bind(active_filters, chip_id, refresh_state), 17, 20, 14)
+			remove_filter.name = "PreparationFilterRemove_" + chip_id.replace(":", "_")
+			remove_filter.tooltip_text = _prep_local("Remove filter", "Filtreyi kaldır", "Usuń filtr")
+			chip_content.add_child(remove_filter)
+			filter_chips.add_child(chip)
+		for old_row in option_rows.get_children():
+			option_rows.remove_child(old_row)
+			old_row.queue_free()
+		for option_index in ids.size():
+			var option_id := str(ids[option_index])
+			var option_name := str(names[option_index])
+			if unavailable.has(option_id):
+				continue
+			var passes_filters := true
+			for filter_id in active_filters:
+				if not _preparation_option_matches(kind, option_id, filter_id):
+					passes_filters = false
+					break
+			if not passes_filters: continue
+			if not search.text.is_empty() and not option_name.to_lower().contains(search.text.to_lower()):
+				continue
+			var row := Button.new()
+			row.text = option_name
+			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			row.custom_minimum_size = Vector2(257, 28)
+			row.add_theme_font_size_override("font_size", 12)
+			row.add_theme_color_override("font_color", CREAM)
+			for state_name in ["normal", "hover", "pressed"]:
+				var row_color := Color("#333638") if state_name == "hover" else Color("#292b2d") if option_id == current_id else Color("#202224")
+				row.add_theme_stylebox_override(state_name, _style(row_color, Color.TRANSPARENT, 0))
+			row.mouse_entered.connect(func(): details.text = _preparation_option_detail(kind, option_id, option_name))
+			row.pressed.connect(func():
+				dialog.queue_free()
+				selected.call(option_id))
+			option_rows.add_child(row)
+	refresh_state["call"] = refresh
+	filter_button.get_popup().id_pressed.connect(func(filter_index: int):
+		var filter_id := str(filters[filter_index]["id"])
+		if filter_id == "all":
+			active_filters.clear()
+		elif not active_filters.has(filter_id):
+			active_filters.append(filter_id)
+		refresh.call())
+	search.text_changed.connect(func(_value: String): refresh.call())
+	refresh.call()
+
+
+func _preparation_choice_chips(parent: Control, ids: Array, names: Array, selected_ids: Array, add_caption: String, header: HBoxContainer = null, start_y := 37.0, show_empty := true) -> Array:
 	var states: Array = []
-	for slot in range(3):
-		var selected_id := str(selected_ids[slot]) if slot < selected_ids.size() else ""
-		states.append({"index": maxi(0, ids.find(selected_id))})
-	var selected_count := 0
+	for selected_id in selected_ids:
+		var choice_index := ids.find(str(selected_id))
+		if choice_index > 0 and not _preparation_index_taken(states, choice_index):
+			states.append({"index": choice_index})
+	var scroller := ScrollContainer.new()
+	scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_preparation_place(parent, scroller, 15, start_y, 295, maxf(36.0, parent.custom_minimum_size.y - start_y - 5.0))
+	var rows := _vbox(3)
+	scroller.add_child(rows)
+	var kind := "trait" if ids.size() == TRAIT_IDS.size() else "health"
 	for slot in range(states.size()):
 		var choice_index := int(states[slot]["index"])
-		if choice_index == 0:
-			continue
-		selected_count += 1
-		var chip_panel := PanelContainer.new()
-		chip_panel.custom_minimum_size = Vector2(194, 27)
-		chip_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-		chip_panel.add_theme_stylebox_override("panel", _style(Color("#181a1b"), Color.TRANSPARENT, 0))
-		parent.add_child(chip_panel)
-		var chip_row := _hbox(0)
-		chip_panel.add_child(chip_row)
 		var target_slot := slot
-		var chip := _label(str(names[choice_index]), 12, CREAM)
-		chip.custom_minimum_size = Vector2(169, 25)
-		chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		chip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		chip_row.add_child(chip)
-		var remove := _setup_button("×", func():
-			states[target_slot]["index"] = 0
+		var chip_row := _hbox(4)
+		chip_row.custom_minimum_size = Vector2(277, 25)
+		rows.add_child(chip_row)
+		var value_button := Button.new()
+		value_button.name = "PreparationTraitEntry" if kind == "trait" else "PreparationHealthEntry"
+		value_button.text = "•  " + str(names[choice_index])
+		value_button.custom_minimum_size = Vector2(250, 25)
+		value_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		value_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		value_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		value_button.add_theme_font_size_override("font_size", 13)
+		value_button.add_theme_color_override("font_color", CREAM)
+		value_button.add_theme_color_override("font_hover_color", GOLD)
+		value_button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		value_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		value_button.add_theme_stylebox_override("hover", _style(Color("#323538"), Color.TRANSPARENT, 0))
+		value_button.add_theme_stylebox_override("pressed", _style(Color("#383c3d"), Color.TRANSPARENT, 0))
+		value_button.pressed.connect(func():
+			var unavailable: Array = []
+			for other_slot in range(states.size()):
+				if other_slot != target_slot:
+					unavailable.append(str(ids[int(states[other_slot]["index"])]))
+			_open_preparation_option_dialog(kind, ids.slice(1), names.slice(1), str(ids[int(states[target_slot]["index"])]), func(selected_id: String):
+				states[target_slot]["index"] = ids.find(selected_id)
+				_save_character_inputs()
+				_show_characters(), unavailable))
+		value_button.mouse_entered.connect(_show_preparation_entry_hover.bind(value_button, _preparation_option_detail(kind, str(ids[choice_index]), str(names[choice_index]))))
+		value_button.mouse_exited.connect(_hide_preparation_entry_hover)
+		chip_row.add_child(value_button)
+		var remove := _preparation_classic_bare_button("×", func():
+			_hide_preparation_entry_hover()
+			states.remove_at(target_slot)
 			_save_character_inputs()
-			_show_characters(), false, Vector2(18, 25))
-		remove.tooltip_text = _prep_local("Remove", "Kaldır", "Usuń")
-		remove.flat = true
+			_show_characters(), 22, 25, 17)
 		for state_name in ["normal", "hover", "pressed", "focus"]:
 			remove.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+		remove.tooltip_text = _prep_local("Remove", "Kaldır", "Usuń")
 		chip_row.add_child(remove)
-	if selected_count < 3:
-		var add_choice := MenuButton.new()
+	if states.is_empty() and show_empty:
+		rows.add_child(_label(_prep_local("No traits", "Özellik yok", "Brak cech"), 12, MUTED))
+	if states.size() < ids.size() - 1:
+		var add_choice := Button.new()
 		add_choice.text = "+" if header != null else "+  " + add_caption
 		add_choice.tooltip_text = add_caption
 		add_choice.custom_minimum_size = Vector2(22, 23) if header != null else Vector2(180, 27)
@@ -3103,19 +5581,14 @@ func _preparation_choice_chips(parent: Control, ids: Array, names: Array, select
 			add_choice.flat = true
 			for state_name in ["normal", "hover", "pressed", "focus"]:
 				add_choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
-		var empty_slot := -1
-		for slot in range(states.size()):
-			if int(states[slot]["index"]) == 0:
-				empty_slot = slot
-				break
-		for candidate in range(1, ids.size()):
-			if not _preparation_index_taken(states, candidate):
-				add_choice.get_popup().add_item(str(names[candidate]), candidate)
-		var target_slot := empty_slot
-		add_choice.get_popup().id_pressed.connect(func(selected_index: int):
-			states[target_slot]["index"] = selected_index
-			_save_character_inputs()
-			_show_characters())
+		add_choice.pressed.connect(func():
+			var unavailable: Array = []
+			for selection in states:
+				unavailable.append(str(ids[int(selection["index"])]))
+			_open_preparation_option_dialog(kind, ids.slice(1), names.slice(1), "", func(selected_id: String):
+				states.append({"index": ids.find(selected_id)})
+				_save_character_inputs()
+				_show_characters(), unavailable))
 		if header != null:
 			header.add_child(add_choice)
 		else:
@@ -3123,15 +5596,337 @@ func _preparation_choice_chips(parent: Control, ids: Array, names: Array, select
 	return states
 
 
-func _step_preparation_chip(states: Array, slot: int, number_of_ids: int, direction: int) -> void:
-	var selected := int(states[slot]["index"])
-	for step in range(1, number_of_ids):
-		var candidate := 1 + posmod(selected - 1 + direction * step, number_of_ids - 1)
-		if not _preparation_index_taken(states, candidate):
-			states[slot]["index"] = candidate
-			_save_character_inputs()
-			_show_characters()
+func _preparation_migrate_legacy_injuries(spec_index: int) -> void:
+	if spec_index < 0 or spec_index >= character_specs.size():
+		return
+	var spec: Dictionary = character_specs[spec_index]
+	var conditions: Array = spec.get("condition_ids", [])
+	var chronic: Array = []
+	var injuries: Array = spec.get("health_injuries", []).duplicate(true)
+	var changed := false
+	for condition in conditions:
+		var condition_id := str(condition)
+		if INJURY_KIND_IDS.has(condition_id):
+			injuries.append({"kind": condition_id,
+				"body_part": str(PreparationRules.LEGACY_INJURY_PARTS.get(condition_id, "torso")), "count": 1})
+			changed = true
+		else:
+			chronic.append(condition_id)
+	if changed:
+		spec["condition_ids"] = chronic
+		spec["health_injuries"] = injuries
+		character_specs[spec_index] = spec
+
+
+func _preparation_body_part_label(part: String) -> String:
+	match part:
+		"head": return _prep_local("Head", "Kafa", "Głowa")
+		"torso": return _prep_local("Torso", "Gövde", "Tułów")
+		"left_arm": return _prep_local("Left arm", "Sol kol", "Lewe ramię")
+		"right_arm": return _prep_local("Right arm", "Sağ kol", "Prawe ramię")
+		"left_leg": return _prep_local("Left leg", "Sol bacak", "Lewa noga")
+		"right_leg": return _prep_local("Right leg", "Sağ bacak", "Prawa noga")
+	return part
+
+
+func _preparation_injury_cause_label(cause: String) -> String:
+	match cause:
+		"unknown": return _prep_local("Unknown", "Bilinmiyor", "Nieznana")
+		"human_fist": return _prep_local("Human fist", "İnsan yumruğu", "Ludzka pięść")
+		"animal_strike": return _prep_local("Animal strike", "Hayvan darbesi", "Uderzenie zwierzęcia")
+		"blunt_weapon": return _prep_local("Blunt weapon", "Künt silah", "Broń obuchowa")
+		"fall": return _prep_local("Fall", "Düşme", "Upadek")
+		"knife": return _prep_local("Knife", "Bıçak", "Nóż")
+		"sword": return _prep_local("Sword", "Kılıç", "Miecz")
+		"glass": return _prep_local("Glass", "Cam", "Szkło")
+		"animal_claw": return _prep_local("Animal claw", "Hayvan pençesi", "Pazur zwierzęcia")
+		"fire": return _prep_local("Fire", "Ateş", "Ogień")
+		"hot_surface": return _prep_local("Hot surface", "Sıcak yüzey", "Gorąca powierzchnia")
+		"old_cut": return _prep_local("Old cut", "Eski kesik", "Stare skaleczenie")
+		"old_burn": return _prep_local("Old burn", "Eski yanık", "Stare oparzenie")
+		"old_scratch": return _prep_local("Old scratch", "Eski çizik", "Stare zadrapanie")
+	return _preparation_injury_cause_label("unknown")
+
+
+func _preparation_injury_tier_label(tier: String, injury_id: String = "") -> String:
+	if injury_id == "bruise" and tier == "severe":
+		return _prep_local("Moderate", "Orta", "Umiarkowany")
+	if injury_id == "bruise" and tier == "extreme":
+		return _prep_local("Older value", "Eski değer", "Starsza wartość")
+	match tier:
+		"minor": return _prep_local("Minor", "Hafif", "Lekki")
+		"moderate": return _prep_local("Moderate", "Orta", "Umiarkowany")
+		"severe": return _prep_local("Severe", "Ağır", "Ciężki")
+		"extreme": return _prep_local("Extreme", "Çok ağır", "Skrajny")
+	return ""
+
+
+func _preparation_injury_label(entry: Dictionary) -> String:
+	var label := "%d× %s · %s" % [int(entry.get("count", 1)), _preparation_condition_label(str(entry.get("kind", "bruise"))),
+		_preparation_body_part_label(str(entry.get("body_part", "torso")))]
+	if str(entry.get("cause", "unknown")) != "unknown":
+		label += " · " + _preparation_injury_cause_label(str(entry.get("cause", "unknown")))
+	return label
+
+
+func _preparation_injury_detail(entry: Dictionary) -> String:
+	var kind := str(entry.get("kind", "bruise"))
+	var rule: Dictionary = PreparationRules.prepared_injuries({"health_injuries": [entry]})[0]
+	var count := int(entry.get("count", 1))
+	var severity := float(rule.get("severity", 0.0))
+	var pain := PreparationRules.wound_pain(rule) * 100.0
+	return "%s\n%s: %s\n%s: %s\n%s: %d\n%s: %s (%.0f)  ·  %s: %.1f%%\n%s" % [
+		_preparation_condition_label(kind), _prep_local("Body part", "Vücut bölgesi", "Część ciała"),
+		_preparation_body_part_label(str(entry.get("body_part", "torso"))),
+		_prep_local("Cause", "Neden", "Przyczyna"), _preparation_injury_cause_label(str(entry.get("cause", "unknown"))),
+		_prep_local("Count", "Adet", "Liczba"), count,
+		_prep_local("Severity each", "Her birinin şiddeti", "Nasilanie"), _preparation_injury_tier_label(str(entry.get("severity_tier", "")), kind), severity,
+		_prep_local("Pain each", "Her birinin acısı", "Ból"), pain,
+		_preparation_option_description("health", kind)]
+
+
+func _build_preparation_health_editor(parent: Control, header: HBoxContainer, selected_ids: Array, injuries: Array) -> Array:
+	var states: Array = []
+	for selected_id in selected_ids:
+		var choice_index := CONDITION_IDS.find(str(selected_id))
+		if choice_index > 0 and choice_index < CHRONIC_CONDITION_IDS.size() and not _preparation_index_taken(states, choice_index):
+			states.append({"index": choice_index})
+	var add_menu := MenuButton.new()
+	add_menu.name = "PreparationHealthAdd"
+	add_menu.text = "+"
+	add_menu.flat = true
+	add_menu.custom_minimum_size = Vector2(22, 23)
+	add_menu.tooltip_text = _prep_local("Add an injury or condition", "Yara veya rahatsızlık ekle", "Dodaj uraz lub chorobę")
+	for state_name in ["normal", "hover", "pressed", "focus"]:
+		add_menu.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+	header.add_child(add_menu)
+	add_menu.get_popup().add_item(_prep_local("Injury...", "Yara...", "Uraz..."), 0)
+	add_menu.get_popup().add_item(_prep_local("Condition...", "Rahatsızlık...", "Schorzenie..."), 1)
+	add_menu.get_popup().id_pressed.connect(func(choice: int):
+		if choice == 0:
+			_open_preparation_injury_dialog(-1)
 			return
+		var unavailable: Array = []
+		for selection in states:
+			unavailable.append(str(CONDITION_IDS[int(selection["index"])]))
+		_open_preparation_option_dialog("health", CHRONIC_CONDITION_IDS.slice(1), _preparation_condition_names().slice(1, CHRONIC_CONDITION_IDS.size()), "", func(selected_id: String):
+			states.append({"index": CONDITION_IDS.find(selected_id)})
+			_save_character_inputs()
+			_show_characters(), unavailable))
+	var scroller := ScrollContainer.new()
+	scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_preparation_place(parent, scroller, 15, 36, 295, 140)
+	var rows := _vbox(2)
+	scroller.add_child(rows)
+	for slot in range(states.size()):
+		var target_slot := slot
+		var condition_id := str(CONDITION_IDS[int(states[slot]["index"])])
+		var row := _hbox(4)
+		row.custom_minimum_size = Vector2(277, 25)
+		rows.add_child(row)
+		var value := _preparation_health_row_button("•  " + _preparation_condition_label(condition_id), "PreparationHealthEntry")
+		value.pressed.connect(func():
+			var unavailable: Array = []
+			for other_slot in range(states.size()):
+				if other_slot != target_slot:
+					unavailable.append(str(CONDITION_IDS[int(states[other_slot]["index"])]))
+			_open_preparation_option_dialog("health", CHRONIC_CONDITION_IDS.slice(1), _preparation_condition_names().slice(1, CHRONIC_CONDITION_IDS.size()), condition_id, func(selected_id: String):
+				states[target_slot]["index"] = CONDITION_IDS.find(selected_id)
+				_save_character_inputs()
+				_show_characters(), unavailable))
+		value.mouse_entered.connect(_show_preparation_entry_hover.bind(value,
+			_preparation_option_detail("health", condition_id, _preparation_condition_label(condition_id))))
+		value.mouse_exited.connect(_hide_preparation_entry_hover)
+		row.add_child(value)
+		var remove := _preparation_classic_bare_button("×", func():
+			_hide_preparation_entry_hover()
+			states.remove_at(target_slot)
+			_save_character_inputs()
+			_show_characters(), 22, 25, 17)
+		row.add_child(remove)
+	for slot in range(injuries.size()):
+		if not injuries[slot] is Dictionary:
+			continue
+		var target_slot := slot
+		var entry: Dictionary = injuries[slot]
+		var row := _hbox(4)
+		row.custom_minimum_size = Vector2(277, 25)
+		rows.add_child(row)
+		var value := _preparation_health_row_button("•  " + _preparation_injury_label(entry), "PreparationInjuryEntry_%d" % slot)
+		value.pressed.connect(func(): _open_preparation_injury_dialog(target_slot))
+		value.mouse_entered.connect(_show_preparation_entry_hover.bind(value, _preparation_injury_detail(entry)))
+		value.mouse_exited.connect(_hide_preparation_entry_hover)
+		row.add_child(value)
+		var remove := _preparation_classic_bare_button("×", func():
+			_hide_preparation_entry_hover()
+			_save_character_inputs()
+			var spec: Dictionary = character_specs[_editing_character_index].duplicate(true)
+			var remaining: Array = spec.get("health_injuries", []).duplicate(true)
+			remaining.remove_at(target_slot)
+			spec["health_injuries"] = remaining
+			character_specs[_editing_character_index] = spec
+			_show_characters(), 22, 25, 17)
+		row.add_child(remove)
+	if states.is_empty() and injuries.is_empty():
+		rows.add_child(_label(_prep_local("No injuries or conditions", "Yara veya rahatsızlık yok", "Brak urazów i chorób"), 12, MUTED))
+	return states
+
+
+func _preparation_health_row_button(caption: String, node_name: String) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.text = caption
+	button.custom_minimum_size = Vector2(250, 25)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.clip_text = true
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_color_override("font_color", CREAM)
+	button.add_theme_color_override("font_hover_color", GOLD)
+	button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	button.add_theme_stylebox_override("hover", _style(Color("#323538"), Color.TRANSPARENT, 0))
+	button.add_theme_stylebox_override("pressed", _style(Color("#383c3d"), Color.TRANSPARENT, 0))
+	return button
+
+
+func _preparation_injury_selector(parent: VBoxContainer, caption: String, ids: Array, labels: Array, selected: Dictionary, key: String) -> MenuButton:
+	var row := _hbox(7)
+	parent.add_child(row)
+	var title := _label(caption, 12, MUTED)
+	title.custom_minimum_size.x = 82
+	row.add_child(title)
+	var index := maxi(0, ids.find(selected.get(key, ids[0])))
+	var menu := _preparation_classic_gold_menu(str(labels[index]), 216, 27)
+	menu.name = "PreparationInjury_%s" % key
+	row.add_child(menu)
+	for option_index in ids.size():
+		menu.get_popup().add_item(str(labels[option_index]), option_index)
+	menu.get_popup().id_pressed.connect(func(option_index: int):
+		selected[key] = ids[option_index]
+		menu.text = str(labels[option_index]))
+	return menu
+
+
+func _preparation_refresh_injury_severity_menu(menu: MenuButton, selected: Dictionary) -> void:
+	var injury_id := str(selected.get("kind", "cut_light"))
+	var tiers := PreparationRules.injury_severity_tiers(injury_id)
+	var popup := menu.get_popup()
+	popup.clear()
+	for tier in tiers:
+		popup.add_item("%s (%d)" % [_preparation_injury_tier_label(str(tier)),
+			roundi(PreparationRules.injury_severity(injury_id, str(tier)))])
+	var selected_tier := str(selected.get("severity_tier", ""))
+	var index := tiers.find(selected_tier)
+	if index >= 0:
+		menu.text = popup.get_item_text(index)
+	else:
+		menu.text = "%s (%d)" % [_preparation_injury_tier_label(selected_tier, injury_id),
+			roundi(PreparationRules.injury_severity(injury_id, selected_tier))]
+
+
+func _preparation_refresh_injury_cause_menu(menu: MenuButton, selected: Dictionary) -> void:
+	var causes := PreparationRules.injury_causes(str(selected.get("kind", "cut_light")))
+	var popup := menu.get_popup()
+	popup.clear()
+	for cause in causes:
+		popup.add_item(_preparation_injury_cause_label(str(cause)))
+	var index := maxi(0, causes.find(str(selected.get("cause", "unknown"))))
+	menu.text = popup.get_item_text(index)
+
+
+func _preparation_injury_dynamic_selector(parent: VBoxContainer, caption: String,
+		selected: Dictionary, key: String) -> MenuButton:
+	var row := _hbox(7)
+	parent.add_child(row)
+	var title := _label(caption, 12, MUTED)
+	title.custom_minimum_size.x = 82
+	row.add_child(title)
+	var menu := _preparation_classic_gold_menu("", 216, 27)
+	menu.name = "PreparationInjury_%s" % key
+	row.add_child(menu)
+	if key == "severity_tier":
+		_preparation_refresh_injury_severity_menu(menu, selected)
+		menu.get_popup().id_pressed.connect(func(option_index: int):
+			selected[key] = PreparationRules.injury_severity_tiers(str(selected.get("kind", "cut_light")))[option_index]
+			_preparation_refresh_injury_severity_menu(menu, selected))
+	else:
+		_preparation_refresh_injury_cause_menu(menu, selected)
+		menu.get_popup().id_pressed.connect(func(option_index: int):
+			selected[key] = PreparationRules.injury_causes(str(selected.get("kind", "cut_light")))[option_index]
+			_preparation_refresh_injury_cause_menu(menu, selected))
+	return menu
+
+
+func _open_preparation_injury_dialog(entry_index: int) -> void:
+	var existing := get_node_or_null("PreparationInjuryDialog")
+	if existing != null:
+		existing.queue_free()
+	var spec: Dictionary = character_specs[_editing_character_index]
+	var injuries: Array = spec.get("health_injuries", [])
+	var selected: Dictionary = injuries[entry_index].duplicate(true) if entry_index >= 0 and entry_index < injuries.size() else \
+		{"kind": "cut_light", "body_part": "left_arm", "count": 1}
+	if not selected.has("severity_tier"):
+		selected["severity_tier"] = PreparationRules.injury_default_tier(str(selected.get("kind", "cut_light")))
+	if not selected.has("cause"):
+		selected["cause"] = "unknown"
+	var dialog := PanelContainer.new()
+	dialog.name = "PreparationInjuryDialog"
+	dialog.z_index = 35
+	dialog.position = Vector2(maxf(12.0, (size.x - 350.0) * 0.5), maxf(12.0, (size.y - 330.0) * 0.5))
+	dialog.custom_minimum_size = Vector2(350, 330)
+	var style := _style(Color("#252729"), GOLD, 0)
+	style.set_content_margin_all(13)
+	dialog.add_theme_stylebox_override("panel", style)
+	add_child(dialog)
+	var content := _vbox(9)
+	dialog.add_child(content)
+	content.add_child(_label(_prep_local("Injury", "Yara", "Uraz"), 18, CREAM))
+	var kind_labels: Array = []
+	for kind in INJURY_KIND_IDS:
+		kind_labels.append(_preparation_condition_label(str(kind)))
+	var kind_menu := _preparation_injury_selector(content, _prep_local("Type", "Tür", "Rodzaj"), INJURY_KIND_IDS, kind_labels, selected, "kind")
+	var part_labels: Array = []
+	for body_part in INJURY_BODY_PART_IDS:
+		part_labels.append(_preparation_body_part_label(str(body_part)))
+	_preparation_injury_selector(content, _prep_local("Body part", "Bölge", "Część ciała"), INJURY_BODY_PART_IDS, part_labels, selected, "body_part")
+	var tier_menu := _preparation_injury_dynamic_selector(content, _prep_local("Severity", "Şiddet", "Nasilenie"), selected, "severity_tier")
+	var cause_menu := _preparation_injury_dynamic_selector(content, _prep_local("Cause", "Neden", "Przyczyna"), selected, "cause")
+	kind_menu.get_popup().id_pressed.connect(func(_option_index: int):
+		selected["severity_tier"] = PreparationRules.injury_default_tier(str(selected["kind"]))
+		selected["cause"] = "unknown"
+		_preparation_refresh_injury_severity_menu(tier_menu, selected)
+		_preparation_refresh_injury_cause_menu(cause_menu, selected))
+	_preparation_injury_selector(content, _prep_local("Count", "Adet", "Liczba"), [1, 2, 3], ["1", "2", "3"], selected, "count")
+	var error_label := _label("", 11, RED)
+	error_label.custom_minimum_size.y = 27
+	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(error_label)
+	var actions := _hbox(8)
+	actions.alignment = BoxContainer.ALIGNMENT_END
+	content.add_child(actions)
+	actions.add_child(_preparation_classic_gold_button(_prep_local("Cancel", "İptal", "Anuluj"), dialog.queue_free, 90, 29))
+	var apply := _preparation_classic_gold_button(_prep_local("Apply", "Uygula", "Zastosuj"), func():
+		_save_character_inputs()
+		var updated: Dictionary = character_specs[_editing_character_index].duplicate(true)
+		var candidate: Array = updated.get("health_injuries", []).duplicate(true)
+		if entry_index < 0:
+			candidate.append(selected.duplicate(true))
+		else:
+			candidate[entry_index] = selected.duplicate(true)
+		var injury_error := PreparationRules.preparation_injury_error({
+			"health_conditions": updated.get("condition_ids", []), "health_injuries": candidate})
+		if not injury_error.is_empty():
+			error_label.text = _prep_local(injury_error,
+				"Bu yaralar başlangıç için fazla ağır veya tekrarlı. Bölgeyi, türü ya da adedi azalt.",
+				"Te obrażenia są zbyt ciężkie lub powtórzone. Zmień część ciała, rodzaj albo liczbę.")
+			return
+		updated["health_injuries"] = candidate
+		character_specs[_editing_character_index] = updated
+		dialog.queue_free()
+		_show_characters(), 90, 29)
+	actions.add_child(apply)
 
 
 func _preparation_index_taken(states: Array, candidate: int) -> bool:
@@ -3141,14 +5936,16 @@ func _preparation_index_taken(states: Array, candidate: int) -> bool:
 	return false
 
 
-func _preparation_skill_field(parent: Control, title: String, initial_index: int, changed: Callable, initial_passion: int = 0) -> Dictionary:
+func _preparation_skill_field(parent: Control, title: String, initial_index: int, changed: Callable, initial_passion: int = 0, row_y := 0.0) -> Dictionary:
 	var state := {"index": clampi(initial_index, 0, 20), "passion": clampi(initial_passion, 0, 2)}
-	var row := _hbox(4)
-	parent.add_child(row)
-	var caption := _label(title, 12, MUTED)
-	caption.custom_minimum_size.x = 105
+	var row := _hbox(0)
+	_preparation_place(parent, row, 14, row_y, 233, 22)
+	var caption := _label(title, 13, MUTED)
+	caption.custom_minimum_size.x = 88
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(caption)
 	var passion := PassionFlame.new()
+	passion.custom_minimum_size = Vector2(22, 21)
 	passion.level = int(state["passion"])
 	passion.tooltip_text = _prep_local("Click to change passion: none, interested, burning", "Tutkuyu değiştirmek için tıkla: yok, ilgili, çok tutkulu", "Kliknij, aby zmienić pasję")
 	passion.level_changed.connect(func(next_level: int): state["passion"] = next_level; changed.call())
@@ -3160,7 +5957,19 @@ func _preparation_skill_field(parent: Control, title: String, initial_index: int
 		state["index"] = value
 		changed.call())
 	state["level"] = level
+	var dash := _label("−", 18, MUTED)
+	dash.custom_minimum_size = Vector2(128, 21)
+	dash.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dash.visible = false
+	row.add_child(dash)
+	state["dash"] = dash
 	return state
+
+
+func _set_preparation_skill_disabled(field: Dictionary, disabled: bool) -> void:
+	(field["level"] as Control).visible = not disabled
+	(field["passion_button"] as Control).visible = not disabled
+	(field["dash"] as Control).visible = disabled
 
 
 func _preparation_palette(parent: VBoxContainer, title: String, colors: Array, field: Dictionary) -> Dictionary:
@@ -3215,36 +6024,55 @@ func _hair_options() -> Array:
 
 func _preparation_trait_names() -> Array:
 	if preferences.language == "tr":
-		return ["Yok", "Çalışkan (+6)", "Sakin (+4)", "Çevik (+4)", "Meraklı (+3)", "İyi kalpli (+3)", "Gece kuşu (+2)", "Çekingen (-4)", "Geçimsiz (-4)", "Tembel (-6)"]
+		return ["Yok", "Çalışkan", "Sakin", "Çevik", "Meraklı", "İyi kalpli", "Gece kuşu", "Çekingen", "Geçimsiz", "Tembel", "Piroman", "Hızlı yürür", "Çirkin"]
 	if preferences.language == "pl":
-		return ["Brak", "Pracowity (+6)", "Spokojny (+4)", "Zwinny (+4)", "Ciekawski (+3)", "Życzliwy (+3)", "Nocny marek (+2)", "Nieśmiały (-4)", "Opryskliwy (-4)", "Leniwy (-6)"]
+		return ["Brak", "Pracowity", "Spokojny", "Zwinny", "Ciekawski", "Życzliwy", "Nocny marek", "Nieśmiały", "Opryskliwy", "Leniwy", "Piroman", "Szybki chód", "Brzydki"]
 	return TRAIT_NAMES
 
 
 func _preparation_condition_names() -> Array:
 	if preferences.language == "tr":
-		return ["Yok", "Astım (-4)", "Bel sorunu (-5)", "Yara izi (-2)"]
+		return ["Yok", "Astım", "Bel sorunu", "Yara izi", "Hafif kesik", "Derin kesik", "Ezik", "Yanık", "Çizik"]
 	if preferences.language == "pl":
-		return ["Brak", "Astma (-4)", "Ból pleców (-5)", "Blizna (-2)"]
+		return ["Brak", "Astma", "Ból pleców", "Blizna", "Lekkie skaleczenie", "Głębokie skaleczenie", "Stłuczenie", "Oparzenie", "Zadrapanie"]
 	return CONDITION_NAMES
+
+
+func _preparation_condition_label(condition_id: String) -> String:
+	var index := CONDITION_IDS.find(condition_id)
+	return str(_preparation_condition_names()[index]) if index >= 0 else condition_id.capitalize()
+
+
+func _preparation_wound_label(kind: String) -> String:
+	match kind:
+		"scar": return _prep_local("Scar", "Yara izi", "Blizna")
+		"cut": return _prep_local("Cut", "Kesik", "Skaleczenie")
+		"bruise": return _prep_local("Bruise", "Ezik", "Stłuczenie")
+		"burn": return _prep_local("Burn", "Yanık", "Oparzenie")
+		"scratch": return _prep_local("Scratch", "Çizik", "Zadrapanie")
+	return kind.capitalize()
 
 func _save_character_inputs() -> void:
 	for input in _character_inputs:
 		var spec: Dictionary = character_specs[int(input.index)].duplicate(true)
-		spec["name"] = (input.name as LineEdit).text.strip_edges()
-		spec["nickname"] = spec["name"]
+		spec["nickname"] = _normalize_prepared_nickname((input.name as LineEdit).text)
 		spec["first_name"] = (input.first_name as LineEdit).text.strip_edges()
 		spec["last_name"] = (input.last_name as LineEdit).text.strip_edges()
+		spec["name"] = _prepared_display_name(spec)
 		spec["hair_index"] = int(input.hair["index"])
+		var chosen_hair_ids := MALE_HAIR_IDS if int(input.sex["index"]) == 1 else FEMALE_HAIR_IDS
+		spec["hair_style"] = chosen_hair_ids[clampi(int(input.hair["index"]), 0, chosen_hair_ids.size() - 1)]
 		spec["body_type"] = int(input.body_type["index"])
 		spec["head_type"] = int(input.head_type["index"])
-		spec["hair_color"] = "#" + (input.hair_color as ColorPickerButton).color.to_html(false)
-		spec["skin_color"] = "#" + (input.skin as ColorPickerButton).color.to_html(false)
+		if input.hair_color is PrepColorButton:
+			spec["hair_color"] = "#" + (input.hair_color as PrepColorButton).color.to_html(false)
+		if input.skin is PrepColorButton:
+			spec["skin_color"] = "#" + (input.skin as PrepColorButton).color.to_html(false)
 		spec["sex"] = ["female", "male"][int(input.sex["index"])]
 		spec["age"] = int((input.age as PrepStepper).value)
 		spec["chronological_age"] = maxi(int((input.chronological_age as PrepStepper).value), spec["age"])
-		spec["childhood"] = ["rural_child", "town_child", "apprentice"][int(input.childhood["index"])]
-		spec["adulthood"] = ["farmer", "builder", "medic", "scholar"][int(input.adulthood["index"])]
+		spec["childhood"] = CHILDHOOD_IDS[int(input.childhood["index"])]
+		spec["adulthood"] = ADULTHOOD_IDS[int(input.adulthood["index"])]
 		var traits: Array = []
 		for selection in input.traits:
 			var trait_id: String = str(TRAIT_IDS[int(selection["index"])])
@@ -3258,7 +6086,7 @@ func _save_character_inputs() -> void:
 		var skills: Dictionary = {}
 		var passions: Dictionary = {}
 		for skill in input.skills:
-			skills[skill] = int(input.skills[skill]["index"])
+			skills[skill] = clampi(int(input.skills[skill]["index"]) - int(input.modifiers.get(skill, 0)), 0, 20)
 			passions[skill] = int(input.skills[skill]["passion"])
 		spec["skills"] = _derive_work_skills(skills)
 		spec["passions"] = passions
@@ -3270,41 +6098,80 @@ func _refresh_character_editor() -> void:
 	_save_character_inputs()
 	var spec: Dictionary = character_specs[_editing_character_index]
 	var input: Dictionary = _character_inputs[0]
+	var modifiers: Dictionary = PreparationRules.skill_modifiers(str(spec.get("childhood", "rural_child")), str(spec.get("adulthood", "farmer")), spec.get("trait_ids", []), spec.get("condition_ids", []))
+	var incapable: Array = PreparationRules.incapable_of(str(spec.get("childhood", "rural_child")), str(spec.get("adulthood", "farmer")), spec.get("trait_ids", []), spec.get("condition_ids", []))
+	for skill in input.skills:
+		var next_level := clampi(int(spec.get("skills", {}).get(skill, 0)) + int(modifiers.get(skill, 0)), 0, 20)
+		input.skills[skill]["index"] = next_level
+		(input.skills[skill]["level"] as PrepStepper).set_value(next_level, false)
+		_set_preparation_skill_disabled(input.skills[skill], incapable.has(skill))
+	input["modifiers"] = modifiers
+	var incapable_names: Array[String] = []
+	for work in incapable:
+		incapable_names.append(_preparation_incapable_name(str(work)))
+	(input.incapable_text as Label).text = ", ".join(incapable_names) if not incapable_names.is_empty() else _prep_local("Nothing", "Yok", "Brak")
 	(input.preview as Control).call("set_appearance", _spec_appearance(spec))
 	(input.childhood_note as Label).text = [
 		_prep_local("Grew up among fields and practical work.", "Tarlalar ve günlük işler arasında büyüdü.", "Dorastał pośród pól i codziennej pracy."),
 		_prep_local("Learned to adapt to a crowded town.", "Kalabalık bir kasabada uyum sağlamayı öğrendi.", "Nauczył się żyć w zatłoczonym mieście."),
 		_prep_local("Spent their early years learning a trade.", "İlk yıllarını bir zanaat öğrenerek geçirdi.", "Młode lata spędził na nauce fachu."),
+		_prep_local("Raised as a soldier in a growth vat.", "Büyüme tankında asker olarak yetiştirildi.", "Wychowany w kadzi jako żołnierz."),
+		_prep_local("No known childhood; no effects.", "Bilinen çocukluğu yok; etkisi yok.", "Nieznane dzieciństwo; bez efektów."),
 	][int(input.childhood["index"])]
 	(input.adulthood_note as Label).text = [
 		_prep_local("Worked the land before this expedition.", "Bu yolculuktan önce toprağı işledi.", "Przed wyprawą pracował na roli."),
 		_prep_local("Helped raise and repair settlements.", "Yerleşkeler kurup onarmaya yardım etti.", "Pomagał budować i naprawiać osady."),
 		_prep_local("Cared for the injured and sick.", "Yaralılarla ve hastalarla ilgilendi.", "Opiekował się rannymi i chorymi."),
 		_prep_local("Studied and pursued new discoveries.", "Çalışıp yeni keşiflerin peşinden gitti.", "Studiował i szukał nowych odkryć."),
+		_prep_local("No known adulthood; no effects.", "Bilinen yetişkinlik geçmişi yok; etkisi yok.", "Nieznana dorosłość; bez efektów."),
 	][int(input.adulthood["index"])]
-	(input.childhood["row"] as Control).tooltip_text = (input.childhood_note as Label).text
-	(input.adulthood["row"] as Control).tooltip_text = (input.adulthood_note as Label).text
+	(input.childhood["row"] as Control).tooltip_text = ""
+	(input.adulthood["row"] as Control).tooltip_text = ""
 	for i in mini(_roster_buttons.size(), character_specs.size()):
-		var role_ids := ["farmer", "builder", "medic", "scholar"]
-		var role_names := [_prep_local("Farmer", "Çiftçi", "Rolnik"), _prep_local("Builder", "İnşaatçı", "Budowniczy"), _prep_local("Medic", "Sağlıkçı", "Medyk"), _prep_local("Scholar", "Araştırmacı", "Badacz")]
-		var role: String = str(role_names[maxi(0, role_ids.find(str(character_specs[i].get("adulthood", "farmer"))))])
-		_roster_buttons[i].text = "%s\n%s" % [str(character_specs[i].get("name", "Colonist")), role]
+		var roster_spec: Dictionary = character_specs[i]
+		var card: Button = _roster_buttons[i]
+		var roster_name := card.get_node_or_null("RosterName") as Label
+		var roster_role := card.get_node_or_null("RosterRole") as Label
+		var roster_portrait := card.get_node_or_null("RosterPortrait") as PawnPortrait
+		if roster_name != null:
+			roster_name.text = _prepared_display_name(roster_spec)
+			roster_name.tooltip_text = roster_name.text
+			card.tooltip_text = roster_name.text
+		if roster_role != null:
+			roster_role.text = _preparation_roster_role(roster_spec)
+		if roster_portrait != null:
+			roster_portrait.set_appearance(_spec_appearance(roster_spec))
 	_refresh_character_points()
 
 func _refresh_character_points() -> void:
 	if not is_instance_valid(_character_points) or character_specs.is_empty():
 		return
-	var spent := 0
-	var exceeds_limit := false
-	for spec in character_specs:
-		var person := {"traits": spec.get("trait_ids", []), "health_conditions": spec.get("condition_ids", []), "skills": spec.get("skills", {}), "starting_gear": spec.get("starting_gear", {})}
-		var personal_cost := int(Game.preparation_points(person)) if Game.has_method("preparation_points") else 0
-		spent += personal_cost
-		exceeds_limit = exceeds_limit or personal_cost > 12
-	for item_id in starting_cargo:
-		spent += int(starting_cargo[item_id]) * int(ITEM_PRICES.get(str(item_id), 1))
-	_character_points.text = _prep_local("Points Spent: %d", "Harcanan Puan: %d", "Wydane Punkty: %d") % spent
-	_character_points.add_theme_color_override("font_color", RED if point_limit_enabled and exceeds_limit else MUTED)
+	var spent := _preparation_spent_for_specs(character_specs)
+	var budget := int(Game.preparation_budget(scenario_id))
+	_character_points.text = (_prep_local("Points Remaining: %d", "Kalan Puan: %d", "Pozostałe punkty: %d") % (budget - spent)) if point_limit_enabled else (_prep_local("Points Spent: %d", "Harcanan Puan: %d", "Wydane Punkty: %d") % spent)
+	_character_points.tooltip_text = _prep_local("Scenario point limit: %d", "Senaryo puan sınırı: %d", "Limit punktów scenariusza: %d") % budget
+	_character_points.add_theme_color_override("font_color", RED if point_limit_enabled and spent > budget else MUTED)
+
+
+func _preparation_spent_for_specs(specs: Array) -> int:
+	var people: Array = []
+	for spec in specs:
+		people.append({"traits": spec.get("trait_ids", []), "health_conditions": spec.get("condition_ids", []),
+			"health_injuries": spec.get("health_injuries", []),
+			"childhood": spec.get("childhood", "rural_child"), "adulthood": spec.get("adulthood", "farmer"),
+			"skills": spec.get("skills", {}), "passions": spec.get("passions", {}), "starting_gear": spec.get("starting_gear", {})})
+	return int(Game.preparation_total_points(people, starting_cargo))
+
+
+func _preparation_random_candidate_fits(candidate: Dictionary) -> bool:
+	if not PreparationRules.preparation_injury_error({"health_conditions": candidate.get("condition_ids", []),
+		"health_injuries": candidate.get("health_injuries", [])}).is_empty():
+		return false
+	if not point_limit_enabled:
+		return true
+	var specs := character_specs.duplicate(true)
+	specs[_editing_character_index] = candidate
+	return _preparation_spent_for_specs(specs) <= int(Game.preparation_budget(scenario_id))
 
 
 func _select_character_editor(index: int) -> void:
@@ -3326,7 +6193,7 @@ func _return_to_world_from_characters() -> void:
 func _advance_to_lobby() -> void:
 	_save_character_inputs()
 	for spec in character_specs:
-		if str(spec.get("name", "")).is_empty():
+		if _prepared_display_name(spec).is_empty():
 			_notice(_prep_local("Every colonist needs a name.", "Her kolonistin bir adı olmalı.", "Każdy kolonista musi mieć imię."))
 			return
 	var prepared := _game_setup_config()
@@ -3424,7 +6291,7 @@ func _on_lobby_changed(lobby: Dictionary) -> void:
 		setup_mode = str(lobby.get("mode", "coop"))
 		setup_seed = str(lobby.get("seed", ""))
 		if character_specs.is_empty():
-			colonist_count = clampi(int(lobby.get("colonists_per_faction", 3)), 1, 3)
+			colonist_count = clampi(int(lobby.get("colonists_per_faction", 3)), 1, 8)
 		world_options = (lobby.get("world_options", {}) as Dictionary).duplicate(true)
 		scenario_id = str(lobby.get("scenario_id", "landfall"))
 		storyteller_id = str(lobby.get("storyteller_id", "steady"))
@@ -3486,11 +6353,12 @@ func _build_faction_spec() -> Dictionary:
 	var people: Array = []
 	for spec in character_specs:
 		people.append({
-			"name": str(spec.get("name", "Colonist")),
+			"name": _prepared_display_name(spec),
 			"first_name": str(spec.get("first_name", spec.get("name", "Colonist"))),
-			"nickname": str(spec.get("nickname", spec.get("name", "Colonist"))),
+			"nickname": str(spec.get("nickname", "")),
 			"last_name": str(spec.get("last_name", "")),
 			"sex": str(spec.get("sex", "female")),
+			"gender": "woman" if str(spec.get("sex", "female")) == "female" else "man",
 			"age": int(spec.get("age", 25)),
 			"chronological_age": int(spec.get("chronological_age", spec.get("age", 25))),
 			"favorite_color": str(spec.get("favorite_color", "#8d985d")),
@@ -3501,8 +6369,21 @@ func _build_faction_spec() -> Dictionary:
 			"skills": spec.get("skills", {}).duplicate(true),
 			"passions": spec.get("passions", {}).duplicate(true),
 			"health_conditions": spec.get("condition_ids", []).duplicate(),
+			"health_injuries": spec.get("health_injuries", []).duplicate(true),
 			"appearance": _spec_appearance(spec),
 			"traits": spec.get("trait_ids", []).duplicate()
+		})
+	var world_people: Array = []
+	for spec in world_character_specs:
+		world_people.append({
+			"name": _prepared_display_name(spec),
+			"first_name": str(spec.get("first_name", spec.get("name", "World person"))),
+			"nickname": str(spec.get("nickname", "")),
+			"last_name": str(spec.get("last_name", "")),
+			"sex": str(spec.get("sex", "female")),
+			"age": int(spec.get("age", 25)),
+			"chronological_age": int(spec.get("chronological_age", spec.get("age", 25))),
+			"appearance": _spec_appearance(spec)
 		})
 	return {
 		"id": 1,
@@ -3512,7 +6393,9 @@ func _build_faction_spec() -> Dictionary:
 		"site_id": selected_site_id,
 		"starting_cargo": starting_cargo.duplicate(true),
 		"players": [1],
-		"colonists": people
+		"colonists": people,
+		"world_characters": world_people,
+		"external_relationships": external_relationships.duplicate(true)
 	}
 
 
@@ -4551,27 +7434,44 @@ func _build_pawn_needs(person: Dictionary) -> void:
 
 func _build_pawn_health(person: Dictionary) -> void:
 	var health: Dictionary = person.get("health", {})
-	_pawn_detail_content.add_child(_label("Overall health  %d / %d" % [int(health.get("hp", 100)), int(health.get("max_hp", 100))], 14, CREAM))
+	_pawn_detail_content.add_child(_label(_prep_local("Overall health  %d / %d", "Genel sağlık  %d / %d", "Stan zdrowia  %d / %d") % [int(health.get("hp", 100)), int(health.get("max_hp", 100))], 14, CREAM))
 	if float(health.get("bleeding", 0)) > 0:
-		_pawn_detail_content.add_child(_label("Bleeding  %d" % int(health.get("bleeding", 0)), 13, RED))
+		_pawn_detail_content.add_child(_label(_prep_local("Bleeding  %.1f", "Kanama  %.1f", "Krwawienie  %.1f") % float(health.get("bleeding", 0)), 13, RED))
+	var pain_percent := roundi(float(health.get("pain", PreparationRules.health_pain(health))) * 100.0)
+	if pain_percent > 0:
+		_pawn_detail_content.add_child(_label(_prep_local("Pain  %d%%", "Acı  %d%%", "Ból  %d%%") % pain_percent, 13, RED))
 	var groups: Dictionary = {}
 	for wound in health.get("wounds", []):
-		var kind := str(wound.get("kind", "Wound")).capitalize()
+		var kind := _preparation_wound_label(str(wound.get("kind", "wound")))
+		var part := _preparation_body_part_label(str(wound.get("body_part", "torso")))
+		var group_key := "%s · %s" % [kind, part]
+		var cause := str(wound.get("cause", "unknown"))
+		if cause != "unknown": group_key += " · " + _preparation_injury_cause_label(cause)
 		var severity := int(wound.get("severity", 0))
-		if not groups.has(kind):
-			groups[kind] = {"count": 0, "severity": 0}
-		groups[kind]["count"] = int(groups[kind]["count"]) + 1
-		groups[kind]["severity"] = maxi(int(groups[kind]["severity"]), severity)
-	for kind in groups:
-		var count := int(groups[kind]["count"])
-		var severity := int(groups[kind]["severity"])
-		var severity_name := "Minor" if severity < 4 else "Moderate" if severity < 8 else "Severe" if severity < 12 else "Critical"
-		_pawn_detail_content.add_child(_label("%s ×%d    %s" % [kind, count, severity_name], 13, RED if severity >= 8 else CREAM))
+		if not groups.has(group_key):
+			groups[group_key] = {"count": 0, "severity": 0, "scar": str(wound.get("kind", "")) == "scar",
+				"kind": str(wound.get("kind", "")), "tier": str(wound.get("severity_tier", ""))}
+		groups[group_key]["count"] = int(groups[group_key]["count"]) + 1
+		if severity >= int(groups[group_key]["severity"]):
+			groups[group_key]["severity"] = severity
+			groups[group_key]["tier"] = str(wound.get("severity_tier", ""))
+	for group_key in groups:
+		var count := int(groups[group_key]["count"])
+		var severity := int(groups[group_key]["severity"])
+		var tier := str(groups[group_key]["tier"])
+		var severity_name := _preparation_injury_tier_label(tier, str(groups[group_key]["kind"])) if not tier.is_empty() else _prep_local("Light", "Hafif", "Lekkie") if severity <= 4 else _prep_local("Moderate", "Orta", "Średnie") if severity <= 8 else _prep_local("Severe", "Ağır", "Ciężkie")
+		if bool(groups[group_key]["scar"]): severity_name = _prep_local("Permanent", "Kalıcı", "Stała") + " · " + severity_name
+		_pawn_detail_content.add_child(_label("%s%s    %s" % [group_key, " ×%d" % count if count > 1 else "", severity_name], 13, RED if severity >= 8 else CREAM))
 	var conditions: Array = health.get("conditions", [])
 	for condition in conditions:
-		_pawn_detail_content.add_child(_label(str(condition).capitalize(), 13, MUTED))
+		if str(condition) == "scar":
+			_pawn_detail_content.add_child(_label(_prep_local("Scar · unknown body part", "Yara izi · bölge bilinmiyor", "Blizna · nieznana część ciała"), 13, MUTED))
+			continue
+		if PreparationRules.CONDITION_INJURIES.has(str(condition)):
+			continue
+		_pawn_detail_content.add_child(_label(_preparation_condition_label(str(condition)), 13, MUTED))
 	if groups.is_empty() and conditions.is_empty():
-		_pawn_detail_content.add_child(_label("No injuries or conditions.", 13, TEAL))
+		_pawn_detail_content.add_child(_label(_prep_local("No injuries or conditions.", "Yaralanma veya rahatsızlık yok.", "Brak urazów i schorzeń."), 13, TEAL))
 
 func _build_pawn_bio(person: Dictionary) -> void:
 	_pawn_detail_content.add_child(_label(_prep_local("Age %d    Sex %s", "Yaş %d    Biyolojik cinsiyet %s", "Wiek %d    Płeć %s") % [int(person.get("age", 25)), _prep_local("Female", "Kadın", "Kobieta") if str(person.get("sex", "female")) == "female" else _prep_local("Male", "Erkek", "Mężczyzna")], 13))
@@ -4601,7 +7501,7 @@ func _build_pawn_gear(person: Dictionary) -> void:
 	if int(inventory.get("spear", 0)) > 0 and str(equipment.get("weapon", "")) != "spear":
 		_pawn_detail_content.add_child(_button(_prep_local("Equip spear", "Mızrak kuşan", "Załóż włócznię"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "spear"})))
 	if int(inventory.get("jacket", 0)) > 0 and str(equipment.get("apparel", "")) != "jacket":
-		_pawn_detail_content.add_child(_button(_prep_local("Wear jacket", "Ceket giy", "Załóż kurtkę"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"})))
+		_pawn_detail_content.add_child(_button(_prep_local("Wear coat", "Kaban giy", "Załóż płaszcz"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"})))
 	if int(inventory.get("tshirt", 0)) > 0 and str(equipment.get("shirt", "")) != "tshirt":
 		_pawn_detail_content.add_child(_button(_prep_local("Wear T-shirt", "Tişört giy", "Załóż koszulkę"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "tshirt"})))
 	if int(inventory.get("pants", 0)) > 0 and str(equipment.get("pants", "")) != "pants":
@@ -4614,6 +7514,7 @@ func _build_pawn_social(person: Dictionary) -> void:
 		_pawn_detail_content.add_child(_label("No established relationships yet.", 13, MUTED))
 	var names: Dictionary = {}
 	for other in _local_colonists(_snapshot()): names[str(other.get("id", ""))] = str(other.get("name", "Colonist"))
+	for other in _snapshot().get("world_people", []): names[str(other.get("id", ""))] = str(other.get("name", "World person"))
 	for person_id in relationships:
 		var relation_type := str(relation_types.get(str(person_id), "Acquaintance")).capitalize()
 		_pawn_detail_content.add_child(_label("%s   %s   %+d" % [str(names.get(str(person_id), person_id)), relation_type, int(relationships[person_id])], 13))
@@ -5236,15 +8137,23 @@ func _build_health_tab(snapshot: Dictionary) -> void:
 	var health_row := _hbox(12)
 	action_column.add_child(health_row)
 	health_row.add_child(_label("%s %d / %d" % [_tr("tabs.health").to_upper(), int(health.get("hp", 100)), int(health.get("max_hp", 100))], 13, GOLD))
-	health_row.add_child(_label("%s %d" % [_tr("health.bleeding"), int(health.get("bleeding", 0))], 12, RED if float(health.get("bleeding", 0)) > 0 else MUTED))
+	health_row.add_child(_label("%s %.1f" % [_tr("health.bleeding"), float(health.get("bleeding", 0))], 12, RED if float(health.get("bleeding", 0)) > 0 else MUTED))
+	health_row.add_child(_label(_prep_local("Pain %d%%", "Acı %d%%", "Ból %d%%") % roundi(float(health.get("pain", PreparationRules.health_pain(health))) * 100.0), 12, RED if float(health.get("pain", 0.0)) > 0.0 else MUTED))
 	for wound in health.get("wounds", []):
-		action_column.add_child(_label(_prep_local("• %s · severity %d", "• %s · şiddet %d", "• %s · nasilenie %d") % [str(wound.get("kind", "Wound")).capitalize(), int(wound.get("severity", 0))], 12))
+		var wound_name := "%s · %s" % [_preparation_wound_label(str(wound.get("kind", "wound"))), _preparation_body_part_label(str(wound.get("body_part", "torso")))]
+		if str(wound.get("cause", "unknown")) != "unknown":
+			wound_name += " · " + _preparation_injury_cause_label(str(wound.get("cause", "unknown")))
+		var tier := _preparation_injury_tier_label(str(wound.get("severity_tier", "")), str(wound.get("kind", "")))
+		if str(wound.get("kind", "")) == "scar":
+			action_column.add_child(_label("• %s · %s%s" % [wound_name, _prep_local("permanent", "kalıcı", "stała"), " · " + tier if not tier.is_empty() else ""], 12))
+		else:
+			action_column.add_child(_label(_prep_local("• %s · severity %d", "• %s · şiddet %d", "• %s · nasilenie %d") % [wound_name, int(wound.get("severity", 0))] + (" · " + tier if not tier.is_empty() else ""), 12))
 	var equipment: Dictionary = person.get("equipment", {})
 	action_column.add_child(_label(_prep_local("Weapon: %s   Apparel: %s", "Silah: %s   Kıyafet: %s", "Broń: %s   Ubranie: %s") % [_display_item(str(equipment.get("weapon", "none"))), _display_item(str(equipment.get("apparel", "none")))], 12))
 	var buttons := _hbox(5)
 	action_column.add_child(buttons)
 	buttons.add_child(_button(_prep_local("Equip spear", "Mızrak kuşan", "Załóż włócznię"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "spear"}), false, Vector2(114, 27)))
-	buttons.add_child(_button(_prep_local("Wear jacket", "Ceket giy", "Załóż kurtkę"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"}), false, Vector2(86, 27)))
+	buttons.add_child(_button(_prep_local("Wear coat", "Kaban giy", "Załóż płaszcz"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "equip", "item": "jacket"}), false, Vector2(86, 27)))
 	buttons.add_child(_button(_prep_local("Draft: %s", "Savaş: %s", "Mobilizacja: %s") % (_tr("common.on") if bool(person.get("drafted", false)) else _tr("common.off")), func(): _send_command({"type": "set_draft", "colonist_id": person_id, "drafted": not bool(person.get("drafted", false))}), false, Vector2(105, 27)))
 	buttons.add_child(_button(_prep_local("Cancel order", "Emri iptal et", "Anuluj rozkaz"), func(): _send_command({"type": "direct", "colonist_id": person_id, "action": "clear"}), false, Vector2(110, 27)))
 

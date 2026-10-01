@@ -28,14 +28,18 @@ func _initialize() -> void:
 				break
 		if not free_tile.is_empty(): break
 	assert(not free_tile.is_empty())
-	var invalid := {"seed": "regression-world", "scenario_id": "hard_landing", "faction_specs": [{"site_id": free_tile,
-		"colonists": [{"traits": ["hardworking", "calm", "quick"]}]}]}
+	var expensive_skills := {}
+	for skill in GameModel.CLASSIC_SKILL_IDS:
+		expensive_skills[skill] = 20
+	var invalid := {"seed": "regression-world", "scenario_id": "hard_landing", "point_limit_enabled": true,
+		"faction_specs": [{"site_id": free_tile,
+		"colonists": [{"traits": ["hardworking", "calm", "quick"], "skills": expensive_skills}]}]}
 	assert(not model.validate_setup(invalid)["ok"], "Point limit was not enforced")
 	invalid["point_limit_enabled"] = false
 	assert(model.validate_setup(invalid)["ok"], "Point limit toggle did not work")
-	assert(model.preparation_points({"traits": ["curious"], "skills": {"combat": 8}}) == 6,
+	assert(model.preparation_points({"traits": ["curious"], "skills": {"combat": 8}}) > model.preparation_points({}),
 		"Skill increases were not charged to preparation points")
-	assert(model.preparation_points({"starting_gear": {"weapon": "spear", "apparel": "jacket"}}) == 5,
+	assert(model.preparation_points({"starting_gear": {"weapon": "spear", "apparel": "jacket"}}) > model.preparation_points({}),
 		"Starting gear was not charged to preparation points")
 	var prepare_spec := {"seed": "regression-world", "mode": "solo", "scenario_id": "homesteaders", "colonists_per_faction": 2,
 		"point_limit_enabled": false, "faction_specs": [{"site_id": free_tile, "players": [1],

@@ -38,17 +38,36 @@ func _run() -> void:
 	main.call("_begin_session", "solo")
 	main.call("_advance_to_world")
 	main.call("_show_characters")
+	main.set("_preparation_appearance_category", 1)
+	main.call("_show_characters")
 	var input: Dictionary = (main.get("_character_inputs") as Array)[0]
 	(input.hair.row.get_child(3) as Button).pressed.emit()
 	(input.hair.row.get_child(3) as Button).pressed.emit()
-	assert(int((main.get("character_specs") as Array)[0]["hair_index"]) == 2)
+	assert(int((main.get("character_specs") as Array)[0]["hair_index"]) == 4)
+	assert(str((main.get("character_specs") as Array)[0]["hair_style"]) == "wavy")
+	main.set("_preparation_appearance_category", 2)
+	main.call("_show_characters")
+	input = (main.get("_character_inputs") as Array)[0]
 	(input.body_type.row.get_child(3) as Button).pressed.emit()
 	assert(int((main.get("character_specs") as Array)[0]["body_type"]) == 1)
 	(input.childhood.row.get_child(3) as Button).pressed.emit()
 	assert(str((main.get("character_specs") as Array)[0]["childhood"]) == "town_child")
-	var add_trait := _find_menu(main, "Add trait")
+	var add_trait: Button = null
+	for candidate in main.find_children("*", "Button", true, false):
+		if (candidate as Button).tooltip_text == "Add trait":
+			add_trait = candidate as Button
+			break
 	assert(add_trait != null)
-	add_trait.get_popup().id_pressed.emit(3)
+	add_trait.pressed.emit()
+	var trait_dialog := main.find_child("PreparationOptionDialog", true, false)
+	assert(trait_dialog != null)
+	var quick_row: Button = null
+	for candidate in trait_dialog.find_children("*", "Button", true, false):
+		if (candidate as Button).text == "Quick":
+			quick_row = candidate as Button
+			break
+	assert(quick_row != null)
+	quick_row.pressed.emit()
 	assert((main.get("character_specs") as Array)[0]["trait_ids"].has("quick"))
 	var remove := _find_remove(main)
 	assert(remove != null)
@@ -62,9 +81,11 @@ func _run() -> void:
 	main.call("_set_starting_gear", "pants", "none")
 	assert(str((main.get("character_specs") as Array)[0]["starting_gear"]["shirt"]) == "none")
 	main.call("_switch_preparation_tab", "relationships")
-	var add_bond := _find_menu(main, "Add relationship")
+	var add_bond := main.find_child("PreparationBondPicker_c_0_c_1", true, false) as MenuButton
 	assert(add_bond != null)
-	add_bond.get_popup().id_pressed.emit(0)
+	add_bond.get_popup().id_pressed.emit(1)
+	assert(main.call("_preparation_family_relation", 0, 1) == "child")
+	assert(main.call("_preparation_family_relation", 1, 2) == "none")
 	var bond_picker := _find_menu(main, "Change relationship")
 	assert(bond_picker != null)
 	bond_picker.get_popup().id_pressed.emit(6)
